@@ -1,0 +1,16 @@
+                Welcome to Metro v0.80.9
+              Fast - Scalable - Integrated
+
+
+TypeError [ERR_INVALID_ARG_TYPE]: The "paths[1]" argument must be of type string. Received undefined
+    at Object.resolve (node:path:1186:7)
+    at /home/vian/Apps/swift-chat-main/react-native/node_modules/metro/src/IncrementalBundler.js:244:12
+    at Array.map (<anonymous>)
+    at IncrementalBundler._getAbsoluteEntryFiles (/home/vian/Apps/swift-chat-main/react-native/node_modules/metro/src/IncrementalBundler.js:243:43)
+    at IncrementalBundler.buildGraphForEntries (/home/vian/Apps/swift-chat-main/react-native/node_modules/metro/src/IncrementalBundler.js:53:43)
+    at IncrementalBundler.buildGraph (/home/vian/Apps/swift-chat-main/react-native/node_modules/metro/src/IncrementalBundler.js:134:30)
+    at Server.build (/home/vian/Apps/swift-chat-main/react-native/node_modules/metro/src/Server.js:92:52)
+    at Object.buildBundle [as build] (/home/vian/Apps/swift-chat-main/react-native/node_modules/metro/src/shared/output/bundle.flow.js:7:25)
+    at buildBundleWithConfig (/home/vian/Apps/swift-chat-main/react-native/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/buildBundle.js:88:37)
+    at Object.buildBundle [as func] (/home/vian/Apps/swift-chat-main/react-native/node_modules/@react-native/community-cli-plugin/dist/commands/bundle/buildBundle.js:42:10)
+info Run CLI with --verbose flag for more details.
