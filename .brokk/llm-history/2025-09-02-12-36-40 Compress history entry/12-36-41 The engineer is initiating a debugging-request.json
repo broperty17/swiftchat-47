@@ -1,0 +1,31 @@
+{
+  "messages" : [ {
+    "text" : "You are an expert software engineer that generates concise summaries of code-related text.\n\nReply only with the summary, without any additional text, explanations, or line breaks.\n"
+  }, {
+    "name" : null,
+    "contents" : [ {
+      "text" : "Give a detailed but concise summary of this task.\nA third party should be able to understand what happened without reference to the original.\nFocus on information that would be useful for someone doing further work on the project described in the task.\n\nHere is the task to summarize. Do not include XML tags or other markup.\n<task sequence=3>\n  <message type=ai>\n    \n    # Planning\n    I need to understand what specific debugging issue needs to be addressed. The goal is simply \"debug this program\" but there's no indication of what problem exists. Let me search for common debugging indicators like error messages, TODO comments, or failing tests.\n    Tool call(s): `callSearchAgent`, `callSearchAgent`, `callSearchAgent`\n  </message>\n</task>\n\n"
+    } ]
+  } ],
+  "parameters" : {
+    "modelName" : null,
+    "temperature" : null,
+    "topP" : null,
+    "frequencyPenalty" : null,
+    "presencePenalty" : null,
+    "maxOutputTokens" : null,
+    "stopSequences" : [ ],
+    "toolSpecifications" : [ ],
+    "toolChoice" : null,
+    "responseFormat" : null,
+    "maxCompletionTokens" : null,
+    "logitBias" : { },
+    "parallelToolCalls" : null,
+    "seed" : null,
+    "user" : null,
+    "store" : null,
+    "metadata" : { },
+    "serviceTier" : null,
+    "reasoningEffort" : null
+  }
+}

@@ -10,14 +10,16 @@ export type DrawerParamList = {
   };
 }; 
   
-  export type RouteParamList = {
-    Drawer: {
-    screen?: keyof DrawerParamList;
-    params?: DrawerParamList[keyof DrawerParamList];
-  } | undefined;
-  TokenUsage: NonNullable<unknown>;
-  Prompt: {
-    prompt?: SystemPrompt;
-  };
-  PresetPrompts: NonNullable<unknown>;
+export type RouteParamList = {
+  Drawer: {
+  screen?: keyof DrawerParamList;
+  params?: DrawerParamList[keyof DrawerParamList];
+} | undefined;
+TokenUsage: NonNullable<unknown>;
+Prompt: {
+  prompt?: SystemPrompt;
+};
+PresetPrompts: NonNullable<unknown>;
+WebView: NonNullable<unknown>;
+Maps: NonNullable<unknown>;
 };

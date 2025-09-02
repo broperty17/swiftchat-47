@@ -74,9 +74,25 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.broperty.app4"
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
+    packagingOptions {
+        pickFirst 'lib/x86/libc++_shared.so'
+        pickFirst 'lib/x86_64/libc++_shared.so'
+        pickFirst 'lib/armeabi-v7a/libc++_shared.so'
+        pickFirst 'lib/arm64-v8a/libc++_shared.so'
+    }
+
+    namespace "com.broperty.app5"
     defaultConfig {
-        applicationId "com.broperty.app4"
+        applicationId "com.broperty.app5"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
@@ -85,8 +101,9 @@ android {
         buildConfigField "boolean", "IS_HERMES_ENABLED", hermesEnabled.toString()
         ndk {
             //noinspection ChromeOsAbiSupport
-            abiFilters 'arm64-v8a'
+            abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
         }
+        multiDexEnabled true
     }
 
     signingConfigs {
@@ -97,7 +114,10 @@ android {
             keyPassword "BropertyRelease2024"
         }
     }
-   buildTypes {
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
         release {
             signingConfig signingConfigs.release
             minifyEnabled enableProguardInReleaseBuilds
@@ -118,8 +138,10 @@ android {
 }
 
 dependencies {
-    // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
+    implementation("androidx.multidex:multidex:2.0.1")
+    implementation("com.google.android.gms:play-services-maps:17.0.1")
+    
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
     } else {

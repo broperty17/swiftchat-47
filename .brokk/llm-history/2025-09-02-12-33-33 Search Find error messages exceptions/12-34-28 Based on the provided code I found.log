@@ -1,0 +1,1227 @@
+# Request to claude-4-sonnet:
+
+<message type=system>
+  You are a code expert extracting ALL information relevant to the given goal
+  from the provided tool call result.
+  
+  Your output will be given to the agent running the search, and replaces the raw result.
+  Thus, you must include every relevant class/method name and any
+  relevant code snippets that may be needed later. DO NOT speculate; only use the provided content.
+</message>
+
+<message type=user>
+  <goal>
+  Find error messages, exceptions, TODO comments, FIXME comments, or failing tests that indicate debugging issues
+  </goal>
+  <reasoning>
+  
+  </reasoning>
+  <tool name="getFileContents">
+  <file name="react-native/ios/Services/ConversationManager.swift">
+  //
+  //  ConversationManager.swift
+  //  SwiftChat
+  //
+  //  Created on 2025/4/10.
+  //
+  
+  import Foundation
+  
+  class ConversationManager {
+      // Services
+      private var audioManager: AudioManager!
+      private var novaSonicService: NovaSonicService?
+      
+      // State
+      private var isInitialized = false
+      private var currentAudioURL: URL?
+      
+      // Callbacks
+      var onTranscriptReceived: ((String, String) -> Void)?
+      var onError: ((Error) -> Void)?
+      var onAudioLevelChanged: ((String, Int) -> Void)? // Callback for audio level changes
+      
+      // MARK: - Initialization
+      
+      func updateCredentials(region: String, accessKey: String, secretKey: String, sessionToken: String? = nil) {
+          novaSonicService?.updateCredentials(accessKey: accessKey, secretKey: secretKey, sessionToken: sessionToken)
+      }
+      
+      func initialize(region: String, accessKey: String, secretKey: String, sessionToken: String? = nil) async throws {
+          guard !isInitialized else { return }
+          // Initialize NovaSonic service
+          novaSonicService = NovaSonicService(region: region, accessKey: accessKey, secretKey: secretKey, sessionToken: sessionToken)
+          audioManager = novaSonicService?.audioManager
+          // Set up callbacks
+          setupCallbacks()
+          
+          isInitialized = true
+      }
+      
+      private func setupCallbacks() {
+          audioManager.onError = { [weak self] error in
+              self?.handleError(error)
+          }
+          
+          // Set up audio level callback
+          audioManager.onAudioLevelChanged = { [weak self] source, level in
+              self?.onAudioLevelChanged?(source, level)
+          }
+          
+          novaSonicService?.onTranscriptReceived = { [weak self] role, text in
+              self?.onTranscriptReceived?(role, text)
+          }
+          
+          novaSonicService?.onAudioReceived = { [weak self] audioData in
+              self?.handleAudioReceived(audioData)
+          }
+          
+          novaSonicService?.onError = { [weak self] error in
+              self?.handleError(error)
+          }
+      }
+      
+      // MARK: - Conversation Management
+      
+      func startConversation(systemPrompt: String, voiceId: String, allowInterruption: Bool) async throws {
+          guard isInitialized, let novaSonicService = novaSonicService else {
+              throw NSError(domain: "ConversationError", code: -1, userInfo: [NSLocalizedDescriptionKey: "Service not initialized"])
+          }
+          
+          do {
+              // Start session with system prompt and voice ID
+              try await novaSonicService.startSession(systemPrompt: systemPrompt, voiceId: voiceId, allowInterruption: allowInterruption)
+              // Automatically start listening
+          } catch {
+              print("❌ Start Conversation error", error)
+              handleError(error)
+              throw error
+          }
+      }
+      
+      func endConversation() async throws {
+          guard isInitialized, let novaSonicService = novaSonicService else {
+              return
+          }
+          print("start endConversation")
+          do {
+              // Stop any ongoing audio playback
+              audioManager.stopPlayback()
+          
+              // Stop microphone capture
+              try await novaSonicService.endAudioInput()
+            
+              // Send end session events
+              try await novaSonicService.endSession()
+            
+              // Deactivate audio session
+              try audioManager.deactivateAudioSession()
+          } catch {
+              print("❌ End Conversation error", error)
+              handleError(error)
+              throw error
+          }
+      }
+      
+      // MARK: - Event Handlers
+      private func handleAudioReceived(_ audioData: Data) {
+          do {
+              try audioManager.playAudio(data: audioData)
+          } catch {
+              print("❌ Error playing audio in AudioManager: \(error)")
+              handleError(error)
+          }
+      }
+      
+      private func handleError(_ error: Error) {
+          onError?(error)
+      }
+  }
+  
+  </file>
+  
+  <file name="react-native/src/api/bedrock-api.ts">
+  import {
+    AllModel,
+    BedrockChunk,
+    ChatMode,
+    ImageRes,
+    Model,
+    ModelTag,
+    SystemPrompt,
+    TokenResponse,
+    UpgradeInfo,
+    Usage,
+  } from '../types/Chat.ts';
+  import {
+    getApiKey,
+    getApiUrl,
+    getDeepSeekApiKey,
+    getImageModel,
+    getImageSize,
+    getOpenAIApiKey,
+    getOpenAICompatApiURL,
+    getRegion,
+    getTextModel,
+    getThinkingEnabled,
+    saveTokenInfo,
+  } from '../storage/StorageUtils.ts';
+  import { saveImageToLocal } from '../chat/util/FileUtils.ts';
+  import {
+    BedrockMessage,
+    ImageContent,
+    ImageInfo,
+    TextContent,
+  } from '../chat/util/BedrockMessageConvertor.ts';
+  import { invokeOpenAIWithCallBack } from './open-api.ts';
+  import { invokeOllamaWithCallBack } from './ollama-api.ts';
+  import { BedrockThinkingModels } from '../storage/Constants.ts';
+  import { getModelTag } from '../utils/ModelUtils.ts';
+  
+  type CallbackFunction = (
+    result: string,
+    complete: boolean,
+    needStop: boolean,
+    usage?: Usage,
+    reasoning?: string
+  ) => void;
+  export const isDev = false;
+  export const invokeBedrockWithCallBack = async (
+    messages: BedrockMessage[],
+    chatMode: ChatMode,
+    prompt: SystemPrompt | null,
+    shouldStop: () => boolean,
+    controller: AbortController,
+    callback: CallbackFunction
+  ) => {
+    const currentModelTag = getModelTag(getTextModel());
+    if (chatMode === ChatMode.Text && currentModelTag !== ModelTag.Bedrock) {
+      if (
+        currentModelTag === ModelTag.Broperty &&
+        getDeepSeekApiKey().length === 0
+      ) {
+        callback('Please configure your DeepSeek API Key', true, true);
+        return;
+      }
+      if (currentModelTag === ModelTag.OpenAI && getOpenAIApiKey().length === 0) {
+        callback('Please configure your OpenAI API Key', true, true);
+        return;
+      }
+      if (
+        currentModelTag === ModelTag.OpenAICompatible &&
+        getOpenAICompatApiURL().length === 0
+      ) {
+        callback('Please configure your OpenAI Compatible API URL', true, true);
+        return;
+      }
+      if (currentModelTag === ModelTag.Ollama) {
+        await invokeOllamaWithCallBack(
+          messages,
+          prompt,
+          shouldStop,
+          controller,
+          callback
+        );
+      } else {
+        await invokeOpenAIWithCallBack(
+          messages,
+          prompt,
+          shouldStop,
+          controller,
+          callback
+        );
+      }
+      return;
+    }
+    if (!isConfigured()) {
+      callback('Please configure your API URL and API Key', true, true);
+      return;
+    }
+      if (chatMode === ChatMode.Text) {
+      const bodyObject = {
+        messages: messages,
+        modelId: getTextModel().modelId,
+        region: getRegion(),
+        enableThinking: isEnableThinking(),
+        system: prompt ? [{ text: prompt?.prompt }] : undefined,
+        botId: prompt?.id,  // Kirim ID bot ke server
+      };
+      if (prompt?.includeHistory === false) {
+        bodyObject.messages = messages.slice(-1);
+      }
+  
+      const options = {
+        method: 'POST',
+        headers: {
+          accept: '*/*',
+          'content-type': 'application/json',
+          Authorization: 'Bearer ' + getApiKey(),
+        },
+        body: JSON.stringify(bodyObject),
+        signal: controller.signal,
+        reactNative: { textStreaming: true },
+      };
+      const url = getApiPrefix() + '/converse/v3';
+      let completeMessage = '';
+      let completeReasoning = '';
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
+      fetch(url!, options)
+        .then(response => {
+          return response.body;
+        })
+        .then(async body => {
+          clearTimeout(timeoutId);
+          if (!body) {
+            return;
+          }
+          const reader = body.getReader();
+          const decoder = new TextDecoder();
+          let appendTimes = 0;
+          while (true) {
+            if (shouldStop()) {
+              await reader.cancel();
+              if (completeMessage === '') {
+                completeMessage = '...';
+              }
+              callback(completeMessage, true, true, undefined, completeReasoning);
+              return;
+            }
+  
+            try {
+              const { done, value } = await reader.read();
+              const chunk = decoder.decode(value, { stream: true });
+              const bedrockChunk = parseChunk(chunk);
+              if (bedrockChunk) {
+                if (bedrockChunk.reasoning) {
+                  completeReasoning += bedrockChunk.reasoning ?? '';
+                  callback(
+                    completeMessage,
+                    false,
+                    false,
+                    undefined,
+                    completeReasoning
+                  );
+                }
+                if (bedrockChunk.text) {
+                  completeMessage += bedrockChunk.text ?? '';
+                  appendTimes++;
+                  if (appendTimes > 5000 && appendTimes % 2 === 0) {
+                    continue;
+                  }
+                  callback(
+                    completeMessage,
+                    false,
+                    false,
+                    undefined,
+                    completeReasoning
+                  );
+                }
+                if (bedrockChunk.usage) {
+                  bedrockChunk.usage.modelName = getTextModel().modelName;
+                  callback(
+                    completeMessage,
+                    false,
+                    false,
+                    bedrockChunk.usage,
+                    completeReasoning
+                  );
+                }
+              }
+              if (done) {
+                callback(
+                  completeMessage,
+                  true,
+                  false,
+                  undefined,
+                  completeReasoning
+                );
+                return;
+              }
+            } catch (readError) {
+              console.log('Error reading stream:', readError);
+              if (completeMessage === '') {
+                completeMessage = '...';
+              }
+              callback(completeMessage, true, true, undefined, completeReasoning);
+              return;
+            }
+          }
+        })
+        .catch(error => {
+          clearTimeout(timeoutId);
+          if (shouldStop()) {
+            if (completeMessage === '') {
+              completeMessage = '...';
+            }
+            callback(completeMessage, true, true, undefined, completeReasoning);
+          } else {
+            let errorMsg = String(error);
+            if (errorMsg.endsWith('AbortError: Aborted')) {
+              errorMsg = 'Timed out';
+            }
+            if (errorMsg.indexOf('http') >= 0) {
+              errorMsg = 'Unable to resolve host';
+            }
+            const errorInfo = 'Request error: ' + errorMsg;
+            callback(completeMessage + '\n\n' + errorInfo, true, true);
+            console.log(errorInfo);
+          }
+        });
+    } else {
+      const imagePrompt = (
+        messages[messages.length - 1].content[0] as TextContent
+      ).text;
+      let image: ImageInfo | undefined;
+      if (messages[messages.length - 1].content[1]) {
+        image = (messages[messages.length - 1].content[1] as ImageContent).image;
+      }
+  
+      const imageRes = await genImage(imagePrompt, controller, image);
+      if (imageRes.image.length > 0) {
+        const localFilePath = await saveImageToLocal(imageRes.image);
+        const imageSize = getImageSize().split('x')[0].trim();
+        const usage: Usage = {
+          modelName: getImageModel().modelName,
+          inputTokens: 0,
+          outputTokens: 0,
+          totalTokens: 0,
+          smallImageCount: 0,
+          imageCount: 0,
+          largeImageCount: 0,
+        };
+        if (imageSize === '512') {
+          usage.smallImageCount = 1;
+        } else if (imageSize === '1024') {
+          usage.imageCount = 1;
+        } else if (imageSize === '2048') {
+          usage.largeImageCount = 1;
+        }
+        if (localFilePath) {
+          callback(`![](${localFilePath})`, true, false, usage);
+        }
+      } else {
+        if (imageRes.error.endsWith('AbortError: Aborted')) {
+          if (shouldStop()) {
+            imageRes.error = 'Request canceled';
+          } else {
+            imageRes.error = 'Request timed out';
+          }
+        }
+        if (imageRes.error.indexOf('http') >= 0) {
+          imageRes.error = 'Request error: Unable to resolve host';
+        }
+        callback(imageRes.error, true, true);
+      }
+    }
+  };
+  
+  export const requestAllModels = async (): Promise<AllModel> => {
+    if (getApiUrl() === '') {
+      return { imageModel: [], textModel: [] };
+    }
+    const controller = new AbortController();
+    const url = getApiPrefix() + '/models';
+    const bodyObject = {
+      region: getRegion(),
+    };
+    const options = {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json',
+        Authorization: 'Bearer ' + getApiKey(),
+      },
+      body: JSON.stringify(bodyObject),
+      reactNative: { textStreaming: true },
+    };
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    try {
+      const response = await fetch(url, options);
+      clearTimeout(timeoutId);
+      if (!response.ok) {
+        console.log(`HTTP error! status: ${response.status}`);
+        return { imageModel: [], textModel: [] };
+      }
+      const allModel = await response.json();
+      allModel.imageModel = allModel.imageModel.map((item: Model) => ({
+        modelId: item.modelId,
+        modelName: item.modelName,
+        modelTag: ModelTag.Bedrock,
+      }));
+      allModel.textModel = allModel.textModel.map((item: Model) => ({
+        modelId: item.modelId,
+        modelName: item.modelName,
+        modelTag: ModelTag.Bedrock,
+      }));
+      return allModel;
+    } catch (error) {
+      console.log('Error fetching models:', error);
+      clearTimeout(timeoutId);
+      return { imageModel: [], textModel: [] };
+    }
+  };
+  
+  export const requestToken = async (): Promise<TokenResponse | null> => {
+    if (getApiUrl() === '') {
+      return null;
+    }
+  
+    const url = getApiPrefix() + '/token';
+    const bodyObject = {
+      region: getRegion(),
+    };
+  
+    const options = {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json',
+        Authorization: 'Bearer ' + getApiKey(),
+      },
+      body: JSON.stringify(bodyObject),
+      reactNative: { textStreaming: true },
+    };
+  
+    try {
+      const response = await fetch(url, options);
+      if (!response.ok) {
+        console.log(`HTTP error! status: ${response.status}`);
+        return null;
+      }
+  
+      const tokenResponse = (await response.json()) as TokenResponse;
+      saveTokenInfo(tokenResponse);
+      return tokenResponse;
+    } catch (error) {
+      console.log('Error fetching token:', error);
+      return null;
+    }
+  };
+  
+  export const requestUpgradeInfo = async (
+    os: string,
+    version: string
+  ): Promise<UpgradeInfo> => {
+    const url = getApiPrefix() + '/upgrade';
+    const options = {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json',
+        Authorization: 'Bearer ' + getApiKey(),
+      },
+      body: JSON.stringify({
+        os: os,
+        version: version,
+      }),
+      reactNative: { textStreaming: true },
+    };
+  
+    try {
+      const response = await fetch(url, options);
+      return await response.json();
+    } catch (error) {
+      console.log('Error fetching upgrade info:', error);
+      return { needUpgrade: false, version: '', url: '' };
+    }
+  };
+  
+  export const genImage = async (
+    imagePrompt: string,
+    controller: AbortController,
+    image?: ImageInfo
+  ): Promise<ImageRes> => {
+    if (!isConfigured()) {
+      return {
+        image: '',
+        error: 'Please configure your API URL and API Key',
+      };
+    }
+    const url = getApiPrefix() + '/image';
+    const imageSize = getImageSize().split('x');
+    const width = imageSize[0].trim();
+    const height = imageSize[1].trim();
+    const bodyObject = {
+      prompt: imagePrompt,
+      refImages: image ? [image] : undefined,
+      modelId: getImageModel().modelId,
+      region: getRegion(),
+      width: width,
+      height: height,
+    };
+    const options = {
+      method: 'POST',
+      headers: {
+        accept: '*/*',
+        'content-type': 'application/json',
+        Authorization: 'Bearer ' + getApiKey(),
+      },
+      body: JSON.stringify(bodyObject),
+      signal: controller.signal,
+      reactNative: { textStreaming: true },
+    };
+  
+    try {
+      const timeoutMs = parseInt(width, 10) >= 1024 ? 120000 : 90000;
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      const response = await fetch(url, options);
+      if (!response.ok) {
+        const responseJson = await response.json();
+        const errMsg = responseJson.detail.includes(
+          "You don't have access to the model"
+        )
+          ? responseJson.detail +
+            ' Please enable your `Nova Lite` model in the US region to support generating images with Chinese prompts.'
+          : responseJson.detail;
+        console.log(errMsg);
+        return {
+          image: '',
+          error: errMsg,
+        };
+      }
+      const data = await response.json();
+      clearTimeout(timeoutId);
+      if (data.error) {
+        console.log(data.error);
+        return {
+          image: '',
+          error: data.error,
+        };
+      }
+      if (data.image && data.image.length > 0) {
+        return {
+          image: data.image,
+          error: '',
+        };
+      }
+      return {
+        image: '',
+        error: 'image is empty',
+      };
+    } catch (error) {
+      const errMsg = `Error fetching image: ${error}`;
+      console.log(errMsg);
+      return {
+        image: '',
+        error: errMsg,
+      };
+    }
+  };
+  
+  function parseChunk(rawChunk: string) {
+    if (rawChunk.length > 0) {
+      const dataChunks = rawChunk.split('\n\n');
+      if (dataChunks.length > 0) {
+        let combinedReasoning = '';
+        let combinedText = '';
+        let lastUsage;
+        for (let i = 0; i < dataChunks.length; i++) {
+          const part = dataChunks[i];
+          if (part.length === 0) {
+            continue;
+          }
+          try {
+            const chunk: BedrockChunk = JSON.parse(part);
+            const content = extractChunkContent(chunk, rawChunk);
+            if (content.reasoning) {
+              combinedReasoning += content.reasoning;
+            }
+            if (content.text) {
+              combinedText += content.text;
+            }
+            if (content.usage) {
+              lastUsage = content.usage;
+            }
+          } catch (innerError) {
+            console.log('DataChunk parse error:' + innerError, part);
+            return {
+              reasoning: combinedReasoning,
+              text: rawChunk,
+              usage: lastUsage,
+            };
+          }
+        }
+        return {
+          reasoning: combinedReasoning,
+          text: combinedText,
+          usage: lastUsage,
+        };
+      }
+    }
+    return null;
+  }
+  
+  /**
+   * Helper function to extract content from a BedrockChunk
+   */
+  function extractChunkContent(bedrockChunk: BedrockChunk, rawChunk: string) {
+    const reasoning =
+      bedrockChunk?.contentBlockDelta?.delta?.reasoningContent?.text;
+    let text = bedrockChunk?.contentBlockDelta?.delta?.text;
+    const usage = bedrockChunk?.metadata?.usage;
+    if (bedrockChunk?.detail) {
+      text = rawChunk;
+    }
+    return { reasoning, text, usage };
+  }
+  
+  function getApiPrefix(): string {
+    if (isDev) {
+      return 'http://localhost:8080/api';
+    } else {
+      return getApiUrl() + '/api';
+    }
+  }
+  
+  const isEnableThinking = (): boolean => {
+    return isThinkingModel() && getThinkingEnabled();
+  };
+  
+  const isThinkingModel = (): boolean => {
+    const textModelName = getTextModel().modelName;
+    return BedrockThinkingModels.includes(textModelName);
+  };
+  
+  function isConfigured(): boolean {
+    return getApiPrefix().startsWith('http') && getApiKey().length > 0;
+  }
+  
+  </file>
+  
+  <file name="react-native/src/chat/service/VoiceChatService.ts">
+  import {
+    NativeModules,
+    NativeEventEmitter,
+    EmitterSubscription,
+  } from 'react-native';
+  import { DefaultVoicePrompt } from '../../storage/Constants';
+  import {
+    getCurrentVoiceSystemPrompt,
+    getVoiceId,
+    isTokenValid,
+    getTokenInfo,
+    getRegion,
+  } from '../../storage/StorageUtils.ts';
+  import { requestToken } from '../../api/bedrock-api.ts';
+  import { TokenResponse } from '../../types/Chat.ts';
+  
+  const { VoiceChatModule } = NativeModules;
+  const voiceChatEmitter = VoiceChatModule
+    ? new NativeEventEmitter(VoiceChatModule)
+    : null;
+  
+  export class VoiceChatService {
+    private isInitialized = false;
+    private subscriptions: EmitterSubscription[] = [];
+    private onTranscriptReceivedCallback?: (role: string, text: string) => void;
+    private onErrorCallback?: (message: string) => void;
+    private onAudioLevelChangedCallback?: (source: string, level: number) => void;
+  
+    constructor() {
+      this.setupEventListeners();
+    }
+  
+    /**
+     * Set callbacks for voice chat events
+     * @param onTranscriptReceived Callback when transcript is received
+     * @param onError Callback when error occurs
+     */
+    public setCallbacks(
+      onTranscriptReceived?: (role: string, text: string) => void,
+      onError?: (message: string) => void
+    ) {
+      this.onTranscriptReceivedCallback = onTranscriptReceived;
+      this.onErrorCallback = onError;
+    }
+  
+    /**
+     * Set OnAudioLevelCallback for voice chat events
+     * @param onAudioLevelChanged Callback when audio level changes
+     */
+    public setOnAudioLevelCallbacks(
+      onAudioLevelChanged?: (source: string, level: number) => void
+    ) {
+      this.onAudioLevelChangedCallback = onAudioLevelChanged;
+    }
+  
+    /**
+     * Setup event listeners for voice chat events
+     */
+    private setupEventListeners() {
+      if (voiceChatEmitter) {
+        const transcriptSubscription = voiceChatEmitter.addListener(
+          'onTranscriptReceived',
+          event => {
+            if (this.onTranscriptReceivedCallback) {
+              this.onTranscriptReceivedCallback(event.role, event.text);
+            }
+          }
+        );
+  
+        const errorSubscription = voiceChatEmitter.addListener(
+          'onError',
+          event => {
+            if (this.onErrorCallback) {
+              let errorMsg = event.message ?? '';
+              if (errorMsg.includes('The network connection was lost')) {
+                errorMsg = '\n**The network connection was lost**';
+              } else if (errorMsg.includes('The request timed out')) {
+                errorMsg = '\n**The request timed out**';
+              } else if (errorMsg.includes('messages cannot be null or empty')) {
+                errorMsg = '\n**Messages cannot be null or empty**';
+              } else if (
+                errorMsg.includes('Timed out waiting for input events')
+              ) {
+                errorMsg = '\n**Timed out waiting for input events**';
+              } else if (
+                errorMsg.includes('The operation couldn’t be completed')
+              ) {
+                errorMsg = '\n**The operation couldn’t be completed**';
+              } else if (
+                errorMsg.includes(
+                  'The system encountered an unexpected error during processing. Try your request again.'
+                )
+              ) {
+                errorMsg =
+                  '\n**The system encountered an unexpected error during processing. Try your request again.**';
+              } else if (
+                errorMsg.includes('closed stream. HTTP/2 error code: NO_ERROR')
+              ) {
+                errorMsg = '\n**Stream Closed With NO_ERROR**';
+              }
+              this.onErrorCallback(errorMsg);
+            }
+          }
+        );
+  
+        const audioLevelSubscription = voiceChatEmitter.addListener(
+          'onAudioLevelChanged',
+          event => {
+            if (this.onAudioLevelChangedCallback) {
+              this.onAudioLevelChangedCallback(event.source, event.level);
+            }
+          }
+        );
+  
+        this.subscriptions = [
+          transcriptSubscription,
+          errorSubscription,
+          audioLevelSubscription,
+        ];
+      }
+    }
+  
+    /**
+     * Get new AWS credentials configuration, requesting a new token if needed
+     * @returns Promise<object | null> Configuration object with AWS credentials or null if not available
+     */
+    private async getValidConfig(): Promise<object | null> {
+      // Request new token
+      let tokenInfo: TokenResponse | null;
+      if (!isTokenValid()) {
+        tokenInfo = await requestToken();
+        if (!tokenInfo) {
+          if (this.onErrorCallback) {
+            this.onErrorCallback('Failed to get credentials');
+          }
+        }
+        if (tokenInfo?.error) {
+          if (this.onErrorCallback) {
+            this.onErrorCallback(tokenInfo.error);
+          }
+        }
+      } else {
+        tokenInfo = getTokenInfo();
+        if (!tokenInfo) {
+          if (this.onErrorCallback) {
+            this.onErrorCallback('AWS credentials not available');
+          }
+        }
+      }
+      if (!tokenInfo) {
+        return null;
+      }
+      // Create and return config
+      return {
+        region: getRegion(),
+        accessKey: tokenInfo.accessKeyId,
+        secretKey: tokenInfo.secretAccessKey,
+        sessionToken: tokenInfo.sessionToken,
+      };
+    }
+  
+    /**
+     * Initialize voice chat module with AWS credentials
+     * @returns Promise<boolean> True if initialization is successful
+     */
+    public async initialize(): Promise<boolean> {
+      if (!VoiceChatModule) {
+        if (this.onErrorCallback) {
+          this.onErrorCallback('Voice chat module not available');
+        }
+        return false;
+      }
+      if (this.isInitialized) {
+        return true;
+      }
+  
+      try {
+        // Get credentials config (will request new token if needed)
+        const config = await this.getValidConfig();
+        if (!config) {
+          return false;
+        }
+        await VoiceChatModule.initialize(config);
+        this.isInitialized = true;
+        return true;
+      } catch (err: unknown) {
+        if (this.onErrorCallback) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          this.onErrorCallback(`Initialization failed: ${errorMessage}`);
+        }
+        return false;
+      }
+    }
+  
+    /**
+     * Start a new conversation
+     * @returns Promise<boolean> True if starting conversation is successful
+     */
+    public async startConversation(): Promise<boolean> {
+      if (!VoiceChatModule) {
+        if (this.onErrorCallback) {
+          this.onErrorCallback('Voice chat module not available');
+        }
+        return false;
+      }
+  
+      try {
+        // Ensure module is initialized
+        const voiceSystemPrompt = getCurrentVoiceSystemPrompt();
+        if (!this.isInitialized) {
+          const initSuccess = await this.initialize();
+          if (!initSuccess) {
+            return false;
+          }
+        } else {
+          const config = await this.getValidConfig();
+          if (!config) {
+            return false;
+          }
+          await VoiceChatModule.updateCredentials(config);
+        }
+  
+        // Start conversation with system prompt and voice ID
+        const systemPrompt = voiceSystemPrompt?.prompt ?? DefaultVoicePrompt;
+        const voiceId = getVoiceId();
+        await VoiceChatModule.startConversation(
+          systemPrompt,
+          voiceId,
+          voiceSystemPrompt?.allowInterruption ?? true
+        );
+        return true;
+      } catch (err: unknown) {
+        if (this.onErrorCallback) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          this.onErrorCallback(`Operation failed: ${errorMessage}`);
+        }
+        return false;
+      }
+    }
+  
+    /**
+     * End the current conversation
+     * @returns Promise<boolean> True if ending conversation is successful
+     */
+    public async endConversation(): Promise<boolean> {
+      if (!VoiceChatModule || !this.isInitialized) {
+        return false;
+      }
+  
+      try {
+        await VoiceChatModule.endConversation();
+        return true;
+      } catch (err: unknown) {
+        if (this.onErrorCallback) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          this.onErrorCallback(`Failed to end conversation: ${errorMessage}`);
+        }
+        return false;
+      }
+    }
+  
+    /**
+     * Clean up event listeners
+     */
+    public cleanup() {
+      this.subscriptions.forEach(subscription => subscription.remove());
+      this.subscriptions = [];
+    }
+  }
+  
+  // Create singleton instance
+  export const voiceChatService = new VoiceChatService();
+  
+  </file>
+  
+  <file name="server/src/image_nl_processor.py">
+  import random
+  import json
+  from fastapi import HTTPException
+  
+  
+  def get_native_request_with_ref_image(client, prompt, ref_images, width, height):
+      result = get_analyse_result(client, prompt, get_prompt())
+      try:
+          result_objet = json.loads(result)
+          seed = random.randint(0, 2147483647)
+          if result_objet['target_task_type'] == 'BACKGROUND_REMOVAL':
+              return {
+                  "taskType": "BACKGROUND_REMOVAL",
+                  "backgroundRemovalParams": {
+                      "image": ref_images[0]['source']['bytes'],
+                  },
+              }
+          elif result_objet['target_task_type'] == 'TEXT_IMAGE':
+              return {
+                  "taskType": "TEXT_IMAGE",
+                  "textToImageParams": {"text": result_objet['optimized_prompt']},
+                  "imageGenerationConfig": {
+                      "numberOfImages": 1,
+                      "quality": "standard",
+                      "cfgScale": 6.5,
+                      "height": height,
+                      "width": width,
+                      "seed": seed,
+                  },
+              }
+          elif result_objet['target_task_type'] == 'COLOR_GUIDED_GENERATION':
+              return {
+                  "taskType": "COLOR_GUIDED_GENERATION",
+                  "colorGuidedGenerationParams": {
+                      "text": result_objet['optimized_prompt'],
+                      "negativeText": "bad quality, low res",
+                      "referenceImage": ref_images[0]['source']['bytes'],
+                      "colors": result_objet['colors']
+                  },
+                  "imageGenerationConfig": {
+                      "numberOfImages": 1,
+                      "cfgScale": 6.5,
+                      "height": height,
+                      "width": width
+                  }
+              }
+          elif result_objet['target_task_type'] == 'IMAGE_VARIATION':
+              return {
+                  "taskType": "IMAGE_VARIATION",
+                  "imageVariationParams": {
+                      "text": result_objet['optimized_prompt'],
+                      "negativeText": "bad quality, low resolution, cartoon",
+                      "images": [ref_images[0]['source']['bytes']],
+                      "similarityStrength": 0.7,
+                  },
+                  "imageGenerationConfig": {
+                      "numberOfImages": 1,
+                      "height": height,
+                      "width": width,
+                      "cfgScale": 6.5
+                  }
+              }
+          elif result_objet['target_task_type'] == 'INPAINTING':
+              return {
+                  "taskType": "INPAINTING",
+                  "inPaintingParams": {
+                      "text": result_objet['optimized_prompt'],
+                      "negativeText": "bad quality, low res",
+                      "image": ref_images[0]['source']['bytes'],
+                      "maskPrompt": result_objet['mask_prompt'],
+                  },
+                  "imageGenerationConfig": {
+                      "numberOfImages": 1,
+                      "height": height,
+                      "width": width,
+                      "cfgScale": 6.5
+                  }
+              }
+          elif result_objet['target_task_type'] == 'OUTPAINTING':
+              return {
+                  "taskType": "OUTPAINTING",
+                  "outPaintingParams": {
+                      "text": result_objet['optimized_prompt'],
+                      "negativeText": "bad quality, low res",
+                      "maskPrompt": result_objet['mask_prompt'],
+                      "image": ref_images[0]['source']['bytes'],
+                      "outPaintingMode": "PRECISE"
+                  },
+                  "imageGenerationConfig": {
+                      "numberOfImages": 1,
+                      "cfgScale": 6.5,
+                      "seed": seed
+                  }
+              }
+          else:
+              raise HTTPException(status_code=400, detail=f"Error: ${result_objet['error']}")
+      except Exception as error:
+          raise HTTPException(status_code=400, detail=f"Error: image analyse failed, {error}")
+  
+  
+  def get_analyse_result(client, prompt, global_prompt):
+      try:
+          messages = [
+              {
+                  "role": "user",
+                  "content": [
+                      {
+                          "text": prompt
+                      }
+                  ]
+              }
+          ]
+          command = {
+              "inferenceConfig": {"maxTokens": 512},
+              "messages": messages,
+              "system": [
+                  {"text": global_prompt}
+              ],
+              "modelId": 'us.amazon.nova-lite-v1:0'
+          }
+          response = client.converse_stream(**command)
+          complete_res = ''
+          for item in response['stream']:
+              if "contentBlockDelta" in item:
+                  text = item["contentBlockDelta"].get("delta", {}).get("text", "")
+                  if text:
+                      complete_res += text
+          return complete_res
+      except Exception as error:
+          print(f"Error analyse by nova-lite: {error}")
+          raise HTTPException(status_code=400, detail=f"Error: analyse failed, {error}")
+  
+  
+  def get_prompt():
+      return """You are an AI assistant that helps users analyze image tasks and generate structured JSON responses. Your role is to:
+  
+  1. Analyze user's input prompt
+  2. Determine the most appropriate image task type from these 6 types:
+  
+      - TEXT_IMAGE: Generate completely new image based on text prompt and giving image
+      - COLOR_GUIDED_GENERATION: Generate image with specific color palette/style
+      - IMAGE_VARIATION: Create variations of entire input image
+      - INPAINTING: Remove, replace or modify specific objects/areas while keeping rest of image intact (e.g. remove person/object, replace item, modify part of image)
+      - OUTPAINTING: Modify image background areas
+      - BACKGROUND_REMOVAL: Remove entire background, leaving only main subject with transparency
+  
+      Quick decision strategy - check these 6 rules in sequence:
+  
+          1. Only classify as BACKGROUND_REMOVAL if user specifically mentions "remove background" or "make background transparent"
+  
+          2. If user mentions image variations or similar style/alternatives, it must be IMAGE_VARIATION
+  
+          3. If user wants to generate content based on specific colors/palette, it must be COLOR_GUIDED_GENERATION
+  
+          4. Only classify as OUTPAINTING if user specifically wants to replace/extend background areas
+  
+          5. If user wants to replace, modify or remove specific objects/areas within the image, it must be INPAINTING
+  
+          6. Only classify as TEXT_IMAGE if user wants to create new image following reference image layout
+  
+          Check these rules in order until a match is found. If no rules match using None instead.
+  
+  3. Generate a JSON response with:
+      - target_task_type: The matched task type, or "None" if no match
+      - error: If no match, return "The current operation on the image is not supported. You can try these operations: Generate image, Generate variation, Remove Object, Replace Object, Replace Background, Remove Background."
+      - optimized_prompt: Optimize the user's input prompt in English based on the detected task type
+      - colors: Only For COLOR_GUIDED_GENERATION, array of 1-4 hex color codes (e.g. ["#ff8080"])
+      - mask_prompt: Only For INPAINTING and OUTPAINTING, the prompt is the mentioned subject, e.g.
+          1. for INPAINTING, if user prompt: 'Modernize the windows of the house' the mask_prompt should be "windows"
+          2. for OUTPAINTING, if use prompt: 'Change the bowl's background to a dining table' the mask_prompt should be "bowl"
+          mask_prompt can't be "background", if user do not provide the mask_prompt, the mask_prompt should be "main subject" as default.
+  
+  Example JSON response:
+  {
+    "target_task_type": "INPAINTING",
+    "optimized_prompt": "replace the red car with a blue sports car",
+    "mask_prompt": "windows",
+    "colors":["#ff8080", "#ffb280"],
+    "error": ""
+  }
+  
+  Out put rules:
+  1. Only include relevant fields based on the matched task type. Analyze the user's intent carefully to determine the most appropriate task type and generate optimal outputs.
+  2. Output content must start with "{" and end with "}". DO NOT use "```json" markup/format for any output responses.
+  3. DO NOT include any explanatory text or markdown in your response. Your entire response must be a single, valid JSON object.
+  """
+  
+  </file>
+  </tool>
+</message>
+
+# Tools:
+
+# Response:
+
+ChatResponse { aiMessage = AiMessage { text = "Based on the provided code, I found several debugging-related items:
+
+## Error Messages & Exception Handling
+
+### ConversationManager.swift
+- **Error logging with print statements**:
+  - `print("❌ Start Conversation error", error)` (line 53)
+  - `print("❌ End Conversation error", error)` (line 74)
+  - `print("❌ Error playing audio in AudioManager: \(error)")` (line 83)
+
+- **Error handling patterns**:
+  - NSError creation for uninitialized service: `NSError(domain: "ConversationError", code: -1, userInfo: [NSLocalizedDescriptionKey: "Service not initialized"])`
+  - Multiple try-catch blocks with error propagation
+
+### bedrock-api.ts
+- **Console logging for debugging**:
+  - `console.log('Error reading stream:', readError)` (line 130)
+  - `console.log(errorInfo)` (line 155)
+  - `console.log(`HTTP error! status: ${response.status}`)` (line 190, 218)
+  - `console.log('Error fetching models:', error)` (line 198)
+  - `console.log('Error fetching token:', error)` (line 225)
+  - `console.log('Error fetching upgrade info:', error)` (line 250)
+  - `console.log(errMsg)` (line 283)
+  - `console.log('DataChunk parse error:' + innerError, part)` (line 329)
+
+- **Error handling patterns**:
+  - Timeout handling with `setTimeout(() => controller.abort(), 60000)`
+  - Network error detection and transformation
+  - Stream reading error recovery
+
+### VoiceChatService.ts
+- **Comprehensive error message mapping** (lines 50-76):
+  ```typescript
+  let errorMsg = event.message ?? '';
+  if (errorMsg.includes('The network connection was lost')) {
+    errorMsg = '\n**The network connection was lost**';
+  } else if (errorMsg.includes('The request timed out')) {
+    errorMsg = '\n**The request timed out**';
+  } else if (errorMsg.includes('messages cannot be null or empty')) {
+    errorMsg = '\n**Messages cannot be null or empty**';
+  }
+  // ... more error mappings
+  ```
+
+- **Error callback patterns** throughout the class for initialization, conversation management, and credential validation
+
+### image_nl_processor.py
+- **Exception handling with HTTPException**:
+  - `raise HTTPException(status_code=400, detail=f"Error: ${result_objet['error']}")` (line 86)
+  - `raise HTTPException(status_code=400, detail=f"Error: image analyse failed, {error}")` (line 88)
+  - `raise HTTPException(status_code=400, detail=f"Error: analyse failed, {error}")` (line 107)
+
+- **Debug print statement**:
+  - `print(f"Error analyse by nova-lite: {error}")` (line 106)
+
+## Key Debugging Issues Found
+
+1. **Inconsistent error logging**: Mix of `console.log` and `print` statements across different platforms
+2. **Network error handling**: Multiple timeout and connection error scenarios handled
+3. **Stream processing errors**: Error recovery in stream reading operations
+4. **Credential validation**: AWS token validation and refresh error handling
+5. **Audio processing errors**: Error handling in audio playback and recording operations
+6. **HTTP error status handling**: Various HTTP status code error scenarios
+
+These debugging elements indicate areas where the application may encounter issues with network connectivity, credential management, audio processing, and stream handling." reasoningContent = null toolExecutionRequests = [] }, metadata = OpenAiChatResponseMetadata{id='chatcmpl-98fdc6d6-846f-4802-9e35-69357c2aede6', modelName='claude-sonnet-4-20250514', tokenUsage=OpenAiTokenUsage { inputTokenCount = 10223, inputTokensDetails = OpenAiTokenUsage.InputTokensDetails { cachedTokens = 0 }, outputTokenCount = 871, outputTokensDetails = OpenAiTokenUsage.OutputTokensDetails { reasoningTokens = 0 }, totalTokenCount = 11094 }, finishReason=STOP, created=1756791251, serviceTier='null', systemFingerprint='null'} }

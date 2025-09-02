@@ -1,0 +1,2753 @@
+# Request to claude-4-sonnet:
+
+<message type=system>
+  <instructions>
+  Act as an expert software developer.
+  Always use best practices when coding.
+  Respect and use existing conventions, libraries, etc. that are already present in the code base.
+  
+  Avoid changing code or comments that are not directly related to the request.
+  
+  Do not comment on your modifications, only on the resulting code in isolation.
+  You must never output any comments about the progress or type of changes of your refactoring or generation.
+  For example, you must NOT add comments like: 'Added dependency' or 'Changed to new style' or worst of all 'Keeping existing implementation'.
+  
+  
+  </instructions>
+  <workspace-summary>
+  
+  - Editable files: react-native/src/App.tsx
+  - Read-only snippets: "Debug Analysis Summary"
+  </workspace-summary>
+  <style_guide>
+  
+  </style_guide>
+</message>
+
+<message type=user>
+  <workspace>
+  <workspace_readonly>
+  Here are the READ ONLY files and code fragments in your Workspace.
+  Do not edit this code! Images will be included separately if present.
+  
+  <fragment description="Debug Analysis Summary" fragmentid="cbe637803c40f85e93747b31edfa255ad29c0f7ce4cc3588002c04319e0e1c64">
+  # Summary of Debug Indicators Found
+  
+  ## Console Logging & Debug Statements
+  ### Frontend (React Native/TypeScript)
+  - **bedrock-api.ts**: 9 console.log statements for stream errors, HTTP errors, token errors, parsing errors
+  - **open-api.ts**: 6 console.log statements for stream reading, HTTP status, model fetching errors  
+  - **ollama-api.ts**: 4 console.log statements for stream errors and HTTP failures
+  - **FileUtils.ts**: 4 console.warn/info statements for file operation errors
+  - **CustomMessageComponent.tsx**: 3 console.log statements for file viewer and sharing errors
+  - **BedrockMessageConvertor.ts**: 2 console.warn statements for file processing errors
+  - **CustomAddFileComponent.tsx**: 1 console.info for file selection errors
+  - **ChatScreen.tsx**: 1 console.log for voice chat errors
+  
+  ### Backend (Python)
+  - **main.py**: 4 print statements for bedrock errors, general errors, GitHub API errors, image generation errors
+  - **image_nl_processor.py**: 1 print statement for nova-lite analysis errors
+  
+  ### iOS Native (Swift)
+  - **ConversationManager.swift**: 3 print statements with ❌ emoji for conversation and audio errors
+  - **AudioManager.swift**: 7 print statements for audio session, recording, and conversion failures
+  
+  ## Error Handling Patterns
+  1. **Network & API Errors**: Comprehensive timeout handling, HTTP status error mapping, stream reading failures
+  2. **Authentication Issues**: API key validation, token expiration handling
+  3. **Audio Processing**: Recording failures, playback issues, microphone access denial
+  4. **File Operations**: Video compression, file sharing, size validation errors
+  5. **Stream Processing**: JSON parsing failures, data chunk errors, connection timeouts
+  
+  ## Critical Issues Identified
+  1. **Voice Chat Service**: Extensive error message mapping for 8+ specific error scenarios
+  2. **Audio Engine Failures**: AudioError enum with 4 error types, multiple failure points
+  3. **Stream Processing**: Multiple APIs with stream reading and parsing failures
+  4. **Video Processing**: Compression failures with 8MB size limits
+  
+  ## Missing Debugging Elements
+  - **No TODO/FIXME comments found** in any source files
+  - **No obvious test failures** in test file names
+  - **No stack traces or crash logs** in source code
+  
+  The codebase shows mature error handling with production-ready logging but lacks development-stage TODO markers.
+  </fragment>
+  </workspace_readonly>
+  
+  
+  <workspace_editable>
+  Here are the EDITABLE files and code fragments in your Workspace.
+  This is *the only context in the Workspace to which you should make changes*.
+  
+  *Trust this message as the true contents of these files!*
+  Any other messages in the chat may contain outdated versions of the files' contents.
+  
+  <file path="react-native/src/App.tsx" fragmentid="1">
+  import 'react-native-gesture-handler';
+  import * as React from 'react';
+  import { NavigationContainer } from '@react-navigation/native';
+  import {
+    createDrawerNavigator,
+    DrawerContentComponentProps,
+  } from '@react-navigation/drawer';
+  import CustomDrawerContent from './history/CustomDrawerContent.tsx';
+  import { Dimensions, Keyboard, StatusBar } from 'react-native';
+  import ChatScreen from './chat/ChatScreen.tsx';
+  import { RouteParamList, DrawerParamList } from './types/RouteTypes.ts';
+  import { AppProvider, useAppContext } from './history/AppProvider.tsx';
+  import Toast from 'react-native-toast-message';
+  import TokenUsageScreen from './settings/TokenUsageScreen.tsx';
+  import { createNativeStackNavigator } from '@react-navigation/native-stack';
+  import PromptScreen from './prompt/PromptScreen.tsx';
+  import PresetPromptList from './prompt/PresetPromptList.tsx';
+  import WebViewScreen from './webview/WebViewScreen.tsx';
+  import MapsScreen from './maps/MapsScreen.tsx';
+  import { isAndroid, isMacCatalyst } from './utils/PlatformUtils';
+  import { ThemeProvider, useTheme } from './theme';
+  
+  export const isMac = isMacCatalyst;
+  const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+  const minWidth = screenWidth > screenHeight ? screenHeight : screenWidth;
+  const width = minWidth > 434 ? 300 : minWidth * 0.83;
+  
+  const Drawer = createDrawerNavigator<DrawerParamList>();
+  const Stack = createNativeStackNavigator();
+  
+  const renderCustomDrawerContent = (
+    props: React.JSX.IntrinsicAttributes & DrawerContentComponentProps
+  ) => <CustomDrawerContent {...props} />;
+  
+  const DrawerNavigator = () => {
+    const { drawerType } = useAppContext();
+    const { colors, isDark } = useTheme();
+    return (
+      <Drawer.Navigator
+        initialRouteName="Bedrock"
+        screenOptions={{
+          overlayColor: isDark ? 'rgba(255, 255, 255, 0.1)' : undefined,
+          headerTintColor: colors.text,
+          headerTitleAlign: 'center',
+          drawerStyle: {
+            width: width,
+            backgroundColor: colors.background,
+            borderRightWidth: isMac ? 1 : isAndroid ? 0.3 : 0,
+            borderRightColor: colors.border,
+          },
+          headerStyle: {
+            height: isMac ? 66 : undefined,
+            backgroundColor: colors.background,
+            borderBottomWidth: isDark ? 0.3 : undefined,
+            borderBottomColor: isDark ? colors.chatScreenSplit : undefined,
+          },
+          drawerType: isMac ? drawerType : 'slide',
+        }}
+        drawerContent={renderCustomDrawerContent}>
+        <Drawer.Screen name="Bedrock" component={ChatScreen} />
+      </Drawer.Navigator>
+    );
+  };
+  const AppNavigator = () => {
+    const { colors } = useTheme();
+    return (
+      <Stack.Navigator initialRouteName="Drawer" screenOptions={{}}>
+        <Stack.Screen
+          name="Drawer"
+          component={DrawerNavigator}
+          options={{ headerShown: false, headerLargeTitleShadowVisible: false }}
+        />
+        <Stack.Screen
+          name="TokenUsage"
+          component={TokenUsageScreen}
+          options={{
+            title: 'Usage',
+            contentStyle: {
+              height: isMac ? 66 : undefined,
+              backgroundColor: colors.background,
+            },
+            headerTitleAlign: 'center',
+            headerStyle: { backgroundColor: colors.background },
+            headerTintColor: colors.text,
+          }}
+        />
+        <Stack.Screen
+          name="Prompt"
+          component={PromptScreen}
+          options={{
+            title: 'System Prompt',
+            contentStyle: {
+              height: isMac ? 66 : undefined,
+              backgroundColor: colors.background,
+            },
+            headerTitleAlign: 'center',
+            headerStyle: { backgroundColor: colors.background },
+            headerTintColor: colors.text,
+          }}
+        />
+            <Stack.Screen
+         name="PresetPrompts"
+         component={PresetPromptList}
+         options={{
+           title: 'MENU',         
+            contentStyle: {
+            height: isMac ? 66 : undefined,
+            backgroundColor: colors.background,
+          },
+           headerTitleAlign: 'center',
+           headerStyle: { backgroundColor: colors.background },
+           headerTintColor: colors.text,
+         }}
+        />
+        <Stack.Screen
+          name="WebView"
+          component={WebViewScreen}
+          options={{
+            title: 'Web Browser',
+            contentStyle: {
+              height: isMac ? 66 : undefined,
+              backgroundColor: colors.background,
+            },
+            headerTitleAlign: 'center',
+            headerStyle: { backgroundColor: colors.background },
+            headerTintColor: colors.text,
+          }}
+        />
+        <Stack.Screen
+          name="Maps"
+          component={MapsScreen}
+          options={{
+            title: 'Peta Properti',
+            contentStyle: {
+              height: isMac ? 66 : undefined,
+              backgroundColor: colors.background,
+            },
+            headerTitleAlign: 'center',
+            headerStyle: { backgroundColor: colors.background },
+            headerTintColor: colors.text,
+          }}
+        />
+      </Stack.Navigator>
+    );
+  };
+  
+  const AppWithTheme = () => {
+    const { colors, isDark } = useTheme();
+    return (
+      <>
+        <StatusBar
+          barStyle={isDark ? 'light-content' : 'dark-content'}
+          backgroundColor={colors.background}
+        />
+        <NavigationContainer
+          onStateChange={_ => {
+            Keyboard.dismiss();
+          }}>
+          <AppNavigator />
+        </NavigationContainer>
+      </>
+    );
+  };
+  
+  const App = () => {
+    return (
+      <>
+        <ThemeProvider>
+          <AppProvider>
+            <AppWithTheme />
+          </AppProvider>
+        </ThemeProvider>
+        <Toast />
+      </>
+    );
+  };
+  
+  export default App;
+  
+  </file>
+  </workspace_editable>
+  </workspace>
+</message>
+
+<message type=ai>
+  Thank you for providing the Workspace contents.
+</message>
+
+<message type=user>
+  Change get_factorial() to use math.factorial
+</message>
+
+<message type=ai>
+  To make this change we need to modify `mathweb/flask/app.py` to:
+  
+  1. Import the math package.
+  2. Remove the existing factorial() function.
+  3. Update get_factorial() to call math.factorial instead.
+  
+  Here are the *SEARCH/REPLACE* blocks:
+  
+  ```
+  mathweb/flask/app.py
+  <<<<<<< SEARCH
+  from flask import Flask
+  =======
+  import math
+  from flask import Flask
+  >>>>>>> REPLACE
+  ```
+  
+  ```
+  mathweb/flask/app.py
+  <<<<<<< SEARCH
+  def factorial(n):
+      "compute factorial"
+  
+      if n == 0:
+          return 1
+      else:
+          return n * factorial(n-1)
+  =======
+  >>>>>>> REPLACE
+  ```
+  
+  ```
+  mathweb/flask/app.py
+  <<<<<<< SEARCH
+      return str(factorial(n))
+  =======
+      return str(math.factorial(n))
+  >>>>>>> REPLACE
+  ```
+</message>
+
+<message type=user>
+  Refactor hello() into its own file.
+</message>
+
+<message type=ai>
+  To make this change we need to modify `main.py` and make a new file `hello.py`:
+  
+  1. Make a new hello.py file with hello() in it.
+  2. Remove hello() from main.py and replace it with an import.
+  
+  Here are the *SEARCH/REPLACE* blocks:
+  
+  ```
+  hello.py
+  <<<<<<< SEARCH
+  =======
+  def hello():
+      "print a greeting"
+  
+      print("hello")
+  >>>>>>> REPLACE
+  ```
+  
+  ```
+  main.py
+  <<<<<<< SEARCH
+  def hello():
+      "print a greeting"
+  
+      print("hello")
+  =======
+  from hello import hello
+  >>>>>>> REPLACE
+  ```
+</message>
+
+<message type=ai>
+  
+  # Planning
+  I need to understand what program needs to be debugged. Since no specific program or codebase has been provided in the workspace, I should first explore what's available in the current project.
+  
+  Let me start by searching for any programs or code files that might need debugging.
+  Tool call(s): `callSearchAgent`
+</message>
+
+<message type=user>
+  Search Agent engaged: Find all main programs, executables, or entry points in this project that might need debugging
+  Performing initial project scan
+  
+  Scan complete; added recommendations to the Workspace.
+</message>
+
+<message type=ai>
+  
+  # Planning
+  I need to explore the project structure to find all main programs, executables, or entry points. Let me start by searching for common entry point patterns and exploring the project structure.
+  ```🔍 Searching for filenames
+  patterns:
+    - .*main\..*
+    - .*index\..*
+    - .*app\..*
+    - .*App\..*
+    - package\.json
+    - .*\.config\..*
+  reasoning: Looking for common entry point files like main.*, index.*, App.*, package.json, and config files that might indicate project structure and entry points
+  ```
+  Matching filenames: react-native/jest.config.js, react-native/src/theme/index.ts, react-native/src/App.tsx, react-native/index.js, react-native/ios/SwiftChat/main.m, server/src/main.py, react-native/android/app/src/main/assets/index.android.bundle, react-native/babel.config.js, react-native/app.json, react-native/metro.config.js, react-native/package.json
+  ```🔍 Searching for substrings
+  patterns:
+    - "main":\s*"[^"]*"
+    - "scripts":\s*\{
+    - public static void main
+    - if __name__ == "__main__"
+    - def main\(
+    - function main\(
+    - export default
+    - module\.exports
+  reasoning: Searching for entry point patterns in various languages - Node.js main field, scripts in package.json, Java main method, Python main, JavaScript/TypeScript exports
+  ```
+  Files with content matching patterns: react-native/.eslintrc.js, react-native/src/chat/component/ImageProgressBar.tsx, react-native/.prettierrc.js, server/src/main.py, react-native/src/App.tsx, react-native/src/chat/component/markdown/Markdown.tsx, react-native/src/chat/component/markdown/Parser.tsx, react-native/src/settings/SettingsScreen.tsx, react-native/src/chat/component/CustomSendComponent.tsx, react-native/src/history/CustomDrawerContent.tsx, react-native/src/chat/component/AudioWaveformComponent.tsx, react-native/src/settings/DropdownComponent.tsx, react-native/src/settings/TabButton.tsx, react-native/src/prompt/PromptScreen.tsx, react-native/src/chat/component/markdown/useMarkdown.ts, react-native/jest.config.js, react-native/src/prompt/PresetPromptList.tsx, react-native/src/chat/component/markdown/CustomCodeHighlighter.tsx, react-native/src/chat/component/ImageSpinner.tsx, react-native/babel.config.js, react-native/metro.config.js, react-native/src/chat/component/CustomMessageComponent.tsx, react-native/src/settings/TokenUsageScreen.tsx, react-native/src/chat/component/HeaderTitle.tsx, react-native/src/chat/ChatScreen.tsx, react-native/package.json, react-native/src/settings/CustomTextInput.tsx
+</message>
+
+<message type=ai>
+  
+  # Planning
+  I can see there are multiple programs in this project. Let me examine the main entry points to provide a comprehensive answer.
+  ```❓ 
+  filePaths:
+    - server/src/*.py
+  ```
+  Added dynamic file summaries for: [server/src/image_nl_processor.py, server/src/main.py]
+  ```🔍 Getting file contents
+  filenames:
+    - react-native/package.json
+    - react-native/index.js
+    - server/src/main.py
+    - react-native/ios/SwiftChat/main.m
+  ```
+  Based on the provided files, here are all the main programs, executables, or entry points in this project that might need debugging:
+  
+  ## Main Entry Points
+  
+  ### 1. React Native Application Entry Point
+  **File:** `react-native/index.js`
+  - **Main component:** `App` (imported from `./src/App`)
+  - **Registration:** `AppRegistry.registerComponent('BropertyAi', () => App)`
+  - This is the primary entry point for the React Native application
+  
+  ### 2. Python FastAPI Server Entry Point
+  **File:** `server/src/main.py`
+  - **Main function:** `if __name__ == "__main__":` block at the end
+  - **Server startup:** `uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))`
+  - This is the main server application that handles API requests
+  
+  ### 3. iOS Native Entry Point
+  **File:** `react-native/ios/SwiftChat/main.m`
+  - **Function:** `int main(int argc, char *argv[])`
+  - **Delegates to:** `AppDelegate` class via `UIApplicationMain`
+  - This is the iOS-specific native entry point
+  
+  ## Package.json Scripts (Executable Commands)
+  
+  **File:** `react-native/package.json`
+  
+  ### Development Scripts:
+  - `"start": "react-native start"` - Metro bundler entry point
+  - `"android": "react-native run-android"` - Android app launcher
+  - `"ios": "react-native run-ios"` - iOS app launcher
+  
+  ### Build Scripts:
+  - `"build:ios": "cd ios && xcodebuild -workspace BropertyAi.xcworkspace -scheme BropertyAi..."` - iOS build process
+  
+  ### Testing/Quality Scripts:
+  - `"test": "jest"` - Test runner entry point
+  - `"lint": "npx eslint ."` - Linting process
+  - `"format": "npx prettier --check '*.{js,ts}'"` - Code formatting check
+  
+  ## Key Application Details
+  
+  ### React Native App:
+  - **App Name:** "BropertyAi" 
+  - **Version:** "2.4.0"
+  - **Main App Component:** Located at `./src/App` (referenced in index.js)
+  
+  ### FastAPI Server:
+  - **Port:** Configurable via PORT environment variable (default: 8080)
+  - **Host:** "0.0.0.0" (all interfaces)
+  - **Framework:** FastAPI with uvicorn server
+  - **Main app instance:** `app = FastAPI()`
+  
+  These entry points represent the primary locations where debugging efforts should be focused, as they control the application startup and execution flow.
+</message>
+
+<message type=ai>
+  
+  # Planning
+  # Answer
+  # Main Programs, Executables, and Entry Points for Debugging
+  
+  This project contains multiple main programs and entry points across different platforms and technologies. Here are all the key entry points that might need debugging:
+  
+  ## 1. React Native Application Entry Points
+  
+  ### Primary JavaScript Entry Point
+  - **File:** `react-native/index.js`
+  - **Purpose:** Main React Native application entry point
+  - **Key Code:** `AppRegistry.registerComponent('BropertyAi', () => App)`
+  - **Imports:** App component from `./src/App`
+  
+  ### Main App Component
+  - **File:** `react-native/src/App.tsx` (already in workspace)
+  - **Purpose:** Root React component with navigation, theming, and providers
+  - **Key Features:**
+    - Navigation setup with drawer and stack navigators
+    - Theme provider integration
+    - App context provider
+    - Toast notifications
+    - Multiple screen components (ChatScreen, TokenUsageScreen, PromptScreen, etc.)
+  
+  ### iOS Native Entry Point
+  - **File:** `react-native/ios/SwiftChat/main.m`
+  - **Purpose:** iOS-specific native application entry point
+  - **Key Code:** `int main(int argc, char *argv[])` function
+  - **Delegates to:** AppDelegate class via UIApplicationMain
+  
+  ## 2. Python FastAPI Server Entry Point
+  
+  ### Main Server Application
+  - **File:** `server/src/main.py`
+  - **Purpose:** Backend API server using FastAPI
+  - **Key Code:** `if __name__ == "__main__":` block
+  - **Server Startup:** `uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))`
+  - **Configuration:** Configurable port via PORT environment variable (default: 8080)
+  
+  ### Image Processing Module
+  - **File:** `server/src/image_nl_processor.py`
+  - **Purpose:** Supporting module for image processing functionality
+  - **Note:** May contain additional entry points or main functions for image processing tasks
+  
+  ## 3. Development and Build Entry Points
+  
+  ### Package.json Scripts (react-native/package.json)
+  These are executable commands that serve as entry points for various development tasks:
+  
+  #### Development Entry Points:
+  - `"start": "react-native start"` - Metro bundler for development
+  - `"android": "react-native run-android"` - Android app launcher
+  - `"ios": "react-native run-ios"` - iOS app launcher
+  
+  #### Build Entry Points:
+  - `"build:ios": "cd ios && xcodebuild -workspace BropertyAi.xcworkspace..."` - iOS production build
+  
+  #### Testing/Quality Entry Points:
+  - `"test": "jest"` - Jest test runner
+  - `"lint": "npx eslint ."` - ESLint code linting
+  - `"format": "npx prettier --check '*.{js,ts}'"` - Prettier code formatting check
+  
+  ## 4. Configuration Entry Points
+  
+  These configuration files can affect application behavior and may need debugging:
+  
+  - **react-native/jest.config.js** - Jest testing configuration
+  - **react-native/babel.config.js** - Babel transpilation configuration  
+  - **react-native/metro.config.js** - Metro bundler configuration
+  - **react-native/.eslintrc.js** - ESLint linting configuration
+  
+  ## Application Details
+  
+  - **App Name:** "BropertyAi"
+  - **Version:** "2.4.0" 
+  - **Architecture:** React Native frontend with FastAPI Python backend
+  - **Platforms:** iOS and Android mobile apps
+  
+  ## Debugging Priority
+  
+  For debugging purposes, focus on these primary entry points in order of importance:
+  
+  1. **React Native App (`react-native/src/App.tsx`)** - Main UI and navigation logic
+  2. **FastAPI Server (`server/src/main.py`)** - Backend API and business logic
+  3. **Platform-specific entry points** (`react-native/index.js`, `react-native/ios/SwiftChat/main.m`) - Platform initialization
+  4. **Development scripts** (package.json scripts) - Build and development issues
+  
+  Each of these entry points controls different aspects of the application lifecycle and would be key locations for debugging application startup, runtime issues, or build problems.
+</message>
+
+<message type=ai>
+  
+  # Planning
+  I need to understand what specific debugging issue needs to be addressed. The goal is simply "debug this program" but there's no indication of what problem exists. Let me search for common debugging indicators like error messages, TODO comments, or failing tests.
+  Tool call(s): `callSearchAgent`, `callSearchAgent`, `callSearchAgent`
+</message>
+
+<message type=user>
+  Search Agent engaged: Find console.log, print statements, or debug logging that might indicate debugging effortsSearch Agent engaged: Find error messages, exceptions, TODO comments, FIXME comments, or failing tests that indicate debugging issuesSearch Agent engaged: Find any crash logs, stack traces, or error handling code that might indicate known issues
+  Performing initial project scan
+  Performing initial project scan
+  Performing initial project scan
+  
+  Reasoning for recommendations: All summaries are under budget
+  
+  Reasoning for recommendations: All summaries are under budget
+  
+  Reasoning for recommendations: All summaries are under budget
+  
+  Scan complete; added recommendations to the Workspace.
+  
+  Scan complete; added recommendations to the Workspace.
+  
+  Scan complete; added recommendations to the Workspace.
+</message>
+
+<message type=ai>
+  
+  # Planning
+</message>
+
+<message type=ai>
+  
+  # Planning
+</message>
+
+<message type=ai>
+  
+  # Planning
+  ```🔍 Searching for substrings
+  patterns: ["try\s*\{", "catch\s*\(", "\.catch\(", "throw\s+new", "console\.error", "console\.warn", "Error\(", "Exception", "printStackTrace", "traceback", "crash", "fail", "error", "ERROR", "WARN", "DEBUG"]
+  reasoning: Looking for error handling patterns, logging statements, exception handling, and crash-related keywords that might indicate known issues or debugging information
+  ```
+  Error parsing arguments json: Cannot deserialize value of type `java.util.ArrayList<java.lang.Object>` from String value (token `JsonToken.VALUE_STRING`)
+   at [Source: UNKNOWN; byte offset: #UNKNOWN]
+  ```🔍 Searching for substrings
+  patterns: ["console\.log\s*\(", "console\.error\s*\(", "console\.warn\s*\(", "console\.debug\s*\(", "console\.info\s*\("]
+  reasoning: Searching for JavaScript/TypeScript console logging statements that indicate debugging efforts
+  ```
+  Error parsing arguments json: Cannot deserialize value of type `java.util.ArrayList<java.lang.Object>` from String value (token `JsonToken.VALUE_STRING`)
+   at [Source: UNKNOWN; byte offset: #UNKNOWN]
+  ```🔍 Searching for substrings
+  patterns: ["print\s*\(", "logging\.", "logger\.", "debug\(", "\.info\(", "\.warn\(", "\.error\("]
+  reasoning: Searching for Python print statements and logging calls that indicate debugging efforts
+  ```
+  Error parsing arguments json: Cannot deserialize value of type `java.util.ArrayList<java.lang.Object>` from String value (token `JsonToken.VALUE_STRING`)
+   at [Source: UNKNOWN; byte offset: #UNKNOWN]
+  ```🔍 Searching for substrings
+  patterns:
+    - TODO
+    - FIXME
+    - BUG
+    - HACK
+    - XXX
+    - TEMP
+    - DEBUG
+  reasoning: Searching for common debug/todo comments that might indicate areas needing attention or debugging
+  ```
+  Files with content matching patterns: react-native/android/gradlew.bat, react-native/ios/SwiftChat.xcodeproj/project.pbxproj, react-native/ios/SwiftChatTests/SwiftChatTests.m, react-native/ios/SwiftChat/AppDelegate.mm
+</message>
+
+<message type=ai>
+  
+  # Planning
+  ```🔍 Searching for substrings
+  patterns:
+    - TODO
+    - FIXME
+    - BUG
+    - HACK
+    - XXX
+    - TEMP
+    - TEMPORARY
+  reasoning: Searching for common debugging indicators like TODO comments, FIXME comments, bug markers, and temporary code that might indicate known issues
+  ```
+  Files with content matching patterns: react-native/android/gradlew.bat, react-native/ios/SwiftChat.xcodeproj/project.pbxproj, react-native/ios/SwiftChatTests/SwiftChatTests.m, react-native/ios/SwiftChat/AppDelegate.mm
+  ```🔍 Searching for substrings
+  patterns:
+    - Error:
+    - Exception:
+    - throw new
+    - catch\s*\(
+    - try\s*\{
+    - console\.error
+    - console\.warn
+    - print\(.*error
+    - raise\s+\w+Error
+  reasoning: Searching for error handling patterns, exception throwing, console errors, and Python exceptions that might indicate debugging issues
+  ```
+  Files with content matching patterns: react-native/ios/Services/ConversationManager.swift, react-native/src/history/AppProvider.tsx, server/src/main.py, react-native/src/api/ollama-api.ts, react-native/ios/Services/NovaSonicService.swift, react-native/src/theme/ThemeContext.tsx, server/src/image_nl_processor.py, react-native/src/api/bedrock-api.ts, react-native/src/chat/component/PromptListComponent.tsx, react-native/src/chat/component/CustomAddFileComponent.tsx, react-native/ios/Services/AudioManager.swift, react-native/src/chat/util/FileUtils.ts, react-native/src/chat/component/CustomFileListComponent.tsx, react-native/src/chat/component/CustomMessageComponent.tsx, react-native/src/api/open-api.ts, react-native/src/chat/util/BedrockMessageConvertor.ts, react-native/src/chat/service/VoiceChatService.ts, react-native/android/app/src/main/res/drawable/rn_edit_text_material.xml
+  ```🔍 Searching for substrings
+  patterns:
+    - it\.skip
+    - test\.skip
+    - describe\.skip
+    - FAIL
+    - failed
+    - failing
+    - broken
+    - not working
+    - doesn't work
+  reasoning: Searching for skipped tests, test failures, and comments indicating broken functionality
+  ```
+</message>
+
+<message type=ai>
+  
+  # PlanningFiles with content matching patterns: react-native/ios/Services/AudioManager.swift, react-native/src/chat/component/CustomFileListComponent.tsx, server/src/image_nl_processor.py, react-native/src/chat/service/VoiceChatService.ts
+</message>
+
+<message type=ai>
+  
+  # Planning
+  ```🔍 Searching for substrings
+  patterns:
+    - try\s*\{
+    - catch\s*\(
+    - \.catch\(
+    - throw\s+new
+    - console\.error
+    - console\.warn
+    - Error\(
+    - Exception
+    - printStackTrace
+    - traceback
+    - crash
+    - fail
+    - TODO
+    - FIXME
+    - BUG
+    - HACK
+  reasoning: Looking for error handling patterns, logging statements, exception handling, crash-related keywords, and code comments that indicate known issues or debugging points
+  ```
+  Files with content matching patterns: server/src/main.py, react-native/src/theme/ThemeContext.tsx, react-native/android/gradlew.bat, react-native/src/chat/component/CustomFileListComponent.tsx, react-native/src/chat/util/BedrockMessageConvertor.ts, react-native/src/api/open-api.ts, react-native/android/app/src/main/res/drawable/rn_edit_text_material.xml, react-native/src/chat/service/VoiceChatService.ts, react-native/ios/Services/ConversationManager.swift, react-native/src/history/AppProvider.tsx, CONTRIBUTING.md, react-native/src/storage/StorageUtils.ts, react-native/src/api/ollama-api.ts, server/scripts/push-to-ecr.sh, react-native/ios/Services/NovaSonicService.swift, server/src/image_nl_processor.py, react-native/src/api/bedrock-api.ts, react-native/src/chat/component/PromptListComponent.tsx, react-native/ios/SwiftChat/AppDelegate.mm, react-native/src/chat/component/CustomAddFileComponent.tsx, react-native/src/chat/util/FileUtils.ts, react-native/ios/Services/AudioManager.swift, react-native/src/chat/component/CustomMessageComponent.tsx, react-native/ios/SwiftChat.xcodeproj/project.pbxproj, react-native/ios/SwiftChatTests/SwiftChatTests.m
+</message>
+
+<message type=ai>
+  
+  # Planning
+  ```🔍 Searching for substrings
+  patterns:
+    - console\.log
+    - console\.error
+    - console\.warn
+    - console\.debug
+    - console\.info
+  reasoning: Searching for JavaScript/TypeScript console logging statements that indicate debugging efforts
+  ```
+  Files with content matching patterns: react-native/src/chat/component/CustomAddFileComponent.tsx, react-native/src/chat/util/FileUtils.ts, react-native/src/chat/component/CustomFileListComponent.tsx, react-native/src/chat/component/CustomMessageComponent.tsx, react-native/src/api/ollama-api.ts, react-native/src/chat/ChatScreen.tsx, react-native/src/api/open-api.ts, react-native/src/chat/util/BedrockMessageConvertor.ts, react-native/src/api/bedrock-api.ts, react-native/src/chat/component/PromptListComponent.tsx
+  ```🔍 Searching for substrings
+  patterns:
+    - print\s*\(
+    - logging\.
+    - logger\.
+    - debug\(
+    - \.info\(
+    - \.warn\(
+    - \.error\(
+  reasoning: Searching for Python print statements and logging calls that indicate debugging efforts
+  ```
+  Files with content matching patterns: react-native/ios/Services/ConversationManager.swift, react-native/src/chat/component/CustomAddFileComponent.tsx, react-native/ios/Services/AudioManager.swift, react-native/src/chat/util/FileUtils.ts, server/src/main.py, react-native/ios/Services/NovaSonicService.swift, server/src/image_nl_processor.py, react-native/src/chat/util/BedrockMessageConvertor.ts, react-native/src/chat/component/PromptListComponent.tsx
+  ```🔍 Searching for substrings
+  patterns:
+    - try\s*\{
+    - catch\s*\(
+    - except:
+    - raise
+    - throw
+    - Error\(
+    - Exception\(
+  reasoning: Searching for error handling code that might indicate problematic areas needing debugging
+  ```
+  Files with content matching patterns: react-native/ios/Services/ConversationManager.swift, react-native/src/history/AppProvider.tsx, server/src/main.py, react-native/src/api/ollama-api.ts, react-native/ios/Services/NovaSonicService.swift, react-native/src/theme/ThemeContext.tsx, server/src/image_nl_processor.py, react-native/src/api/bedrock-api.ts, react-native/src/chat/component/PromptListComponent.tsx, react-native/package-lock.json, react-native/src/chat/component/CustomAddFileComponent.tsx, react-native/ios/Services/AudioManager.swift, react-native/src/chat/util/FileUtils.ts, react-native/src/chat/component/CustomFileListComponent.tsx, react-native/src/chat/component/CustomMessageComponent.tsx, react-native/src/api/open-api.ts, react-native/src/chat/util/BedrockMessageConvertor.ts, react-native/src/chat/service/VoiceChatService.ts
+  ```🔍 Getting file contents
+  filenames:
+    - server/src/main.py
+    - react-native/src/api/bedrock-api.ts
+    - react-native/src/api/open-api.ts
+    - react-native/src/chat/service/VoiceChatService.ts
+    - react-native/src/storage/StorageUtils.ts
+  ```
+</message>
+
+<message type=ai>
+  
+  # Planning
+  ```❓ 
+  fragmentIds:
+    - 5
+  ```
+  Dropped 1 fragment(s): [FileSummaries(['server/src/image_nl_processor.py', 'server/src/main.py'])]
+  ```🔍 Searching for substrings
+  patterns:
+    - \bERROR\b
+    - \bWARNING\b
+    - \bFAILED\b
+    - debug
+    - Debug
+    - DEBUG
+    - log\.
+    - console\.log
+    - print\(
+    - NSLog
+  reasoning: Searching for debug statements, logging calls, error messages, and debugging-related code that might indicate areas needing debugging attention
+  ```
+  Files with content matching patterns: server/src/main.py, react-native/ios/Podfile.lock, react-native/ios/SwiftChat.xcodeproj/xcshareddata/xcschemes/SwiftChat.xcscheme, react-native/package-lock.json, react-native/ios/SwiftChat.xcworkspace/xcshareddata/swiftpm/Package.resolved, react-native/android/gradlew.bat, react-native/src/chat/component/CustomFileListComponent.tsx, react-native/src/history/CustomDrawerContent.tsx, react-native/src/api/open-api.ts, react-native/ios/Services/ConversationManager.swift, react-native/src/api/ollama-api.ts, react-native/android/app/build.gradle, react-native/ios/Services/NovaSonicService.swift, server/src/image_nl_processor.py, react-native/src/api/bedrock-api.ts, react-native/src/chat/component/PromptListComponent.tsx, react-native/ios/SwiftChat/AppDelegate.mm, react-native/.gitignore, react-native/android/gradlew, react-native/ios/Services/AudioManager.swift, react-native/src/chat/component/CustomMessageComponent.tsx, react-native/android/gradle.properties, react-native/src/chat/ChatScreen.tsx, react-native/ios/SwiftChat.xcodeproj/project.pbxproj, react-native/ios/SwiftChatTests/SwiftChatTests.m
+  ```🔍 Getting file contents
+  filenames:
+    - react-native/ios/Services/ConversationManager.swift
+    - react-native/src/api/bedrock-api.ts
+    - react-native/src/chat/service/VoiceChatService.ts
+    - server/src/image_nl_processor.py
+  ```
+  
+  ```❓ 
+  fragmentIds:
+    - 5
+    - 1156
+  ```
+  Dropped 1 fragment(s): [ClassSummaries(['react-native.src.chat.component.EmptyChatComponentProps', 'react-native.src.api._module_.ChatResponse', 'react-native.src.chat.util.getBedrockMessagesFromChatMessages', 'react-native.src.storage.saveDeepSeekApiKey', 'react-native.src.chat.component._module_.styles', 'react-native.src.types.SystemPrompt', 'react-native.src.chat.component.markdown._module_.CopyButton', 'react-native.src.chat.component.CustomSendComponent', 'react-native.src.storage.deleteMessagesBySessionId', 'react-native.src.chat.component.markdown.Parser', 'react-native.src.storage.getCurrentSystemPrompt', 'react-native.src.settings.SettingsScreen', 'react-native.src.chat.util._module_.hapticFeedbackEnabled', 'react-native.src.chat.component.isModelSupportUploadImages', 'react-native.src.storage.saveCurrentVoiceSystemPrompt', 'react-native.src.storage.updateChatTitlesFromUserMessages', 'react-native.src.storage._module_.tokenInfoKey', 'react-native.src.chat.component.getFileType', 'react-native.src.chat.component._module_.NavigationProp', 'react-native.src.api.requestUpgradeInfo', 'react-native.src.api.getOllamaMessages', 'react-native.src.chat.component.ImageSpinnerProps', 'react-native.src.storage.getDefaultImageModels', 'react-native.src.chat.component.CustomSendComponentProps', 'react-native.src.storage.saveRegion', 'react-native.src.prompt._module_.PromptScreenRouteProp', 'react-native.src.api.invokeOpenAIWithCallBack', 'react-native.src.chat.component.CustomComposerProps', 'react-native.src.chat.component.createStyles', 'react-native.src.storage.getDefaultTextModels', 'react-native.src.settings.addBedrockPrefixToDeepseekModels', 'react-native.src.storage._module_.GPTModels', 'react-native.src.storage.getMessagesBySessionId', 'react-native.src.api.extractChunkContent', 'react-native.src.chat.component.ModelSelectionModal', 'react-native.src.chat.ChatScreen', 'react-native.src.storage.getOllamaApiUrl', 'react-native.src.chat.util._module_.MAX_IMAGES', 'react-native.src.storage.saveAllSystemPrompts', 'react-native.src.chat._module_.textPlaceholder', 'react-native.src.storage.saveOpenAICompatModels', 'react-native.src.chat.component.markdown._module_.CustomCodeHighlighter', 'react-native.src.storage.updateMessageList', 'react-native.src.storage._module_.apiKeyTag', 'react-native.src.chat.component._module_.EXTRA_DOCUMENT_FORMATS', 'react-native.src.settings.getImagePrice', 'react-native.src.storage._module_.DefaultTextModel', 'react-native.src.settings.CustomDropdown', 'react-native.src.storage._module_.DefaultImageModel', 'react-native.src.settings.createStyles', 'react-native.src.theme.ThemeProviderProps', 'react-native.src.chat.component.ModelIconButton', 'react-native.src.api.requestAllModels', 'react-native.src.storage._module_.thinkingEnabledKey', 'react-native.src.chat.util.ImageContent', 'react-native.src.chat.component.ModelIconButtonProps', 'react-native.src.storage.saveImageModel', 'react-native.src.storage.saveApiKey', 'react-native.src.settings.TabButton', 'react-native.src.storage._module_.sessionIdPrefix', 'react-native.src.history.groupMessagesByDate', 'react-native.src.utils._module_.isAndroid', 'react-native.src.storage.getSystemPrompts', 'react-native.src.chat.createStyles', 'react-native.src.storage._module_.messageListKey', 'react-native.src.api.isEnableThinking', 'react-native.src.api.genImage', 'react-native.src.chat.component.HeaderTitleProps', 'react-native.src.storage.getApiUrl', 'react-native.src.storage.saveThinkingEnabled', 'react-native.src.types.Metrics', 'react-native.src.storage._module_.openAICompatModelsKey', 'react-native.src.storage._module_.systemPromptsKey', 'react-native.src.chat.component.ModelSelectionModalProps', 'react-native.src.chat.component.markdown._module_.ALLOWED_STYLE_PROPERTIES', 'react-native.src.api.parseStreamData', 'react-native.src.storage.saveKeys', 'react-native.src.chat.component.markdown.getTableWidthArr', 'react-native.src.storage.getCurrentVoiceSystemPrompt', 'react-native.src.storage.saveOllamaApiURL', 'react-native.src.history.AppProviderProps', 'react-native.src.chat.util.getFileTypeSummary', 'react-native.src.chat.service._module_.voiceChatEmitter', 'react-native.src.api.getApiKey', 'react-native.src.types._module_.Usage', 'react-native.src.prompt.PresetPromptListProps', 'react-native.src.api.invokeBedrockWithCallBack', 'react-native.src.chat.component.markdown.useMarkdownHookOptions', 'react-native.src.types._module_.OllamaModel', 'react-native.src.theme.ThemeProvider', 'react-native.src.chat.component.CustomAddFileComponent', 'react-native.src.history._module_.AppContext', 'react-native.src.storage.getMessageList', 'react-native.src.api.requestAllOllamaModels', 'react-native.src.storage.getThinkingEnabled', 'react-native.src.storage._module_.ollamaApiUrlKey', 'react-native.src.utils._module_.isMacCatalyst', 'react-native.src.settings.getUsagePrice', 'react-native.src.chat.component.markdown._module_.MemoizedCodeHighlighter', 'react-native.src.storage.saveOpenAIApiKey', 'react-native.src.storage._module_.DefaultVoiceSystemPrompts', 'react-native.src.chat.component._module_.CustomHeaderRightButton', 'react-native.src.storage.saveVoiceId', 'react-native.src.storage._module_.textModelKey', 'react-native.src.chat.util.saveImageToLocal', 'react-native.src.types._module_.UsagePrice', 'react-native.src.settings._module_.ModelPrice', 'react-native.src.chat.component._module_.AnimatedCircle', 'react-native.src.chat.component.markdown.CustomMarkdownRenderer', 'react-native.src.chat.component.markdown._module_.ChatMarkdownProps', 'react-native.src.chat.component.markdown._module_.HighlighterStyleSheet', 'react-native.src.api.requestToken', 'react-native.src.chat.component.CustomScrollToBottomComponent', 'react-native.src.settings.getTotalInputPrice', 'react-native.src.storage.getImageModel', 'react-native.src.utils.getModelTag', 'react-native.src.storage.saveOpenAICompatApiKey', 'react-native.src.chat._module_.imagePlaceholder', 'react-native.src.chat.component.CircularProgress', 'react-native.src.chat.component.ListIcon', 'react-native.src.chat.util.setHapticFeedbackEnabled', 'react-native.src.chat.component.CustomMessageProps', 'react-native.src.types._module_.TokenResponse', 'react-native.src.history.useAppContext', 'react-native.src.storage.saveModelOrder', 'react-native.src.storage.getOpenAICompatApiKey', 'react-native.src.storage._module_.hapticEnabledKey', 'react-native.src.chat.service._module_.voiceChatService', 'react-native.src.storage._module_.DefaultRegion', 'react-native.src.storage.getAllImageSize', 'react-native.src.api.getApiPrefix', 'react-native.src.history._module_.DrawerType', 'react-native.src.prompt._module_.styles', 'react-native.src.chat.component.markdown.getRNStylesFromHljsStyle', 'react-native.src.utils.getModelIcon', 'react-native.src.chat.component.markdown.Markdown', 'react-native.src.storage.getDeepSeekApiKey', 'react-native.src.chat.component.isVideoFormat', 'react-native.src.storage.getOpenAIApiKey', 'react-native.src.settings._module_.GITHUB_LINK', 'react-native.src.storage.saveSystemPrompts', 'react-native.src.chat.component.HeaderRightButtonProps', 'react-native.src.storage._module_.VoiceIDList', 'react-native.src.history.getTodayTimestamp', 'react-native.src.chat.util._module_.OpenAIMessage', 'react-native.src.prompt._module_.RootStackParamList', 'react-native.src.types._module_.RouteParamList', 'react-native.src.storage.getRegion', 'react-native.src.chat.component.markdown.CodeHighlighterProps', 'react-native.src.storage.updateTextModelUsageOrder', 'react-native.src.storage.getAllRegions', 'react-native.src.chat.component.CustomFileProps', 'react-native.src.chat.util._module_.MessageContent', 'react-native.src.prompt.PresetPrompt', 'react-native.src.prompt._module_.MAX_NAME_LENGTH', 'react-native.src.chat.service.VoiceChatService', 'react-native.src.types._module_.DrawerParamList', 'react-native.src.chat.util.getFullFileUrl', 'react-native.src.chat.util._module_.MAX_NOVA_VIDEOS', 'react-native.src.chat.component.ImageProgressBar', 'react-native.src.history.getFirstDayOfMonthTimestamp', 'react-native.src.types.FileType', 'react-native.src.chat.component.markdown.CustomTokenizer', 'react-native.src.api.isOpenRouterRequest', 'react-native.src.storage._module_.RegionList', 'react-native.src.storage.getTextModel', 'react-native.src.chat.component.isDocumentFormat', 'react-native.src.types.PressMode', 'react-native.src.chat.component.PromptListProps', 'react-native.src.chat.component._module_.minWidth', 'react-native.src.chat.util.trigger', 'react-native.src.storage.getMessageListStr', 'react-native.src.api.invokeOllamaWithCallBack', 'react-native.src.storage.saveAllModels', 'react-native.src.storage._module_.currentSystemPromptKey', 'react-native.src.settings.getTotalOutputTokens', 'react-native.src.storage._module_.voiceIdKey', 'react-native.src.storage.getDefaultApiKeyModels', 'react-native.src.history.CustomDrawerContent', 'react-native.src.chat.component.markdown._module_.MemoizedText', 'react-native.src.chat.component._module_.AnimatedImage', 'react-native.src.storage.getTokenInfo', 'react-native.src.types._module_.UpgradeInfo', 'react-native.src.storage._module_.openAICompatApiURLKey', 'react-native.src.chat.component.isImageFormat', 'react-native.src.chat.component.ImageSpinner', 'react-native.src.history.AppContextType', 'react-native.src.storage.getModelUsage', 'react-native.src.types.SwiftChatMessage', 'react-native.src.api._module_.isDev', 'react-native.src.storage._module_.modelUsageKey', 'react-native.src.chat.util._module_.BedrockMessage', 'react-native.src.chat.component._module_.VIDEO_FORMATS', 'react-native.src.chat.util.DocumentContent', 'react-native.src.prompt.createStyles', 'react-native.src.theme.ThemeContextType', 'react-native.src.chat._module_.ChatScreenRouteProp', 'react-native.src.chat.component.CustomFileListComponent', 'react-native.src.chat.component.AudioWaveformRef', 'react-native.src.chat.util.TextContent', 'react-native.src.chat.component._module_.MODAL_HEIGHT', 'react-native.src.api._module_.OllamaResponse', 'react-native.src.api._module_.CallbackFunction', 'react-native.src.prompt._module_.PresetPromptListNavigationProp', 'react-native.src.theme._module_.lightColors', 'react-native.src.history.createStyles', 'react-native.src.types._module_.AllModel', 'react-native.src.settings.TabButtonProps', 'react-native.src.settings.CustomTextInput', 'react-native.src.settings._module_.ImageModelPrices', 'react-native.src.history.formatTimestampToYearMonth', 'react-native.src.storage._module_.currentVoiceSystemPromptKey', 'react-native.src.storage._module_.imageSizeKey', 'react-native.src.chat.util.normalizeFilename', 'react-native.src.settings.getTotalImageCount', 'react-native.src.storage._module_.allModelKey', 'react-native.src.prompt._module_.PROMPT_CATEGORIES', 'react-native.src.storage._module_.currentSessionIdKey', 'react-native.src.types.ModelTag', 'react-native.src.settings.ModelPriceType', 'react-native.src.prompt.PromptScreen', 'react-native.src.storage.saveMessages', 'react-native.src.chat.generateId', 'react-native.src.utils.getModelTagByUserName', 'react-native.src.storage.initializeStorage', 'react-native.src.theme.useTheme', 'react-native.src.prompt._module_.PRESET_PROMPTS', 'react-native.src.chat.util.VideoContent', 'react-native.src.storage._module_.HARDCODED_DEEPSEEK_API_KEY', 'react-native.src.types.ReasoningContent', 'react-native.src.chat.util.getBedrockMessage', 'react-native.src.settings._module_.NavigationProp', 'react-native.src.theme.ColorScheme', 'react-native.src.chat.component.markdown._module_.ReactStyle', 'react-native.src.chat.component.markdown.useMarkdown', 'react-native.src.storage.saveTextModel', 'react-native.src.api.isConfigured', 'react-native.src.theme._module_.ThemeContext', 'react-native.src.api.isThinkingModel', 'react-native.src.storage.getMergedModelOrder', 'react-native.src.storage.saveOpenAIProxyEnabled', 'react-native.src.prompt.PresetPromptList', 'react-native.src.settings.getTotalOutputPrice', 'react-native.src.chat.component.CustomRenderActionsProps', 'react-native.src.chat.component.HeaderTitle', 'react-native.src.storage.getAllModels', 'react-native.src.chat.util._module_.MAX_NOVA_FILES', 'react-native.src.chat.util.ImageInfo', 'react-native.src.storage.updateTotalUsage', 'react-native.src.storage.getImageSize', 'react-native.src.chat.component.markdown.CustomCodeHighlighter', 'react-native.src.chat.component.getFileNameWithoutExtension', 'react-native.src.settings._module_.initUpgradeInfo', 'react-native.src.storage.saveMessageList', 'react-native.src.storage.saveTokenInfo', 'react-native.src.storage.saveApiUrl', 'react-native.src.prompt.HeaderLeftView', 'react-native.src.api._module_.OpenRouterTag', 'react-native.src.types.EventData', 'react-native.src.api.getApiURL', 'react-native.src.types._module_.Chat', 'react-native.src.prompt._module_.NavigationProp', 'react-native.src.chat.util.isAllFileReady', 'react-native.src.storage._module_.openAIProxyEnabledKey', 'react-native.src.storage.getPromptId', 'react-native.src.api.getOpenAIMessages', 'react-native.src.settings.getTotalInputTokens', 'react-native.src.storage._module_.BedrockVoiceModels', 'react-native.src.chat.util.getUniqueFileName', 'react-native.src.types.SwiftChatUser', 'react-native.src.chat.component._module_.customMarkedStyles', 'react-native.src.storage.saveCurrentSystemPrompt', 'react-native.src.chat.component.openInFileViewer', 'react-native.src.chat.util.getFileBytes', 'react-native.src.storage.saveOpenAICompatApiURL', 'react-native.src.storage.getSessionId', 'react-native.src.chat.util.isNova', 'react-native.src.settings.getTotalImagePrice', 'react-native.src.storage._module_.encryptStorage', 'react-native.src.storage._module_.keyPrefix', 'react-native.src.chat.util.isValidFilename', 'react-native.src.chat.component.markdown.getMathKey', 'react-native.src.chat.component.getFiles', 'react-native.src.chat.util._module_.hapticOptions', 'react-native.src.chat.createBotMessage', 'react-native.src.storage._module_.imageModelKey', 'react-native.src.storage._module_.DefaultSystemPrompts', 'react-native.src.chat.component.DefaultIcon', 'react-native.src.storage.getApiKey', 'react-native.src.storage.getOpenAIProxyEnabled', 'react-native.src.settings.DropdownItem', 'react-native.src.chat.component.markdown._module_.mathViewIndex', 'react-native.src.theme._module_.darkColors', 'react-native.src.storage.isNovaCanvas', 'react-native.src.storage.getDefaultSystemPrompts', 'react-native.src.storage._module_.BedrockThinkingModels', 'react-native.src.chat.component._module_.isAndroid', 'react-native.src.settings.CustomDropdownProps', 'react-native.src.settings.CustomTextInputProps', 'react-native.src.chat.component.markdown.createCustomStyles', 'react-native.src.chat.util.saveFile', 'react-native.src.chat.component._module_.IMAGE_FORMATS', 'react-native.src.storage._module_.apiUrlKey', 'react-native.src.storage._module_.modelOrderKey', 'react-native.src.chat.component.ProgressCircle', 'react-native.src.chat.component.getStyles', 'react-native.src.settings.getTotalCost', 'react-native.src.chat.component.EmptyChatComponent', 'react-native.src.types.Delta', 'react-native.src.types._module_.FileInfo', 'react-native.src.storage.getModelOrder', 'react-native.src.types.BedrockChunk', 'react-native.src.storage.isTokenValid', 'react-native.src.api.parseChunk', 'react-native.src.storage._module_.regionKey', 'react-native.src.chat.component.markdown._module_.styles', 'react-native.src.chat.util.checkFileNumberLimit', 'react-native.src.storage.getOpenAICompatModels', 'react-native.src.storage._module_.DefaultVoicePrompt', 'react-native.src.storage._module_.deepSeekApiKeyTag', 'react-native.src.chat.component._module_.MAX_FILE_SIZE', 'react-native.src.storage._module_.DeepSeekModels', 'react-native.src.chat.component.DisplayMode', 'react-native.src.chat.component._module_.AudioWaveformComponent', 'react-native.src.storage._module_.currentPromptIdKey', 'react-native.src.chat.component.CustomMessageComponent', 'react-native.src.chat.component.CustomChatFooter', 'react-native.src.storage._module_.openAIApiKeyTag', 'react-native.src.chat.component._module_.isPad', 'react-native.src.settings.TokenUsageScreen', 'react-native.src.types._module_.Model', 'react-native.src.chat.component._module_.SCREEN_WIDTH', 'react-native.src.storage.saveImageSize', 'react-native.src.chat.util.showInfo', 'react-native.src.storage.isNewStabilityImageModel', 'react-native.src.chat.component.markdown.cleanStyle', 'react-native.src.storage.getVoiceId', 'react-native.src.chat.component._module_.MAX_VIDEO_SIZE', 'react-native.src.chat.component.isVideoSupported', 'react-native.src.chat.component.markdown.CopyButtonProps', 'react-native.src.prompt.calculateTextLength', 'react-native.src.chat.util._module_.MAX_DOCUMENTS', 'react-native.src.storage.savePromptId', 'react-native.src.storage.getOpenAICompatApiURL', 'react-native.src.types.DropdownItem', 'react-native.src.storage.getHapticEnabled', 'react-native.src.history.AppProvider', 'react-native.src.chat._module_.currentMode', 'react-native.src.storage._module_.storage', 'react-native.src.types._module_.ImageRes', 'react-native.src.storage.saveHapticEnabled', 'react-native.src.chat.component._module_.DOCUMENT_FORMATS', 'react-native.src.chat._module_.BOT_ID', 'react-native.src.chat.util.getFileTextContent', 'react-native.src.types.ChatMode', 'react-native.src.chat.component.PromptListComponent', 'react-native.src.storage._module_.openAICompatApiKeyTag', 'react-native.src.types.ChatStatus', 'react-native.src.api.getProxyRequestURL'])]
+  ```🔍 Getting file contents
+  filenames:
+    - react-native/src/chat/component/CustomAddFileComponent.tsx
+    - react-native/src/chat/util/FileUtils.ts
+    - react-native/src/chat/component/CustomMessageComponent.tsx
+    - react-native/src/api/ollama-api.ts
+    - react-native/src/chat/ChatScreen.tsx
+    - react-native/src/api/open-api.ts
+    - react-native/src/chat/util/BedrockMessageConvertor.ts
+    - react-native/src/api/bedrock-api.ts
+    - server/src/main.py
+    - server/src/image_nl_processor.py
+  ```
+  Based on the provided code, I found several debugging-related items:
+  
+  ## Error Messages & Exception Handling
+  
+  ### ConversationManager.swift
+  - **Error logging with print statements**:
+    - `print("❌ Start Conversation error", error)` (line 53)
+    - `print("❌ End Conversation error", error)` (line 74)
+    - `print("❌ Error playing audio in AudioManager: \(error)")` (line 83)
+  
+  - **Error handling patterns**:
+    - NSError creation for uninitialized service: `NSError(domain: "ConversationError", code: -1, userInfo: [NSLocalizedDescriptionKey: "Service not initialized"])`
+    - Multiple try-catch blocks with error propagation
+  
+  ### bedrock-api.ts
+  - **Console logging for debugging**:
+    - `console.log('Error reading stream:', readError)` (line 130)
+    - `console.log(errorInfo)` (line 155)
+    - `console.log(`HTTP error! status: ${response.status}`)` (line 190, 218)
+    - `console.log('Error fetching models:', error)` (line 198)
+    - `console.log('Error fetching token:', error)` (line 225)
+    - `console.log('Error fetching upgrade info:', error)` (line 250)
+    - `console.log(errMsg)` (line 283)
+    - `console.log('DataChunk parse error:' + innerError, part)` (line 329)
+  
+  - **Error handling patterns**:
+    - Timeout handling with `setTimeout(() => controller.abort(), 60000)`
+    - Network error detection and transformation
+    - Stream reading error recovery
+  
+  ### VoiceChatService.ts
+  - **Comprehensive error message mapping** (lines 50-76):
+    ```typescript
+    let errorMsg = event.message ?? '';
+    if (errorMsg.includes('The network connection was lost')) {
+      errorMsg = '\n**The network connection was lost**';
+    } else if (errorMsg.includes('The request timed out')) {
+      errorMsg = '\n**The request timed out**';
+    } else if (errorMsg.includes('messages cannot be null or empty')) {
+      errorMsg = '\n**Messages cannot be null or empty**';
+    }
+    // ... more error mappings
+    ```
+  
+  - **Error callback patterns** throughout the class for initialization, conversation management, and credential validation
+  
+  ### image_nl_processor.py
+  - **Exception handling with HTTPException**:
+    - `raise HTTPException(status_code=400, detail=f"Error: ${result_objet['error']}")` (line 86)
+    - `raise HTTPException(status_code=400, detail=f"Error: image analyse failed, {error}")` (line 88)
+    - `raise HTTPException(status_code=400, detail=f"Error: analyse failed, {error}")` (line 107)
+  
+  - **Debug print statement**:
+    - `print(f"Error analyse by nova-lite: {error}")` (line 106)
+  
+  ## Key Debugging Issues Found
+  
+  1. **Inconsistent error logging**: Mix of `console.log` and `print` statements across different platforms
+  2. **Network error handling**: Multiple timeout and connection error scenarios handled
+  3. **Stream processing errors**: Error recovery in stream reading operations
+  4. **Credential validation**: AWS token validation and refresh error handling
+  5. **Audio processing errors**: Error handling in audio playback and recording operations
+  6. **HTTP error status handling**: Various HTTP status code error scenarios
+  
+  These debugging elements indicate areas where the application may encounter issues with network connectivity, credential management, audio processing, and stream handling.
+</message>
+
+<message type=ai>
+  
+  # PlanningLooking through the provided code files, I found several instances of console.log, print statements, and debug logging that indicate debugging efforts:
+  
+  ## React Native TypeScript Files
+  
+  ### CustomAddFileComponent.tsx
+  - **Line 168**: `console.info(err);` - Error logging in try-catch block when handling file selection
+  
+  ### CustomMessageComponent.tsx
+  - **Line 124**: `console.log(error);` - Error logging when opening files with FileViewer
+  - **Line 128**: `console.log(res)` - Success response logging for Share.open
+  - **Line 129**: `console.log(err)` - Error logging for Share.open
+  
+  ### FileUtils.ts
+  - **Line 19**: `console.info('Error saving image:', error);` - Error logging for image saving
+  - **Line 45**: `console.warn('Error saving file:', error);` - Warning for file saving errors
+  - **Line 54**: `console.warn('Error reading image file:', fileUrl, error);` - Warning for file reading errors
+  - **Line 63**: `console.warn('Error reading text file:', fileUrl, error);` - Warning for text file reading errors
+  
+  ### ollama-api.ts
+  - **Line 83**: `console.log('Error reading stream:', readError);` - Stream reading error logging
+  - **Line 93**: `console.log(error);` - General error logging
+  - **Line 168**: `console.log(`HTTP error! status: ${response.status}`);` - HTTP status error logging
+  - **Line 175**: `console.log('Error fetching models:', error);` - Model fetching error logging
+  
+  ### ChatScreen.tsx
+  - **Line 471**: `handleVoiceChatTranscript('ASSISTANT', message);` followed by `console.log('Voice chat error:', message);` on line 475 - Voice chat error logging
+  
+  ### open-api.ts
+  - **Line 95**: `console.log('Error reading stream:', readError);` - Stream reading error logging
+  - **Line 105**: `console.log(error);` - General error logging
+  - **Line 181**: `console.log(`HTTP error! status: ${response.status}`);` - HTTP status error logging
+  - **Line 190**: `console.log('Error fetching models:', error);` - Model fetching error logging
+  
+  ### BedrockMessageConvertor.ts
+  - **Line 102**: `console.warn(`Error reading text content from ${fileName}:`, error);` - Warning for text content reading errors
+  - **Line 121**: `console.warn(`Error processing file ${file.fileName}:`, error);` - Warning for file processing errors
+  
+  ### bedrock-api.ts
+  - **Line 150**: `console.log('Error reading stream:', readError);` - Stream reading error logging
+  - **Line 175**: `console.log(errMsg);` - Error message logging for image generation
+  - **Line 203**: `console.log(`HTTP error! status: ${response.status}`);` - HTTP status error logging
+  - **Line 208**: `console.log('Error fetching models:', error);` - Model fetching error logging
+  - **Line 222**: `console.log('Error fetching token:', error);` - Token fetching error logging
+  - **Line 239**: `console.log('Error fetching upgrade info:', error);` - Upgrade info error logging
+  - **Line 294**: `console.log(data.error);` - Image generation error logging
+  - **Line 313**: `console.log(errMsg);` - Image generation error logging
+  - **Line 341**: `console.log('DataChunk parse error:' + innerError, part);` - JSON parsing error logging
+  
+  ## Server Python Files
+  
+  ### main.py
+  - **Line 264**: `print(f"bedrock error: {e}")` - Bedrock error logging
+  - **Line 294**: `print("error:", err)` - General error logging
+  - **Line 318**: `print(f"Error occurred when get github tag: {error}")` - GitHub API error logging
+  - **Line 363**: `print(f"Error occurred: {error_msg}")` - Image generation error logging
+  
+  ### image_nl_processor.py
+  - **Line 115**: `print(f"Error analyse by nova-lite: {error}")` - Nova-lite analysis error logging
+  
+  These logging statements appear to be primarily for:
+  1. **Error handling and debugging** - Most console.log/print statements are in catch blocks
+  2. **API response logging** - Logging responses from external services
+  3. **File operation debugging** - Logging file read/write operations
+  4. **Stream processing debugging** - Logging stream reading errors
+  5. **Service integration debugging** - Logging errors from various AWS services and APIs
+  
+  The logging indicates active debugging efforts for network requests, file operations, stream processing, and integration with external services like AWS Bedrock, OpenAI, and file system operations.
+</message>
+
+<message type=ai>
+  
+  # Planning
+  ```🔍 Searching for substrings
+  patterns:
+    - /\*.*TODO.*\*/
+    - //.*TODO
+    - #.*TODO
+    - //.*FIXME
+    - /\*.*FIXME.*\*/
+    - #.*FIXME
+  reasoning: Searching specifically for TODO and FIXME comments in various comment formats (JavaScript/TypeScript, Swift, Python)
+  ```
+  No files found with content matching patterns: /\*.*TODO.*\*/, //.*TODO, #.*TODO, //.*FIXME, /\*.*FIXME.*\*/, #.*FIXME
+  ```🔍 Searching for filenames
+  patterns:
+    - .*test.*
+    - .*spec.*
+    - .*Test.*
+    - .*Spec.*
+  reasoning: Looking for test files to check for failing tests or test-related debugging issues
+  ```
+  Based on my analysis of the codebase, I found several crash logs, error handling code, and indicators of known issues:
+  
+  ## Error Handling and Known Issues
+  
+  ### 1. Server-side Error Handling (main.py)
+  
+  **API Key Validation Errors:**
+  ```python
+  def get_api_key_from_ssm(use_cache_token: bool):
+      # ...
+      except Exception as error:
+          raise HTTPException(status_code=401,
+                              detail=f"Error: Please create your API Key in Parameter Store, {str(error)}")
+  
+  def verify_api_key(credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
+                     use_cache_token: bool = True):
+      if credentials.credentials != get_api_key_from_ssm(use_cache_token):
+          raise HTTPException(status_code=401, detail="Invalid API Key")
+  ```
+  
+  **Image Generation Error Handling:**
+  ```python
+  def get_image(client, model_id, prompt, ref_image, width, height):
+      try:
+          # ... image generation logic
+          return {"image": base64_image_data}
+      except Exception as error:
+          error_msg = str(error)
+          print(f"Error occurred: {error_msg}")
+          return {"error": error_msg}
+  ```
+  
+  **General Exception Handling in Endpoints:**
+  ```python
+  @app.post("/api/converse/v3")
+  async def converse_v3(request: ConverseRequest, _: Annotated[str, Depends(verify_api_key)]):
+      try:
+          # ... processing logic
+          return StreamingResponse(event_generator(), media_type="text/event-stream")
+      except Exception as error:
+          return PlainTextResponse(f"Error: {str(error)}", status_code=500)
+  ```
+  
+  ### 2. Client-side Error Handling (bedrock-api.ts)
+  
+  **Network and Timeout Errors:**
+  ```typescript
+  .catch(error => {
+      clearTimeout(timeoutId);
+      if (shouldStop()) {
+          // Handle cancellation
+      } else {
+          let errorMsg = String(error);
+          if (errorMsg.endsWith('AbortError: Aborted')) {
+              errorMsg = 'Timed out';
+          }
+          if (errorMsg.indexOf('http') >= 0) {
+              errorMsg = 'Unable to resolve host';
+          }
+          const errorInfo = 'Request error: ' + errorMsg;
+          callback(completeMessage + '\n\n' + errorInfo, true, true);
+      }
+  });
+  ```
+  
+  **Configuration Validation:**
+  ```typescript
+  if (!isConfigured()) {
+      callback('Please configure your API URL and API Key', true, true);
+      return;
+  }
+  
+  if (chatMode === ChatMode.Text && currentModelTag !== ModelTag.Bedrock) {
+      if (currentModelTag === ModelTag.Broperty && getDeepSeekApiKey().length === 0) {
+          callback('Please configure your DeepSeek API Key', true, true);
+          return;
+      }
+      // ... other API key checks
+  }
+  ```
+  
+  ### 3. Voice Chat Error Handling (VoiceChatService.ts)
+  
+  **Specific Voice Chat Errors with Known Messages:**
+  ```typescript
+  let errorMsg = event.message ?? '';
+  if (errorMsg.includes('The network connection was lost')) {
+      errorMsg = '\n**The network connection was lost**';
+  } else if (errorMsg.includes('The request timed out')) {
+      errorMsg = '\n**The request timed out**';
+  } else if (errorMsg.includes('messages cannot be null or empty')) {
+      errorMsg = '\n**Messages cannot be null or empty**';
+  } else if (errorMsg.includes('Timed out waiting for input events')) {
+      errorMsg = '\n**Timed out waiting for input events**';
+  } else if (errorMsg.includes('The operation couldn't be completed')) {
+      errorMsg = '\n**The operation couldn't be completed**';
+  } else if (errorMsg.includes('The system encountered an unexpected error during processing')) {
+      errorMsg = '\n**The system encountered an unexpected error during processing. Try your request again.**';
+  } else if (errorMsg.includes('closed stream. HTTP/2 error code: NO_ERROR')) {
+      errorMsg = '\n**Stream Closed With NO_ERROR**';
+  }
+  ```
+  
+  ### 4. OpenAI API Error Handling (open-api.ts)
+  
+  **Stream Parsing Errors:**
+  ```typescript
+  try {
+      const parsedData: ChatResponse = JSON.parse(cleanedData);
+      if (parsedData.error) {
+          let errorMessage = '**Error:** ' + (parsedData.error?.message ?? '');
+          if (parsedData.error?.metadata?.raw) {
+              errorMessage += ':\n' + parsedData.error.metadata.raw;
+          }
+          return { error: errorMessage };
+      }
+      if (parsedData.detail) {
+          return {
+              error: `Error: Please upgrade your [server API](${GITHUB_LINK}?tab=readme-ov-file#upgrade-api), API ` + parsedData.detail,
+          };
+      }
+  } catch (error) {
+      // ... error handling for parsing failures
+  }
+  ```
+  
+  ### 5. Storage Error Prevention (StorageUtils.ts)
+  
+  **Crash Prevention Code:**
+  ```typescript
+  export function getSystemPrompts(type?: string): SystemPrompt[] {
+      // ... existing logic
+      if (currentSystemPrompts.length === 0) {
+          // fix the crash issue
+          currentSystemPrompts = getDefaultSystemPrompts();
+          currentSystemPrompts = type
+              ? currentSystemPrompts.filter(p => p.promptType === type)
+              : currentSystemPrompts.filter(p => p.promptType === undefined);
+          saveAllSystemPrompts(getDefaultSystemPrompts());
+      }
+      return currentSystemPrompts;
+  }
+  ```
+  
+  ## Key Known Issues Identified:
+  
+  1. **Network connectivity issues** - Various timeout and connection errors
+  2. **Authentication failures** - API key validation and token expiration
+  3. **Voice chat stream errors** - HTTP/2 stream closure and timeout issues  
+  4. **Configuration validation** - Missing API keys and URLs
+  5. **Image generation failures** - Model access and processing errors
+  6. **Stream parsing errors** - JSON parsing failures in API responses
+  7. **Storage corruption prevention** - Empty system prompts causing crashes
+  
+  The codebase shows comprehensive error handling throughout, suggesting these are well-known issues that the developers have encountered and addressed with specific error messages and recovery mechanisms.
+</message>
+
+<message type=ai>
+  
+  # PlanningMatching filenames: react-native/ios/SwiftChatTests/Info.plist, react-native/ios/TestAddBridge.swift, react-native/ios/SwiftChatTests/SwiftChatTests.m
+  ```🔍 Getting file contents
+  filenames:
+    - react-native/src/api/open-api.ts
+    - react-native/src/api/ollama-api.ts
+    - react-native/ios/Services/AudioManager.swift
+    - react-native/src/chat/component/CustomFileListComponent.tsx
+  ```
+  
+  ```🔍 Searching for substrings
+  patterns:
+    - stack trace
+    - stacktrace
+    - at .*:\d+
+    - \s+at 
+    - Caused by:
+    - Exception in thread
+    - Fatal Exception
+    - FATAL
+    - \*\*\* Terminating app due to
+    - libc\+\+abi
+    - abort\(\)
+    - SIGABRT
+    - SIGSEGV
+    - NSException
+    - uncaught exception
+    - unhandled exception
+  reasoning: Looking for actual crash logs, stack traces, and fatal error patterns that would indicate specific crash locations and causes
+  ```
+  Files with content matching patterns: react-native/android/gradlew, react-native/ios/Services/AudioManager.swift, CONTRIBUTING.md, react-native/--assets-dest, react-native/src/api/ollama-api.ts, react-native/src/chat/ChatScreen.tsx, react-native/src/api/open-api.ts, react-native/src/api/bedrock-api.ts, react-native/package-lock.json, README.md
+</message>
+
+<message type=ai>
+  
+  # Planning
+  ```🔍 Getting file contents
+  filenames:
+    - react-native/ios/Services/AudioManager.swift
+    - react-native/src/chat/ChatScreen.tsx
+    - react-native/src/api/ollama-api.ts
+  ```
+  
+  # Answer
+  # Debug Logging and Console Statements Found in the Project
+  
+  Based on my analysis of the codebase, I found extensive debugging efforts throughout the React Native application and Python server. Here are the key debugging patterns and locations:
+  
+  ## React Native Frontend Debug Logging
+  
+  ### File Operation Debugging
+  - **FileUtils.ts**: Contains multiple console logging statements for file operations:
+    - `console.info('Error saving image:', error)` - Image saving errors
+    - `console.warn('Error saving file:', error)` - File saving warnings
+    - `console.warn('Error reading image file:', fileUrl, error)` - Image reading errors
+    - `console.warn('Error reading text file:', fileUrl, error)` - Text file reading errors
+  
+  ### API Communication Debugging
+  - **ollama-api.ts**: Extensive logging for Ollama API interactions:
+    - `console.log('Error reading stream:', readError)` - Stream processing errors
+    - `console.log(error)` - General API errors
+    - `console.log(\`HTTP error! status: ${response.status}\`)` - HTTP status logging
+    - `console.log('Error fetching models:', error)` - Model fetching errors
+  
+  - **open-api.ts**: Similar patterns for OpenAI API:
+    - `console.log('Error reading stream:', readError)` - Stream reading errors
+    - `console.log(error)` - General error logging
+    - `console.log(\`HTTP error! status: ${response.status}\`)` - HTTP response logging
+    - `console.log('Error fetching models:', error)` - Model API errors
+  
+  - **bedrock-api.ts**: AWS Bedrock service debugging:
+    - `console.log('Error reading stream:', readError)` - Stream processing
+    - `console.log(errMsg)` - Image generation errors
+    - `console.log(\`HTTP error! status: ${response.status}\`)` - HTTP status
+    - `console.log('Error fetching token:', error)` - Authentication errors
+    - `console.log('Error fetching upgrade info:', error)` - Service upgrade errors
+    - `console.log('DataChunk parse error:' + innerError, part)` - JSON parsing errors
+  
+  ### UI Component Debugging
+  - **CustomAddFileComponent.tsx**: File selection debugging:
+    - `console.info(err)` - File selection error logging
+  
+  - **CustomMessageComponent.tsx**: Message handling debugging:
+    - `console.log(error)` - File viewer errors
+    - `console.log(res)` - Share operation success
+    - `console.log(err)` - Share operation errors
+  
+  - **ChatScreen.tsx**: Voice chat debugging:
+    - `console.log('Voice chat error:', message)` - Voice interaction errors
+  
+  ### Message Processing Debugging
+  - **BedrockMessageConvertor.ts**: Message conversion debugging:
+    - `console.warn(\`Error reading text content from ${fileName}:\`, error)` - Text content errors
+    - `console.warn(\`Error processing file ${file.fileName}:\`, error)` - File processing errors
+  
+  ## Python Server Debug Logging
+  
+  ### Main Server Debugging (main.py)
+  - `print(f"bedrock error: {e}")` - AWS Bedrock integration errors
+  - `print("error:", err)` - General server errors  
+  - `print(f"Error occurred when get github tag: {error}")` - GitHub API errors
+  - `print(f"Error occurred: {error_msg}")` - Image generation errors
+  
+  ### Image Processing Debugging (image_nl_processor.py)
+  - `print(f"Error analyse by nova-lite: {error}")` - AI model analysis errors
+  
+  ## Common Debugging Patterns Identified
+  
+  1. **Error Handling**: Most logging occurs in try-catch blocks for error diagnosis
+  2. **API Integration**: Heavy logging around external service calls (AWS, OpenAI, Ollama)
+  3. **File Operations**: Comprehensive logging for file read/write operations
+  4. **Stream Processing**: Detailed logging for real-time data streaming
+  5. **Network Requests**: HTTP status and response logging
+  6. **Service Authentication**: Token and API key validation logging
+  
+  ## Debugging Recommendations
+  
+  The extensive logging suggests active development and troubleshooting efforts around:
+  - **External API integrations** (AWS Bedrock, OpenAI, Ollama)
+  - **File handling and media processing**
+  - **Real-time streaming and voice chat features**
+  - **Authentication and token management**
+  - **Cross-platform mobile functionality**
+  
+  These logging statements indicate areas where the development team has encountered issues and implemented debugging to diagnose problems. The patterns suggest this is a sophisticated AI chat application with multiple service integrations that requires careful error handling and monitoring.
+</message>
+
+<message type=user>
+  debug this program
+</message>
+
+<message type=user>
+  
+  Examining initial workspace
+  No additional recommended context found
+</message>
+
+<message type=ai>
+  
+  # Planning
+  I need to understand what program needs to be debugged. Since no specific program or codebase has been provided in the workspace, I should first explore what's available in the current project.
+  
+  Let me start by searching for any programs or code files that might need debugging.
+  Tool call(s): `callSearchAgent`
+</message>
+
+<message type=user>
+  Search Agent engaged: Find all main programs, executables, or entry points in this project that might need debugging
+  Performing initial project scan
+  
+  Scan complete; added recommendations to the Workspace.
+</message>
+
+<message type=ai>
+  
+  # Planning
+  I need to explore the project structure to find all main programs, executables, or entry points. Let me start by searching for common entry point patterns and exploring the project structure.
+  ```🔍 Searching for filenames
+  patterns:
+    - .*main\..*
+    - .*index\..*
+    - .*app\..*
+    - .*App\..*
+    - package\.json
+    - .*\.config\..*
+  reasoning: Looking for common entry point files like main.*, index.*, App.*, package.json, and config files that might indicate project structure and entry points
+  ```
+  Matching filenames: react-native/jest.config.js, react-native/src/theme/index.ts, react-native/src/App.tsx, react-native/index.js, react-native/ios/SwiftChat/main.m, server/src/main.py, react-native/android/app/src/main/assets/index.android.bundle, react-native/babel.config.js, react-native/app.json, react-native/metro.config.js, react-native/package.json
+  ```🔍 Searching for substrings
+  patterns:
+    - "main":\s*"[^"]*"
+    - "scripts":\s*\{
+    - public static void main
+    - if __name__ == "__main__"
+    - def main\(
+    - function main\(
+    - export default
+    - module\.exports
+  reasoning: Searching for entry point patterns in various languages - Node.js main field, scripts in package.json, Java main method, Python main, JavaScript/TypeScript exports
+  ```
+  Files with content matching patterns: react-native/.eslintrc.js, react-native/src/chat/component/ImageProgressBar.tsx, react-native/.prettierrc.js, server/src/main.py, react-native/src/App.tsx, react-native/src/chat/component/markdown/Markdown.tsx, react-native/src/chat/component/markdown/Parser.tsx, react-native/src/settings/SettingsScreen.tsx, react-native/src/chat/component/CustomSendComponent.tsx, react-native/src/history/CustomDrawerContent.tsx, react-native/src/chat/component/AudioWaveformComponent.tsx, react-native/src/settings/DropdownComponent.tsx, react-native/src/settings/TabButton.tsx, react-native/src/prompt/PromptScreen.tsx, react-native/src/chat/component/markdown/useMarkdown.ts, react-native/jest.config.js, react-native/src/prompt/PresetPromptList.tsx, react-native/src/chat/component/markdown/CustomCodeHighlighter.tsx, react-native/src/chat/component/ImageSpinner.tsx, react-native/babel.config.js, react-native/metro.config.js, react-native/src/chat/component/CustomMessageComponent.tsx, react-native/src/settings/TokenUsageScreen.tsx, react-native/src/chat/component/HeaderTitle.tsx, react-native/src/chat/ChatScreen.tsx, react-native/package.json, react-native/src/settings/CustomTextInput.tsx
+</message>
+
+<message type=ai>
+  
+  # Planning
+  I can see there are multiple programs in this project. Let me examine the main entry points to provide a comprehensive answer.
+  ```❓ 
+  filePaths:
+    - server/src/*.py
+  ```
+  Added dynamic file summaries for: [server/src/image_nl_processor.py, server/src/main.py]
+  ```🔍 Getting file contents
+  filenames:
+    - react-native/package.json
+    - react-native/index.js
+    - server/src/main.py
+    - react-native/ios/SwiftChat/main.m
+  ```
+  Based on the provided files, here are all the main programs, executables, or entry points in this project that might need debugging:
+  
+  ## Main Entry Points
+  
+  ### 1. React Native Application Entry Point
+  **File:** `react-native/index.js`
+  - **Main component:** `App` (imported from `./src/App`)
+  - **Registration:** `AppRegistry.registerComponent('BropertyAi', () => App)`
+  - This is the primary entry point for the React Native application
+  
+  ### 2. Python FastAPI Server Entry Point
+  **File:** `server/src/main.py`
+  - **Main function:** `if __name__ == "__main__":` block at the end
+  - **Server startup:** `uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))`
+  - This is the main server application that handles API requests
+  
+  ### 3. iOS Native Entry Point
+  **File:** `react-native/ios/SwiftChat/main.m`
+  - **Function:** `int main(int argc, char *argv[])`
+  - **Delegates to:** `AppDelegate` class via `UIApplicationMain`
+  - This is the iOS-specific native entry point
+  
+  ## Package.json Scripts (Executable Commands)
+  
+  **File:** `react-native/package.json`
+  
+  ### Development Scripts:
+  - `"start": "react-native start"` - Metro bundler entry point
+  - `"android": "react-native run-android"` - Android app launcher
+  - `"ios": "react-native run-ios"` - iOS app launcher
+  
+  ### Build Scripts:
+  - `"build:ios": "cd ios && xcodebuild -workspace BropertyAi.xcworkspace -scheme BropertyAi..."` - iOS build process
+  
+  ### Testing/Quality Scripts:
+  - `"test": "jest"` - Test runner entry point
+  - `"lint": "npx eslint ."` - Linting process
+  - `"format": "npx prettier --check '*.{js,ts}'"` - Code formatting check
+  
+  ## Key Application Details
+  
+  ### React Native App:
+  - **App Name:** "BropertyAi" 
+  - **Version:** "2.4.0"
+  - **Main App Component:** Located at `./src/App` (referenced in index.js)
+  
+  ### FastAPI Server:
+  - **Port:** Configurable via PORT environment variable (default: 8080)
+  - **Host:** "0.0.0.0" (all interfaces)
+  - **Framework:** FastAPI with uvicorn server
+  - **Main app instance:** `app = FastAPI()`
+  
+  These entry points represent the primary locations where debugging efforts should be focused, as they control the application startup and execution flow.
+</message>
+
+<message type=ai>
+  
+  # Planning
+  # Answer
+  # Main Programs, Executables, and Entry Points for Debugging
+  
+  This project contains multiple main programs and entry points across different platforms and technologies. Here are all the key entry points that might need debugging:
+  
+  ## 1. React Native Application Entry Points
+  
+  ### Primary JavaScript Entry Point
+  - **File:** `react-native/index.js`
+  - **Purpose:** Main React Native application entry point
+  - **Key Code:** `AppRegistry.registerComponent('BropertyAi', () => App)`
+  - **Imports:** App component from `./src/App`
+  
+  ### Main App Component
+  - **File:** `react-native/src/App.tsx` (already in workspace)
+  - **Purpose:** Root React component with navigation, theming, and providers
+  - **Key Features:**
+    - Navigation setup with drawer and stack navigators
+    - Theme provider integration
+    - App context provider
+    - Toast notifications
+    - Multiple screen components (ChatScreen, TokenUsageScreen, PromptScreen, etc.)
+  
+  ### iOS Native Entry Point
+  - **File:** `react-native/ios/SwiftChat/main.m`
+  - **Purpose:** iOS-specific native application entry point
+  - **Key Code:** `int main(int argc, char *argv[])` function
+  - **Delegates to:** AppDelegate class via UIApplicationMain
+  
+  ## 2. Python FastAPI Server Entry Point
+  
+  ### Main Server Application
+  - **File:** `server/src/main.py`
+  - **Purpose:** Backend API server using FastAPI
+  - **Key Code:** `if __name__ == "__main__":` block
+  - **Server Startup:** `uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))`
+  - **Configuration:** Configurable port via PORT environment variable (default: 8080)
+  
+  ### Image Processing Module
+  - **File:** `server/src/image_nl_processor.py`
+  - **Purpose:** Supporting module for image processing functionality
+  - **Note:** May contain additional entry points or main functions for image processing tasks
+  
+  ## 3. Development and Build Entry Points
+  
+  ### Package.json Scripts (react-native/package.json)
+  These are executable commands that serve as entry points for various development tasks:
+  
+  #### Development Entry Points:
+  - `"start": "react-native start"` - Metro bundler for development
+  - `"android": "react-native run-android"` - Android app launcher
+  - `"ios": "react-native run-ios"` - iOS app launcher
+  
+  #### Build Entry Points:
+  - `"build:ios": "cd ios && xcodebuild -workspace BropertyAi.xcworkspace..."` - iOS production build
+  
+  #### Testing/Quality Entry Points:
+  - `"test": "jest"` - Jest test runner
+  - `"lint": "npx eslint ."` - ESLint code linting
+  - `"format": "npx prettier --check '*.{js,ts}'"` - Prettier code formatting check
+  
+  ## 4. Configuration Entry Points
+  
+  These configuration files can affect application behavior and may need debugging:
+  
+  - **react-native/jest.config.js** - Jest testing configuration
+  - **react-native/babel.config.js** - Babel transpilation configuration  
+  - **react-native/metro.config.js** - Metro bundler configuration
+  - **react-native/.eslintrc.js** - ESLint linting configuration
+  
+  ## Application Details
+  
+  - **App Name:** "BropertyAi"
+  - **Version:** "2.4.0" 
+  - **Architecture:** React Native frontend with FastAPI Python backend
+  - **Platforms:** iOS and Android mobile apps
+  
+  ## Debugging Priority
+  
+  For debugging purposes, focus on these primary entry points in order of importance:
+  
+  1. **React Native App (`react-native/src/App.tsx`)** - Main UI and navigation logic
+  2. **FastAPI Server (`server/src/main.py`)** - Backend API and business logic
+  3. **Platform-specific entry points** (`react-native/index.js`, `react-native/ios/SwiftChat/main.m`) - Platform initialization
+  4. **Development scripts** (package.json scripts) - Build and development issues
+  
+  Each of these entry points controls different aspects of the application lifecycle and would be key locations for debugging application startup, runtime issues, or build problems.
+</message>
+
+<message type=ai>
+  
+  # Planning
+  I need to understand what specific debugging issue needs to be addressed. The goal is simply "debug this program" but there's no indication of what problem exists. Let me search for common debugging indicators like error messages, TODO comments, or failing tests.
+  Tool call(s): `callSearchAgent`, `callSearchAgent`, `callSearchAgent`
+</message>
+
+<message type=user>
+  Search Agent engaged: Find console.log, print statements, or debug logging that might indicate debugging effortsSearch Agent engaged: Find error messages, exceptions, TODO comments, FIXME comments, or failing tests that indicate debugging issuesSearch Agent engaged: Find any crash logs, stack traces, or error handling code that might indicate known issues
+  Performing initial project scan
+  Performing initial project scan
+  Performing initial project scan
+  
+  Reasoning for recommendations: All summaries are under budget
+  
+  Reasoning for recommendations: All summaries are under budget
+  
+  Reasoning for recommendations: All summaries are under budget
+  
+  Scan complete; added recommendations to the Workspace.
+  
+  Scan complete; added recommendations to the Workspace.
+  
+  Scan complete; added recommendations to the Workspace.
+</message>
+
+<message type=ai>
+  
+  # Planning
+</message>
+
+<message type=ai>
+  
+  # Planning
+</message>
+
+<message type=ai>
+  
+  # Planning
+  ```🔍 Searching for substrings
+  patterns: ["try\s*\{", "catch\s*\(", "\.catch\(", "throw\s+new", "console\.error", "console\.warn", "Error\(", "Exception", "printStackTrace", "traceback", "crash", "fail", "error", "ERROR", "WARN", "DEBUG"]
+  reasoning: Looking for error handling patterns, logging statements, exception handling, and crash-related keywords that might indicate known issues or debugging information
+  ```
+  Error parsing arguments json: Cannot deserialize value of type `java.util.ArrayList<java.lang.Object>` from String value (token `JsonToken.VALUE_STRING`)
+   at [Source: UNKNOWN; byte offset: #UNKNOWN]
+  ```🔍 Searching for substrings
+  patterns: ["console\.log\s*\(", "console\.error\s*\(", "console\.warn\s*\(", "console\.debug\s*\(", "console\.info\s*\("]
+  reasoning: Searching for JavaScript/TypeScript console logging statements that indicate debugging efforts
+  ```
+  Error parsing arguments json: Cannot deserialize value of type `java.util.ArrayList<java.lang.Object>` from String value (token `JsonToken.VALUE_STRING`)
+   at [Source: UNKNOWN; byte offset: #UNKNOWN]
+  ```🔍 Searching for substrings
+  patterns: ["print\s*\(", "logging\.", "logger\.", "debug\(", "\.info\(", "\.warn\(", "\.error\("]
+  reasoning: Searching for Python print statements and logging calls that indicate debugging efforts
+  ```
+  Error parsing arguments json: Cannot deserialize value of type `java.util.ArrayList<java.lang.Object>` from String value (token `JsonToken.VALUE_STRING`)
+   at [Source: UNKNOWN; byte offset: #UNKNOWN]
+  ```🔍 Searching for substrings
+  patterns:
+    - TODO
+    - FIXME
+    - BUG
+    - HACK
+    - XXX
+    - TEMP
+    - DEBUG
+  reasoning: Searching for common debug/todo comments that might indicate areas needing attention or debugging
+  ```
+  Files with content matching patterns: react-native/android/gradlew.bat, react-native/ios/SwiftChat.xcodeproj/project.pbxproj, react-native/ios/SwiftChatTests/SwiftChatTests.m, react-native/ios/SwiftChat/AppDelegate.mm
+</message>
+
+<message type=ai>
+  
+  # Planning
+  ```🔍 Searching for substrings
+  patterns:
+    - TODO
+    - FIXME
+    - BUG
+    - HACK
+    - XXX
+    - TEMP
+    - TEMPORARY
+  reasoning: Searching for common debugging indicators like TODO comments, FIXME comments, bug markers, and temporary code that might indicate known issues
+  ```
+  Files with content matching patterns: react-native/android/gradlew.bat, react-native/ios/SwiftChat.xcodeproj/project.pbxproj, react-native/ios/SwiftChatTests/SwiftChatTests.m, react-native/ios/SwiftChat/AppDelegate.mm
+  ```🔍 Searching for substrings
+  patterns:
+    - Error:
+    - Exception:
+    - throw new
+    - catch\s*\(
+    - try\s*\{
+    - console\.error
+    - console\.warn
+    - print\(.*error
+    - raise\s+\w+Error
+  reasoning: Searching for error handling patterns, exception throwing, console errors, and Python exceptions that might indicate debugging issues
+  ```
+  Files with content matching patterns: react-native/ios/Services/ConversationManager.swift, react-native/src/history/AppProvider.tsx, server/src/main.py, react-native/src/api/ollama-api.ts, react-native/ios/Services/NovaSonicService.swift, react-native/src/theme/ThemeContext.tsx, server/src/image_nl_processor.py, react-native/src/api/bedrock-api.ts, react-native/src/chat/component/PromptListComponent.tsx, react-native/src/chat/component/CustomAddFileComponent.tsx, react-native/ios/Services/AudioManager.swift, react-native/src/chat/util/FileUtils.ts, react-native/src/chat/component/CustomFileListComponent.tsx, react-native/src/chat/component/CustomMessageComponent.tsx, react-native/src/api/open-api.ts, react-native/src/chat/util/BedrockMessageConvertor.ts, react-native/src/chat/service/VoiceChatService.ts, react-native/android/app/src/main/res/drawable/rn_edit_text_material.xml
+  ```🔍 Searching for substrings
+  patterns:
+    - it\.skip
+    - test\.skip
+    - describe\.skip
+    - FAIL
+    - failed
+    - failing
+    - broken
+    - not working
+    - doesn't work
+  reasoning: Searching for skipped tests, test failures, and comments indicating broken functionality
+  ```
+</message>
+
+<message type=ai>
+  
+  # PlanningFiles with content matching patterns: react-native/ios/Services/AudioManager.swift, react-native/src/chat/component/CustomFileListComponent.tsx, server/src/image_nl_processor.py, react-native/src/chat/service/VoiceChatService.ts
+</message>
+
+<message type=ai>
+  
+  # Planning
+  ```🔍 Searching for substrings
+  patterns:
+    - try\s*\{
+    - catch\s*\(
+    - \.catch\(
+    - throw\s+new
+    - console\.error
+    - console\.warn
+    - Error\(
+    - Exception
+    - printStackTrace
+    - traceback
+    - crash
+    - fail
+    - TODO
+    - FIXME
+    - BUG
+    - HACK
+  reasoning: Looking for error handling patterns, logging statements, exception handling, crash-related keywords, and code comments that indicate known issues or debugging points
+  ```
+  Files with content matching patterns: server/src/main.py, react-native/src/theme/ThemeContext.tsx, react-native/android/gradlew.bat, react-native/src/chat/component/CustomFileListComponent.tsx, react-native/src/chat/util/BedrockMessageConvertor.ts, react-native/src/api/open-api.ts, react-native/android/app/src/main/res/drawable/rn_edit_text_material.xml, react-native/src/chat/service/VoiceChatService.ts, react-native/ios/Services/ConversationManager.swift, react-native/src/history/AppProvider.tsx, CONTRIBUTING.md, react-native/src/storage/StorageUtils.ts, react-native/src/api/ollama-api.ts, server/scripts/push-to-ecr.sh, react-native/ios/Services/NovaSonicService.swift, server/src/image_nl_processor.py, react-native/src/api/bedrock-api.ts, react-native/src/chat/component/PromptListComponent.tsx, react-native/ios/SwiftChat/AppDelegate.mm, react-native/src/chat/component/CustomAddFileComponent.tsx, react-native/src/chat/util/FileUtils.ts, react-native/ios/Services/AudioManager.swift, react-native/src/chat/component/CustomMessageComponent.tsx, react-native/ios/SwiftChat.xcodeproj/project.pbxproj, react-native/ios/SwiftChatTests/SwiftChatTests.m
+</message>
+
+<message type=ai>
+  
+  # Planning
+  ```🔍 Searching for substrings
+  patterns:
+    - console\.log
+    - console\.error
+    - console\.warn
+    - console\.debug
+    - console\.info
+  reasoning: Searching for JavaScript/TypeScript console logging statements that indicate debugging efforts
+  ```
+  Files with content matching patterns: react-native/src/chat/component/CustomAddFileComponent.tsx, react-native/src/chat/util/FileUtils.ts, react-native/src/chat/component/CustomFileListComponent.tsx, react-native/src/chat/component/CustomMessageComponent.tsx, react-native/src/api/ollama-api.ts, react-native/src/chat/ChatScreen.tsx, react-native/src/api/open-api.ts, react-native/src/chat/util/BedrockMessageConvertor.ts, react-native/src/api/bedrock-api.ts, react-native/src/chat/component/PromptListComponent.tsx
+  ```🔍 Searching for substrings
+  patterns:
+    - print\s*\(
+    - logging\.
+    - logger\.
+    - debug\(
+    - \.info\(
+    - \.warn\(
+    - \.error\(
+  reasoning: Searching for Python print statements and logging calls that indicate debugging efforts
+  ```
+  Files with content matching patterns: react-native/ios/Services/ConversationManager.swift, react-native/src/chat/component/CustomAddFileComponent.tsx, react-native/ios/Services/AudioManager.swift, react-native/src/chat/util/FileUtils.ts, server/src/main.py, react-native/ios/Services/NovaSonicService.swift, server/src/image_nl_processor.py, react-native/src/chat/util/BedrockMessageConvertor.ts, react-native/src/chat/component/PromptListComponent.tsx
+  ```🔍 Searching for substrings
+  patterns:
+    - try\s*\{
+    - catch\s*\(
+    - except:
+    - raise
+    - throw
+    - Error\(
+    - Exception\(
+  reasoning: Searching for error handling code that might indicate problematic areas needing debugging
+  ```
+  Files with content matching patterns: react-native/ios/Services/ConversationManager.swift, react-native/src/history/AppProvider.tsx, server/src/main.py, react-native/src/api/ollama-api.ts, react-native/ios/Services/NovaSonicService.swift, react-native/src/theme/ThemeContext.tsx, server/src/image_nl_processor.py, react-native/src/api/bedrock-api.ts, react-native/src/chat/component/PromptListComponent.tsx, react-native/package-lock.json, react-native/src/chat/component/CustomAddFileComponent.tsx, react-native/ios/Services/AudioManager.swift, react-native/src/chat/util/FileUtils.ts, react-native/src/chat/component/CustomFileListComponent.tsx, react-native/src/chat/component/CustomMessageComponent.tsx, react-native/src/api/open-api.ts, react-native/src/chat/util/BedrockMessageConvertor.ts, react-native/src/chat/service/VoiceChatService.ts
+  ```🔍 Getting file contents
+  filenames:
+    - server/src/main.py
+    - react-native/src/api/bedrock-api.ts
+    - react-native/src/api/open-api.ts
+    - react-native/src/chat/service/VoiceChatService.ts
+    - react-native/src/storage/StorageUtils.ts
+  ```
+</message>
+
+<message type=ai>
+  
+  # Planning
+  ```❓ 
+  fragmentIds:
+    - 5
+  ```
+  Dropped 1 fragment(s): [FileSummaries(['server/src/image_nl_processor.py', 'server/src/main.py'])]
+  ```🔍 Searching for substrings
+  patterns:
+    - \bERROR\b
+    - \bWARNING\b
+    - \bFAILED\b
+    - debug
+    - Debug
+    - DEBUG
+    - log\.
+    - console\.log
+    - print\(
+    - NSLog
+  reasoning: Searching for debug statements, logging calls, error messages, and debugging-related code that might indicate areas needing debugging attention
+  ```
+  Files with content matching patterns: server/src/main.py, react-native/ios/Podfile.lock, react-native/ios/SwiftChat.xcodeproj/xcshareddata/xcschemes/SwiftChat.xcscheme, react-native/package-lock.json, react-native/ios/SwiftChat.xcworkspace/xcshareddata/swiftpm/Package.resolved, react-native/android/gradlew.bat, react-native/src/chat/component/CustomFileListComponent.tsx, react-native/src/history/CustomDrawerContent.tsx, react-native/src/api/open-api.ts, react-native/ios/Services/ConversationManager.swift, react-native/src/api/ollama-api.ts, react-native/android/app/build.gradle, react-native/ios/Services/NovaSonicService.swift, server/src/image_nl_processor.py, react-native/src/api/bedrock-api.ts, react-native/src/chat/component/PromptListComponent.tsx, react-native/ios/SwiftChat/AppDelegate.mm, react-native/.gitignore, react-native/android/gradlew, react-native/ios/Services/AudioManager.swift, react-native/src/chat/component/CustomMessageComponent.tsx, react-native/android/gradle.properties, react-native/src/chat/ChatScreen.tsx, react-native/ios/SwiftChat.xcodeproj/project.pbxproj, react-native/ios/SwiftChatTests/SwiftChatTests.m
+  ```🔍 Getting file contents
+  filenames:
+    - react-native/ios/Services/ConversationManager.swift
+    - react-native/src/api/bedrock-api.ts
+    - react-native/src/chat/service/VoiceChatService.ts
+    - server/src/image_nl_processor.py
+  ```
+  
+  ```❓ 
+  fragmentIds:
+    - 5
+    - 1156
+  ```
+  Dropped 1 fragment(s): [ClassSummaries(['react-native.src.chat.component.EmptyChatComponentProps', 'react-native.src.api._module_.ChatResponse', 'react-native.src.chat.util.getBedrockMessagesFromChatMessages', 'react-native.src.storage.saveDeepSeekApiKey', 'react-native.src.chat.component._module_.styles', 'react-native.src.types.SystemPrompt', 'react-native.src.chat.component.markdown._module_.CopyButton', 'react-native.src.chat.component.CustomSendComponent', 'react-native.src.storage.deleteMessagesBySessionId', 'react-native.src.chat.component.markdown.Parser', 'react-native.src.storage.getCurrentSystemPrompt', 'react-native.src.settings.SettingsScreen', 'react-native.src.chat.util._module_.hapticFeedbackEnabled', 'react-native.src.chat.component.isModelSupportUploadImages', 'react-native.src.storage.saveCurrentVoiceSystemPrompt', 'react-native.src.storage.updateChatTitlesFromUserMessages', 'react-native.src.storage._module_.tokenInfoKey', 'react-native.src.chat.component.getFileType', 'react-native.src.chat.component._module_.NavigationProp', 'react-native.src.api.requestUpgradeInfo', 'react-native.src.api.getOllamaMessages', 'react-native.src.chat.component.ImageSpinnerProps', 'react-native.src.storage.getDefaultImageModels', 'react-native.src.chat.component.CustomSendComponentProps', 'react-native.src.storage.saveRegion', 'react-native.src.prompt._module_.PromptScreenRouteProp', 'react-native.src.api.invokeOpenAIWithCallBack', 'react-native.src.chat.component.CustomComposerProps', 'react-native.src.chat.component.createStyles', 'react-native.src.storage.getDefaultTextModels', 'react-native.src.settings.addBedrockPrefixToDeepseekModels', 'react-native.src.storage._module_.GPTModels', 'react-native.src.storage.getMessagesBySessionId', 'react-native.src.api.extractChunkContent', 'react-native.src.chat.component.ModelSelectionModal', 'react-native.src.chat.ChatScreen', 'react-native.src.storage.getOllamaApiUrl', 'react-native.src.chat.util._module_.MAX_IMAGES', 'react-native.src.storage.saveAllSystemPrompts', 'react-native.src.chat._module_.textPlaceholder', 'react-native.src.storage.saveOpenAICompatModels', 'react-native.src.chat.component.markdown._module_.CustomCodeHighlighter', 'react-native.src.storage.updateMessageList', 'react-native.src.storage._module_.apiKeyTag', 'react-native.src.chat.component._module_.EXTRA_DOCUMENT_FORMATS', 'react-native.src.settings.getImagePrice', 'react-native.src.storage._module_.DefaultTextModel', 'react-native.src.settings.CustomDropdown', 'react-native.src.storage._module_.DefaultImageModel', 'react-native.src.settings.createStyles', 'react-native.src.theme.ThemeProviderProps', 'react-native.src.chat.component.ModelIconButton', 'react-native.src.api.requestAllModels', 'react-native.src.storage._module_.thinkingEnabledKey', 'react-native.src.chat.util.ImageContent', 'react-native.src.chat.component.ModelIconButtonProps', 'react-native.src.storage.saveImageModel', 'react-native.src.storage.saveApiKey', 'react-native.src.settings.TabButton', 'react-native.src.storage._module_.sessionIdPrefix', 'react-native.src.history.groupMessagesByDate', 'react-native.src.utils._module_.isAndroid', 'react-native.src.storage.getSystemPrompts', 'react-native.src.chat.createStyles', 'react-native.src.storage._module_.messageListKey', 'react-native.src.api.isEnableThinking', 'react-native.src.api.genImage', 'react-native.src.chat.component.HeaderTitleProps', 'react-native.src.storage.getApiUrl', 'react-native.src.storage.saveThinkingEnabled', 'react-native.src.types.Metrics', 'react-native.src.storage._module_.openAICompatModelsKey', 'react-native.src.storage._module_.systemPromptsKey', 'react-native.src.chat.component.ModelSelectionModalProps', 'react-native.src.chat.component.markdown._module_.ALLOWED_STYLE_PROPERTIES', 'react-native.src.api.parseStreamData', 'react-native.src.storage.saveKeys', 'react-native.src.chat.component.markdown.getTableWidthArr', 'react-native.src.storage.getCurrentVoiceSystemPrompt', 'react-native.src.storage.saveOllamaApiURL', 'react-native.src.history.AppProviderProps', 'react-native.src.chat.util.getFileTypeSummary', 'react-native.src.chat.service._module_.voiceChatEmitter', 'react-native.src.api.getApiKey', 'react-native.src.types._module_.Usage', 'react-native.src.prompt.PresetPromptListProps', 'react-native.src.api.invokeBedrockWithCallBack', 'react-native.src.chat.component.markdown.useMarkdownHookOptions', 'react-native.src.types._module_.OllamaModel', 'react-native.src.theme.ThemeProvider', 'react-native.src.chat.component.CustomAddFileComponent', 'react-native.src.history._module_.AppContext', 'react-native.src.storage.getMessageList', 'react-native.src.api.requestAllOllamaModels', 'react-native.src.storage.getThinkingEnabled', 'react-native.src.storage._module_.ollamaApiUrlKey', 'react-native.src.utils._module_.isMacCatalyst', 'react-native.src.settings.getUsagePrice', 'react-native.src.chat.component.markdown._module_.MemoizedCodeHighlighter', 'react-native.src.storage.saveOpenAIApiKey', 'react-native.src.storage._module_.DefaultVoiceSystemPrompts', 'react-native.src.chat.component._module_.CustomHeaderRightButton', 'react-native.src.storage.saveVoiceId', 'react-native.src.storage._module_.textModelKey', 'react-native.src.chat.util.saveImageToLocal', 'react-native.src.types._module_.UsagePrice', 'react-native.src.settings._module_.ModelPrice', 'react-native.src.chat.component._module_.AnimatedCircle', 'react-native.src.chat.component.markdown.CustomMarkdownRenderer', 'react-native.src.chat.component.markdown._module_.ChatMarkdownProps', 'react-native.src.chat.component.markdown._module_.HighlighterStyleSheet', 'react-native.src.api.requestToken', 'react-native.src.chat.component.CustomScrollToBottomComponent', 'react-native.src.settings.getTotalInputPrice', 'react-native.src.storage.getImageModel', 'react-native.src.utils.getModelTag', 'react-native.src.storage.saveOpenAICompatApiKey', 'react-native.src.chat._module_.imagePlaceholder', 'react-native.src.chat.component.CircularProgress', 'react-native.src.chat.component.ListIcon', 'react-native.src.chat.util.setHapticFeedbackEnabled', 'react-native.src.chat.component.CustomMessageProps', 'react-native.src.types._module_.TokenResponse', 'react-native.src.history.useAppContext', 'react-native.src.storage.saveModelOrder', 'react-native.src.storage.getOpenAICompatApiKey', 'react-native.src.storage._module_.hapticEnabledKey', 'react-native.src.chat.service._module_.voiceChatService', 'react-native.src.storage._module_.DefaultRegion', 'react-native.src.storage.getAllImageSize', 'react-native.src.api.getApiPrefix', 'react-native.src.history._module_.DrawerType', 'react-native.src.prompt._module_.styles', 'react-native.src.chat.component.markdown.getRNStylesFromHljsStyle', 'react-native.src.utils.getModelIcon', 'react-native.src.chat.component.markdown.Markdown', 'react-native.src.storage.getDeepSeekApiKey', 'react-native.src.chat.component.isVideoFormat', 'react-native.src.storage.getOpenAIApiKey', 'react-native.src.settings._module_.GITHUB_LINK', 'react-native.src.storage.saveSystemPrompts', 'react-native.src.chat.component.HeaderRightButtonProps', 'react-native.src.storage._module_.VoiceIDList', 'react-native.src.history.getTodayTimestamp', 'react-native.src.chat.util._module_.OpenAIMessage', 'react-native.src.prompt._module_.RootStackParamList', 'react-native.src.types._module_.RouteParamList', 'react-native.src.storage.getRegion', 'react-native.src.chat.component.markdown.CodeHighlighterProps', 'react-native.src.storage.updateTextModelUsageOrder', 'react-native.src.storage.getAllRegions', 'react-native.src.chat.component.CustomFileProps', 'react-native.src.chat.util._module_.MessageContent', 'react-native.src.prompt.PresetPrompt', 'react-native.src.prompt._module_.MAX_NAME_LENGTH', 'react-native.src.chat.service.VoiceChatService', 'react-native.src.types._module_.DrawerParamList', 'react-native.src.chat.util.getFullFileUrl', 'react-native.src.chat.util._module_.MAX_NOVA_VIDEOS', 'react-native.src.chat.component.ImageProgressBar', 'react-native.src.history.getFirstDayOfMonthTimestamp', 'react-native.src.types.FileType', 'react-native.src.chat.component.markdown.CustomTokenizer', 'react-native.src.api.isOpenRouterRequest', 'react-native.src.storage._module_.RegionList', 'react-native.src.storage.getTextModel', 'react-native.src.chat.component.isDocumentFormat', 'react-native.src.types.PressMode', 'react-native.src.chat.component.PromptListProps', 'react-native.src.chat.component._module_.minWidth', 'react-native.src.chat.util.trigger', 'react-native.src.storage.getMessageListStr', 'react-native.src.api.invokeOllamaWithCallBack', 'react-native.src.storage.saveAllModels', 'react-native.src.storage._module_.currentSystemPromptKey', 'react-native.src.settings.getTotalOutputTokens', 'react-native.src.storage._module_.voiceIdKey', 'react-native.src.storage.getDefaultApiKeyModels', 'react-native.src.history.CustomDrawerContent', 'react-native.src.chat.component.markdown._module_.MemoizedText', 'react-native.src.chat.component._module_.AnimatedImage', 'react-native.src.storage.getTokenInfo', 'react-native.src.types._module_.UpgradeInfo', 'react-native.src.storage._module_.openAICompatApiURLKey', 'react-native.src.chat.component.isImageFormat', 'react-native.src.chat.component.ImageSpinner', 'react-native.src.history.AppContextType', 'react-native.src.storage.getModelUsage', 'react-native.src.types.SwiftChatMessage', 'react-native.src.api._module_.isDev', 'react-native.src.storage._module_.modelUsageKey', 'react-native.src.chat.util._module_.BedrockMessage', 'react-native.src.chat.component._module_.VIDEO_FORMATS', 'react-native.src.chat.util.DocumentContent', 'react-native.src.prompt.createStyles', 'react-native.src.theme.ThemeContextType', 'react-native.src.chat._module_.ChatScreenRouteProp', 'react-native.src.chat.component.CustomFileListComponent', 'react-native.src.chat.component.AudioWaveformRef', 'react-native.src.chat.util.TextContent', 'react-native.src.chat.component._module_.MODAL_HEIGHT', 'react-native.src.api._module_.OllamaResponse', 'react-native.src.api._module_.CallbackFunction', 'react-native.src.prompt._module_.PresetPromptListNavigationProp', 'react-native.src.theme._module_.lightColors', 'react-native.src.history.createStyles', 'react-native.src.types._module_.AllModel', 'react-native.src.settings.TabButtonProps', 'react-native.src.settings.CustomTextInput', 'react-native.src.settings._module_.ImageModelPrices', 'react-native.src.history.formatTimestampToYearMonth', 'react-native.src.storage._module_.currentVoiceSystemPromptKey', 'react-native.src.storage._module_.imageSizeKey', 'react-native.src.chat.util.normalizeFilename', 'react-native.src.settings.getTotalImageCount', 'react-native.src.storage._module_.allModelKey', 'react-native.src.prompt._module_.PROMPT_CATEGORIES', 'react-native.src.storage._module_.currentSessionIdKey', 'react-native.src.types.ModelTag', 'react-native.src.settings.ModelPriceType', 'react-native.src.prompt.PromptScreen', 'react-native.src.storage.saveMessages', 'react-native.src.chat.generateId', 'react-native.src.utils.getModelTagByUserName', 'react-native.src.storage.initializeStorage', 'react-native.src.theme.useTheme', 'react-native.src.prompt._module_.PRESET_PROMPTS', 'react-native.src.chat.util.VideoContent', 'react-native.src.storage._module_.HARDCODED_DEEPSEEK_API_KEY', 'react-native.src.types.ReasoningContent', 'react-native.src.chat.util.getBedrockMessage', 'react-native.src.settings._module_.NavigationProp', 'react-native.src.theme.ColorScheme', 'react-native.src.chat.component.markdown._module_.ReactStyle', 'react-native.src.chat.component.markdown.useMarkdown', 'react-native.src.storage.saveTextModel', 'react-native.src.api.isConfigured', 'react-native.src.theme._module_.ThemeContext', 'react-native.src.api.isThinkingModel', 'react-native.src.storage.getMergedModelOrder', 'react-native.src.storage.saveOpenAIProxyEnabled', 'react-native.src.prompt.PresetPromptList', 'react-native.src.settings.getTotalOutputPrice', 'react-native.src.chat.component.CustomRenderActionsProps', 'react-native.src.chat.component.HeaderTitle', 'react-native.src.storage.getAllModels', 'react-native.src.chat.util._module_.MAX_NOVA_FILES', 'react-native.src.chat.util.ImageInfo', 'react-native.src.storage.updateTotalUsage', 'react-native.src.storage.getImageSize', 'react-native.src.chat.component.markdown.CustomCodeHighlighter', 'react-native.src.chat.component.getFileNameWithoutExtension', 'react-native.src.settings._module_.initUpgradeInfo', 'react-native.src.storage.saveMessageList', 'react-native.src.storage.saveTokenInfo', 'react-native.src.storage.saveApiUrl', 'react-native.src.prompt.HeaderLeftView', 'react-native.src.api._module_.OpenRouterTag', 'react-native.src.types.EventData', 'react-native.src.api.getApiURL', 'react-native.src.types._module_.Chat', 'react-native.src.prompt._module_.NavigationProp', 'react-native.src.chat.util.isAllFileReady', 'react-native.src.storage._module_.openAIProxyEnabledKey', 'react-native.src.storage.getPromptId', 'react-native.src.api.getOpenAIMessages', 'react-native.src.settings.getTotalInputTokens', 'react-native.src.storage._module_.BedrockVoiceModels', 'react-native.src.chat.util.getUniqueFileName', 'react-native.src.types.SwiftChatUser', 'react-native.src.chat.component._module_.customMarkedStyles', 'react-native.src.storage.saveCurrentSystemPrompt', 'react-native.src.chat.component.openInFileViewer', 'react-native.src.chat.util.getFileBytes', 'react-native.src.storage.saveOpenAICompatApiURL', 'react-native.src.storage.getSessionId', 'react-native.src.chat.util.isNova', 'react-native.src.settings.getTotalImagePrice', 'react-native.src.storage._module_.encryptStorage', 'react-native.src.storage._module_.keyPrefix', 'react-native.src.chat.util.isValidFilename', 'react-native.src.chat.component.markdown.getMathKey', 'react-native.src.chat.component.getFiles', 'react-native.src.chat.util._module_.hapticOptions', 'react-native.src.chat.createBotMessage', 'react-native.src.storage._module_.imageModelKey', 'react-native.src.storage._module_.DefaultSystemPrompts', 'react-native.src.chat.component.DefaultIcon', 'react-native.src.storage.getApiKey', 'react-native.src.storage.getOpenAIProxyEnabled', 'react-native.src.settings.DropdownItem', 'react-native.src.chat.component.markdown._module_.mathViewIndex', 'react-native.src.theme._module_.darkColors', 'react-native.src.storage.isNovaCanvas', 'react-native.src.storage.getDefaultSystemPrompts', 'react-native.src.storage._module_.BedrockThinkingModels', 'react-native.src.chat.component._module_.isAndroid', 'react-native.src.settings.CustomDropdownProps', 'react-native.src.settings.CustomTextInputProps', 'react-native.src.chat.component.markdown.createCustomStyles', 'react-native.src.chat.util.saveFile', 'react-native.src.chat.component._module_.IMAGE_FORMATS', 'react-native.src.storage._module_.apiUrlKey', 'react-native.src.storage._module_.modelOrderKey', 'react-native.src.chat.component.ProgressCircle', 'react-native.src.chat.component.getStyles', 'react-native.src.settings.getTotalCost', 'react-native.src.chat.component.EmptyChatComponent', 'react-native.src.types.Delta', 'react-native.src.types._module_.FileInfo', 'react-native.src.storage.getModelOrder', 'react-native.src.types.BedrockChunk', 'react-native.src.storage.isTokenValid', 'react-native.src.api.parseChunk', 'react-native.src.storage._module_.regionKey', 'react-native.src.chat.component.markdown._module_.styles', 'react-native.src.chat.util.checkFileNumberLimit', 'react-native.src.storage.getOpenAICompatModels', 'react-native.src.storage._module_.DefaultVoicePrompt', 'react-native.src.storage._module_.deepSeekApiKeyTag', 'react-native.src.chat.component._module_.MAX_FILE_SIZE', 'react-native.src.storage._module_.DeepSeekModels', 'react-native.src.chat.component.DisplayMode', 'react-native.src.chat.component._module_.AudioWaveformComponent', 'react-native.src.storage._module_.currentPromptIdKey', 'react-native.src.chat.component.CustomMessageComponent', 'react-native.src.chat.component.CustomChatFooter', 'react-native.src.storage._module_.openAIApiKeyTag', 'react-native.src.chat.component._module_.isPad', 'react-native.src.settings.TokenUsageScreen', 'react-native.src.types._module_.Model', 'react-native.src.chat.component._module_.SCREEN_WIDTH', 'react-native.src.storage.saveImageSize', 'react-native.src.chat.util.showInfo', 'react-native.src.storage.isNewStabilityImageModel', 'react-native.src.chat.component.markdown.cleanStyle', 'react-native.src.storage.getVoiceId', 'react-native.src.chat.component._module_.MAX_VIDEO_SIZE', 'react-native.src.chat.component.isVideoSupported', 'react-native.src.chat.component.markdown.CopyButtonProps', 'react-native.src.prompt.calculateTextLength', 'react-native.src.chat.util._module_.MAX_DOCUMENTS', 'react-native.src.storage.savePromptId', 'react-native.src.storage.getOpenAICompatApiURL', 'react-native.src.types.DropdownItem', 'react-native.src.storage.getHapticEnabled', 'react-native.src.history.AppProvider', 'react-native.src.chat._module_.currentMode', 'react-native.src.storage._module_.storage', 'react-native.src.types._module_.ImageRes', 'react-native.src.storage.saveHapticEnabled', 'react-native.src.chat.component._module_.DOCUMENT_FORMATS', 'react-native.src.chat._module_.BOT_ID', 'react-native.src.chat.util.getFileTextContent', 'react-native.src.types.ChatMode', 'react-native.src.chat.component.PromptListComponent', 'react-native.src.storage._module_.openAICompatApiKeyTag', 'react-native.src.types.ChatStatus', 'react-native.src.api.getProxyRequestURL'])]
+  ```🔍 Getting file contents
+  filenames:
+    - react-native/src/chat/component/CustomAddFileComponent.tsx
+    - react-native/src/chat/util/FileUtils.ts
+    - react-native/src/chat/component/CustomMessageComponent.tsx
+    - react-native/src/api/ollama-api.ts
+    - react-native/src/chat/ChatScreen.tsx
+    - react-native/src/api/open-api.ts
+    - react-native/src/chat/util/BedrockMessageConvertor.ts
+    - react-native/src/api/bedrock-api.ts
+    - server/src/main.py
+    - server/src/image_nl_processor.py
+  ```
+  Based on the provided code, I found several debugging-related items:
+  
+  ## Error Messages & Exception Handling
+  
+  ### ConversationManager.swift
+  - **Error logging with print statements**:
+    - `print("❌ Start Conversation error", error)` (line 53)
+    - `print("❌ End Conversation error", error)` (line 74)
+    - `print("❌ Error playing audio in AudioManager: \(error)")` (line 83)
+  
+  - **Error handling patterns**:
+    - NSError creation for uninitialized service: `NSError(domain: "ConversationError", code: -1, userInfo: [NSLocalizedDescriptionKey: "Service not initialized"])`
+    - Multiple try-catch blocks with error propagation
+  
+  ### bedrock-api.ts
+  - **Console logging for debugging**:
+    - `console.log('Error reading stream:', readError)` (line 130)
+    - `console.log(errorInfo)` (line 155)
+    - `console.log(`HTTP error! status: ${response.status}`)` (line 190, 218)
+    - `console.log('Error fetching models:', error)` (line 198)
+    - `console.log('Error fetching token:', error)` (line 225)
+    - `console.log('Error fetching upgrade info:', error)` (line 250)
+    - `console.log(errMsg)` (line 283)
+    - `console.log('DataChunk parse error:' + innerError, part)` (line 329)
+  
+  - **Error handling patterns**:
+    - Timeout handling with `setTimeout(() => controller.abort(), 60000)`
+    - Network error detection and transformation
+    - Stream reading error recovery
+  
+  ### VoiceChatService.ts
+  - **Comprehensive error message mapping** (lines 50-76):
+    ```typescript
+    let errorMsg = event.message ?? '';
+    if (errorMsg.includes('The network connection was lost')) {
+      errorMsg = '\n**The network connection was lost**';
+    } else if (errorMsg.includes('The request timed out')) {
+      errorMsg = '\n**The request timed out**';
+    } else if (errorMsg.includes('messages cannot be null or empty')) {
+      errorMsg = '\n**Messages cannot be null or empty**';
+    }
+    // ... more error mappings
+    ```
+  
+  - **Error callback patterns** throughout the class for initialization, conversation management, and credential validation
+  
+  ### image_nl_processor.py
+  - **Exception handling with HTTPException**:
+    - `raise HTTPException(status_code=400, detail=f"Error: ${result_objet['error']}")` (line 86)
+    - `raise HTTPException(status_code=400, detail=f"Error: image analyse failed, {error}")` (line 88)
+    - `raise HTTPException(status_code=400, detail=f"Error: analyse failed, {error}")` (line 107)
+  
+  - **Debug print statement**:
+    - `print(f"Error analyse by nova-lite: {error}")` (line 106)
+  
+  ## Key Debugging Issues Found
+  
+  1. **Inconsistent error logging**: Mix of `console.log` and `print` statements across different platforms
+  2. **Network error handling**: Multiple timeout and connection error scenarios handled
+  3. **Stream processing errors**: Error recovery in stream reading operations
+  4. **Credential validation**: AWS token validation and refresh error handling
+  5. **Audio processing errors**: Error handling in audio playback and recording operations
+  6. **HTTP error status handling**: Various HTTP status code error scenarios
+  
+  These debugging elements indicate areas where the application may encounter issues with network connectivity, credential management, audio processing, and stream handling.
+</message>
+
+<message type=ai>
+  
+  # PlanningLooking through the provided code files, I found several instances of console.log, print statements, and debug logging that indicate debugging efforts:
+  
+  ## React Native TypeScript Files
+  
+  ### CustomAddFileComponent.tsx
+  - **Line 168**: `console.info(err);` - Error logging in try-catch block when handling file selection
+  
+  ### CustomMessageComponent.tsx
+  - **Line 124**: `console.log(error);` - Error logging when opening files with FileViewer
+  - **Line 128**: `console.log(res)` - Success response logging for Share.open
+  - **Line 129**: `console.log(err)` - Error logging for Share.open
+  
+  ### FileUtils.ts
+  - **Line 19**: `console.info('Error saving image:', error);` - Error logging for image saving
+  - **Line 45**: `console.warn('Error saving file:', error);` - Warning for file saving errors
+  - **Line 54**: `console.warn('Error reading image file:', fileUrl, error);` - Warning for file reading errors
+  - **Line 63**: `console.warn('Error reading text file:', fileUrl, error);` - Warning for text file reading errors
+  
+  ### ollama-api.ts
+  - **Line 83**: `console.log('Error reading stream:', readError);` - Stream reading error logging
+  - **Line 93**: `console.log(error);` - General error logging
+  - **Line 168**: `console.log(`HTTP error! status: ${response.status}`);` - HTTP status error logging
+  - **Line 175**: `console.log('Error fetching models:', error);` - Model fetching error logging
+  
+  ### ChatScreen.tsx
+  - **Line 471**: `handleVoiceChatTranscript('ASSISTANT', message);` followed by `console.log('Voice chat error:', message);` on line 475 - Voice chat error logging
+  
+  ### open-api.ts
+  - **Line 95**: `console.log('Error reading stream:', readError);` - Stream reading error logging
+  - **Line 105**: `console.log(error);` - General error logging
+  - **Line 181**: `console.log(`HTTP error! status: ${response.status}`);` - HTTP status error logging
+  - **Line 190**: `console.log('Error fetching models:', error);` - Model fetching error logging
+  
+  ### BedrockMessageConvertor.ts
+  - **Line 102**: `console.warn(`Error reading text content from ${fileName}:`, error);` - Warning for text content reading errors
+  - **Line 121**: `console.warn(`Error processing file ${file.fileName}:`, error);` - Warning for file processing errors
+  
+  ### bedrock-api.ts
+  - **Line 150**: `console.log('Error reading stream:', readError);` - Stream reading error logging
+  - **Line 175**: `console.log(errMsg);` - Error message logging for image generation
+  - **Line 203**: `console.log(`HTTP error! status: ${response.status}`);` - HTTP status error logging
+  - **Line 208**: `console.log('Error fetching models:', error);` - Model fetching error logging
+  - **Line 222**: `console.log('Error fetching token:', error);` - Token fetching error logging
+  - **Line 239**: `console.log('Error fetching upgrade info:', error);` - Upgrade info error logging
+  - **Line 294**: `console.log(data.error);` - Image generation error logging
+  - **Line 313**: `console.log(errMsg);` - Image generation error logging
+  - **Line 341**: `console.log('DataChunk parse error:' + innerError, part);` - JSON parsing error logging
+  
+  ## Server Python Files
+  
+  ### main.py
+  - **Line 264**: `print(f"bedrock error: {e}")` - Bedrock error logging
+  - **Line 294**: `print("error:", err)` - General error logging
+  - **Line 318**: `print(f"Error occurred when get github tag: {error}")` - GitHub API error logging
+  - **Line 363**: `print(f"Error occurred: {error_msg}")` - Image generation error logging
+  
+  ### image_nl_processor.py
+  - **Line 115**: `print(f"Error analyse by nova-lite: {error}")` - Nova-lite analysis error logging
+  
+  These logging statements appear to be primarily for:
+  1. **Error handling and debugging** - Most console.log/print statements are in catch blocks
+  2. **API response logging** - Logging responses from external services
+  3. **File operation debugging** - Logging file read/write operations
+  4. **Stream processing debugging** - Logging stream reading errors
+  5. **Service integration debugging** - Logging errors from various AWS services and APIs
+  
+  The logging indicates active debugging efforts for network requests, file operations, stream processing, and integration with external services like AWS Bedrock, OpenAI, and file system operations.
+</message>
+
+<message type=ai>
+  
+  # Planning
+  ```🔍 Searching for substrings
+  patterns:
+    - /\*.*TODO.*\*/
+    - //.*TODO
+    - #.*TODO
+    - //.*FIXME
+    - /\*.*FIXME.*\*/
+    - #.*FIXME
+  reasoning: Searching specifically for TODO and FIXME comments in various comment formats (JavaScript/TypeScript, Swift, Python)
+  ```
+  No files found with content matching patterns: /\*.*TODO.*\*/, //.*TODO, #.*TODO, //.*FIXME, /\*.*FIXME.*\*/, #.*FIXME
+  ```🔍 Searching for filenames
+  patterns:
+    - .*test.*
+    - .*spec.*
+    - .*Test.*
+    - .*Spec.*
+  reasoning: Looking for test files to check for failing tests or test-related debugging issues
+  ```
+  Based on my analysis of the codebase, I found several crash logs, error handling code, and indicators of known issues:
+  
+  ## Error Handling and Known Issues
+  
+  ### 1. Server-side Error Handling (main.py)
+  
+  **API Key Validation Errors:**
+  ```python
+  def get_api_key_from_ssm(use_cache_token: bool):
+      # ...
+      except Exception as error:
+          raise HTTPException(status_code=401,
+                              detail=f"Error: Please create your API Key in Parameter Store, {str(error)}")
+  
+  def verify_api_key(credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
+                     use_cache_token: bool = True):
+      if credentials.credentials != get_api_key_from_ssm(use_cache_token):
+          raise HTTPException(status_code=401, detail="Invalid API Key")
+  ```
+  
+  **Image Generation Error Handling:**
+  ```python
+  def get_image(client, model_id, prompt, ref_image, width, height):
+      try:
+          # ... image generation logic
+          return {"image": base64_image_data}
+      except Exception as error:
+          error_msg = str(error)
+          print(f"Error occurred: {error_msg}")
+          return {"error": error_msg}
+  ```
+  
+  **General Exception Handling in Endpoints:**
+  ```python
+  @app.post("/api/converse/v3")
+  async def converse_v3(request: ConverseRequest, _: Annotated[str, Depends(verify_api_key)]):
+      try:
+          # ... processing logic
+          return StreamingResponse(event_generator(), media_type="text/event-stream")
+      except Exception as error:
+          return PlainTextResponse(f"Error: {str(error)}", status_code=500)
+  ```
+  
+  ### 2. Client-side Error Handling (bedrock-api.ts)
+  
+  **Network and Timeout Errors:**
+  ```typescript
+  .catch(error => {
+      clearTimeout(timeoutId);
+      if (shouldStop()) {
+          // Handle cancellation
+      } else {
+          let errorMsg = String(error);
+          if (errorMsg.endsWith('AbortError: Aborted')) {
+              errorMsg = 'Timed out';
+          }
+          if (errorMsg.indexOf('http') >= 0) {
+              errorMsg = 'Unable to resolve host';
+          }
+          const errorInfo = 'Request error: ' + errorMsg;
+          callback(completeMessage + '\n\n' + errorInfo, true, true);
+      }
+  });
+  ```
+  
+  **Configuration Validation:**
+  ```typescript
+  if (!isConfigured()) {
+      callback('Please configure your API URL and API Key', true, true);
+      return;
+  }
+  
+  if (chatMode === ChatMode.Text && currentModelTag !== ModelTag.Bedrock) {
+      if (currentModelTag === ModelTag.Broperty && getDeepSeekApiKey().length === 0) {
+          callback('Please configure your DeepSeek API Key', true, true);
+          return;
+      }
+      // ... other API key checks
+  }
+  ```
+  
+  ### 3. Voice Chat Error Handling (VoiceChatService.ts)
+  
+  **Specific Voice Chat Errors with Known Messages:**
+  ```typescript
+  let errorMsg = event.message ?? '';
+  if (errorMsg.includes('The network connection was lost')) {
+      errorMsg = '\n**The network connection was lost**';
+  } else if (errorMsg.includes('The request timed out')) {
+      errorMsg = '\n**The request timed out**';
+  } else if (errorMsg.includes('messages cannot be null or empty')) {
+      errorMsg = '\n**Messages cannot be null or empty**';
+  } else if (errorMsg.includes('Timed out waiting for input events')) {
+      errorMsg = '\n**Timed out waiting for input events**';
+  } else if (errorMsg.includes('The operation couldn't be completed')) {
+      errorMsg = '\n**The operation couldn't be completed**';
+  } else if (errorMsg.includes('The system encountered an unexpected error during processing')) {
+      errorMsg = '\n**The system encountered an unexpected error during processing. Try your request again.**';
+  } else if (errorMsg.includes('closed stream. HTTP/2 error code: NO_ERROR')) {
+      errorMsg = '\n**Stream Closed With NO_ERROR**';
+  }
+  ```
+  
+  ### 4. OpenAI API Error Handling (open-api.ts)
+  
+  **Stream Parsing Errors:**
+  ```typescript
+  try {
+      const parsedData: ChatResponse = JSON.parse(cleanedData);
+      if (parsedData.error) {
+          let errorMessage = '**Error:** ' + (parsedData.error?.message ?? '');
+          if (parsedData.error?.metadata?.raw) {
+              errorMessage += ':\n' + parsedData.error.metadata.raw;
+          }
+          return { error: errorMessage };
+      }
+      if (parsedData.detail) {
+          return {
+              error: `Error: Please upgrade your [server API](${GITHUB_LINK}?tab=readme-ov-file#upgrade-api), API ` + parsedData.detail,
+          };
+      }
+  } catch (error) {
+      // ... error handling for parsing failures
+  }
+  ```
+  
+  ### 5. Storage Error Prevention (StorageUtils.ts)
+  
+  **Crash Prevention Code:**
+  ```typescript
+  export function getSystemPrompts(type?: string): SystemPrompt[] {
+      // ... existing logic
+      if (currentSystemPrompts.length === 0) {
+          // fix the crash issue
+          currentSystemPrompts = getDefaultSystemPrompts();
+          currentSystemPrompts = type
+              ? currentSystemPrompts.filter(p => p.promptType === type)
+              : currentSystemPrompts.filter(p => p.promptType === undefined);
+          saveAllSystemPrompts(getDefaultSystemPrompts());
+      }
+      return currentSystemPrompts;
+  }
+  ```
+  
+  ## Key Known Issues Identified:
+  
+  1. **Network connectivity issues** - Various timeout and connection errors
+  2. **Authentication failures** - API key validation and token expiration
+  3. **Voice chat stream errors** - HTTP/2 stream closure and timeout issues  
+  4. **Configuration validation** - Missing API keys and URLs
+  5. **Image generation failures** - Model access and processing errors
+  6. **Stream parsing errors** - JSON parsing failures in API responses
+  7. **Storage corruption prevention** - Empty system prompts causing crashes
+  
+  The codebase shows comprehensive error handling throughout, suggesting these are well-known issues that the developers have encountered and addressed with specific error messages and recovery mechanisms.
+</message>
+
+<message type=ai>
+  
+  # PlanningMatching filenames: react-native/ios/SwiftChatTests/Info.plist, react-native/ios/TestAddBridge.swift, react-native/ios/SwiftChatTests/SwiftChatTests.m
+  ```🔍 Getting file contents
+  filenames:
+    - react-native/src/api/open-api.ts
+    - react-native/src/api/ollama-api.ts
+    - react-native/ios/Services/AudioManager.swift
+    - react-native/src/chat/component/CustomFileListComponent.tsx
+  ```
+  
+  ```🔍 Searching for substrings
+  patterns:
+    - stack trace
+    - stacktrace
+    - at .*:\d+
+    - \s+at 
+    - Caused by:
+    - Exception in thread
+    - Fatal Exception
+    - FATAL
+    - \*\*\* Terminating app due to
+    - libc\+\+abi
+    - abort\(\)
+    - SIGABRT
+    - SIGSEGV
+    - NSException
+    - uncaught exception
+    - unhandled exception
+  reasoning: Looking for actual crash logs, stack traces, and fatal error patterns that would indicate specific crash locations and causes
+  ```
+  Files with content matching patterns: react-native/android/gradlew, react-native/ios/Services/AudioManager.swift, CONTRIBUTING.md, react-native/--assets-dest, react-native/src/api/ollama-api.ts, react-native/src/chat/ChatScreen.tsx, react-native/src/api/open-api.ts, react-native/src/api/bedrock-api.ts, react-native/package-lock.json, README.md
+</message>
+
+<message type=ai>
+  
+  # Planning
+  ```🔍 Getting file contents
+  filenames:
+    - react-native/ios/Services/AudioManager.swift
+    - react-native/src/chat/ChatScreen.tsx
+    - react-native/src/api/ollama-api.ts
+  ```
+  
+  # Answer
+  # Debug Logging and Console Statements Found in the Project
+  
+  Based on my analysis of the codebase, I found extensive debugging efforts throughout the React Native application and Python server. Here are the key debugging patterns and locations:
+  
+  ## React Native Frontend Debug Logging
+  
+  ### File Operation Debugging
+  - **FileUtils.ts**: Contains multiple console logging statements for file operations:
+    - `console.info('Error saving image:', error)` - Image saving errors
+    - `console.warn('Error saving file:', error)` - File saving warnings
+    - `console.warn('Error reading image file:', fileUrl, error)` - Image reading errors
+    - `console.warn('Error reading text file:', fileUrl, error)` - Text file reading errors
+  
+  ### API Communication Debugging
+  - **ollama-api.ts**: Extensive logging for Ollama API interactions:
+    - `console.log('Error reading stream:', readError)` - Stream processing errors
+    - `console.log(error)` - General API errors
+    - `console.log(\`HTTP error! status: ${response.status}\`)` - HTTP status logging
+    - `console.log('Error fetching models:', error)` - Model fetching errors
+  
+  - **open-api.ts**: Similar patterns for OpenAI API:
+    - `console.log('Error reading stream:', readError)` - Stream reading errors
+    - `console.log(error)` - General error logging
+    - `console.log(\`HTTP error! status: ${response.status}\`)` - HTTP response logging
+    - `console.log('Error fetching models:', error)` - Model API errors
+  
+  - **bedrock-api.ts**: AWS Bedrock service debugging:
+    - `console.log('Error reading stream:', readError)` - Stream processing
+    - `console.log(errMsg)` - Image generation errors
+    - `console.log(\`HTTP error! status: ${response.status}\`)` - HTTP status
+    - `console.log('Error fetching token:', error)` - Authentication errors
+    - `console.log('Error fetching upgrade info:', error)` - Service upgrade errors
+    - `console.log('DataChunk parse error:' + innerError, part)` - JSON parsing errors
+  
+  ### UI Component Debugging
+  - **CustomAddFileComponent.tsx**: File selection debugging:
+    - `console.info(err)` - File selection error logging
+  
+  - **CustomMessageComponent.tsx**: Message handling debugging:
+    - `console.log(error)` - File viewer errors
+    - `console.log(res)` - Share operation success
+    - `console.log(err)` - Share operation errors
+  
+  - **ChatScreen.tsx**: Voice chat debugging:
+    - `console.log('Voice chat error:', message)` - Voice interaction errors
+  
+  ### Message Processing Debugging
+  - **BedrockMessageConvertor.ts**: Message conversion debugging:
+    - `console.warn(\`Error reading text content from ${fileName}:\`, error)` - Text content errors
+    - `console.warn(\`Error processing file ${file.fileName}:\`, error)` - File processing errors
+  
+  ## Python Server Debug Logging
+  
+  ### Main Server Debugging (main.py)
+  - `print(f"bedrock error: {e}")` - AWS Bedrock integration errors
+  - `print("error:", err)` - General server errors  
+  - `print(f"Error occurred when get github tag: {error}")` - GitHub API errors
+  - `print(f"Error occurred: {error_msg}")` - Image generation errors
+  
+  ### Image Processing Debugging (image_nl_processor.py)
+  - `print(f"Error analyse by nova-lite: {error}")` - AI model analysis errors
+  
+  ## Common Debugging Patterns Identified
+  
+  1. **Error Handling**: Most logging occurs in try-catch blocks for error diagnosis
+  2. **API Integration**: Heavy logging around external service calls (AWS, OpenAI, Ollama)
+  3. **File Operations**: Comprehensive logging for file read/write operations
+  4. **Stream Processing**: Detailed logging for real-time data streaming
+  5. **Network Requests**: HTTP status and response logging
+  6. **Service Authentication**: Token and API key validation logging
+  
+  ## Debugging Recommendations
+  
+  The extensive logging suggests active development and troubleshooting efforts around:
+  - **External API integrations** (AWS Bedrock, OpenAI, Ollama)
+  - **File handling and media processing**
+  - **Real-time streaming and voice chat features**
+  - **Authentication and token management**
+  - **Cross-platform mobile functionality**
+  
+  These logging statements indicate areas where the development team has encountered issues and implemented debugging to diagnose problems. The patterns suggest this is a sophisticated AI chat application with multiple service integrations that requires careful error handling and monitoring.I'll analyze these files for debugging-related content, looking for error messages, exceptions, TODO/FIXME comments, and potential failing tests.
+  
+  ## Error Handling and Exceptions Found
+  
+  ### react-native/src/api/open-api.ts
+  
+  **Error Handling and Messages:**
+  - `console.log('Error reading stream:', readError);` - Stream reading error logging
+  - `console.log(error);` - General error logging in catch blocks
+  - Error response parsing: `let errorMessage = '**Error:** ' + (parsedData.error?.message ?? '');`
+  - API upgrade error: `Error: Please upgrade your [server API](${GITHUB_LINK}?tab=readme-ov-file#upgrade-api), API` + parsedData.detail
+  - Request error handling: `const errorInfo = 'Request error: ' + errorMsg;`
+  - Stream parsing error fallback: `return { error: chunk };`
+  - Timeout handling with 60-second timeout: `setTimeout(() => controller.abort(), 60000);`
+  
+  **Key Error Scenarios:**
+  1. Stream reading failures
+  2. JSON parsing errors in `parseStreamData`
+  3. API response errors with detailed error messages
+  4. Network request failures
+  5. Timeout errors after 60 seconds
+  
+  ### react-native/src/api/ollama-api.ts
+  
+  **Error Handling:**
+  - `console.log('Error reading stream:', readError);` - Stream reading error
+  - `console.log(error);` - General error logging
+  - `console.log(\`HTTP error! status: ${response.status}\`);` - HTTP status errors
+  - `console.log('Error fetching models:', error);` - Model fetching errors
+  - Request error handling: `const errorInfo = 'Request error: ' + errorMsg;`
+  - Stream parsing error: `return { error: error + chunk };`
+  
+  **Key Error Scenarios:**
+  1. Stream reading failures
+  2. HTTP request failures with status codes
+  3. Model fetching failures
+  4. JSON parsing errors in stream data
+  5. Network timeouts (5 seconds for model requests, 60 seconds for chat)
+  
+  ### react-native/ios/Services/AudioManager.swift
+  
+  **Error Enum and Handling:**
+  ```swift
+  enum AudioError: Error {
+      case recordingFailed(String)
+      case playbackFailed(String)
+      case audioSessionFailed(String)
+      case microphoneAccessDenied(String)
+  }
+  ```
+  
+  **Error Scenarios:**
+  - `print("Failed to setup audio session: \(error)")` - Audio session setup failures
+  - `print("Failed to enable voice processing: \(error)")` - Voice processing setup failures
+  - `throw AudioError.recordingFailed("Failed to prepare recorder")` - Recording preparation failures
+  - `throw AudioError.microphoneAccessDenied("Microphone access denied")` - Permission issues
+  - `print("Failed to create format converter")` - Audio format conversion failures
+  - `print("Conversion error: \(error?.localizedDescription ?? "unknown error")")` - Audio conversion errors
+  - `print("Failed to start audio engine or install tap: \(error)")` - Audio engine startup failures
+  
+  ### react-native/src/chat/component/CustomFileListComponent.tsx
+  
+  **Error Handling:**
+  - Video compression errors: `catch (error) { showInfo('Video process failed'); }`
+  - File sharing errors: `console.log('Error opening file:', error);`
+  - Video size validation: `showInfo(\`Video too large: ${currentSize.toFixed(1)}MB (max ${MAX_VIDEO_SIZE}MB)\`);`
+  
+  **Key Issues:**
+  1. Video compression failures with user feedback
+  2. File sharing/opening failures
+  3. Video size limit enforcement (8MB max)
+  4. File processing and metadata extraction errors
+  
+  ## Critical Debugging Indicators
+  
+  **Most Critical Issues:**
+  1. **Stream Processing Errors** - Multiple console.log statements for stream reading failures across OpenAI and Ollama APIs
+  2. **Audio Engine Failures** - Comprehensive error handling in AudioManager.swift for recording, playback, and microphone access
+  3. **Network Timeout Issues** - 60-second timeouts that could cause user experience issues
+  4. **Video Compression Failures** - Complex video processing with multiple failure points
+  
+  **Error Recovery Patterns:**
+  - Fallback to "..." message when no content received
+  - Audio queue clearing on barge-in detection
+  - File removal on processing failures
+  - Timeout handling with controller.abort()
+  
+  All files show production-ready error handling but lack TODO/FIXME comments, suggesting these are mature components with established error handling patterns.
+</message>
+
+<message type=ai>
+  
+  # PlanningBased on the provided code, I've found several crash logs, stack traces, and error handling patterns that indicate known issues:
+  
+  ## AudioManager.swift Error Handling
+  
+  The AudioManager class defines several custom error types and has extensive error handling:
+  
+  ### Custom Error Types
+  ```swift
+  enum AudioError: Error {
+      case recordingFailed(String)
+      case playbackFailed(String)
+      case audioSessionFailed(String)
+      case microphoneAccessDenied(String)
+  }
+  ```
+  
+  ### Known Audio Issues & Error Handling
+  
+  **1. Audio Session Setup Failures**
+  ```swift
+  do {
+      try audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetooth, .duckOthers])
+      try audioSession.setActive(true)
+      if audioSession.isInputGainSettable {
+          try audioSession.setInputGain(1.0)
+      }
+  } catch {
+      print("Failed to setup audio session: \(error)")
+  }
+  ```
+  
+  **2. Voice Processing Failures**
+  ```swift
+  do {
+      try audioEngine.inputNode.setVoiceProcessingEnabled(true)
+      print("Voice processing enabled successfully")
+  } catch {
+      print("Failed to enable voice processing: \(error)")
+  }
+  ```
+  
+  **3. Recording Preparation Issues**
+  ```swift
+  guard let recorder = audioRecorder, recorder.prepareToRecord() else {
+      throw AudioError.recordingFailed("Failed to prepare recorder")
+  }
+  
+  if recorder.record() {
+      return fileURL
+  } else {
+      throw AudioError.recordingFailed("Failed to start recording")
+  }
+  ```
+  
+  **4. Microphone Permission Handling**
+  ```swift
+  case .denied:
+      throw AudioError.microphoneAccessDenied("Microphone access denied")
+  case .undetermined:
+      // Request permission with timeout
+      let semaphore = DispatchSemaphore(value: 0)
+      _ = semaphore.wait(timeout: .now() + 5.0)
+      if !permissionGranted {
+          throw AudioError.microphoneAccessDenied("Microphone access denied")
+      }
+  ```
+  
+  **5. Audio Input Availability Issues**
+  ```swift
+  if !audioSession.isInputAvailable {
+      throw AudioError.recordingFailed("Audio input is not available")
+  }
+  ```
+  
+  **6. Audio Engine Start Failures**
+  ```swift
+  do {
+      try audioEngine.start()
+      isCapturing = true
+      print("Audio engine started successfully")
+  } catch {
+      print("Failed to start audio engine or install tap: \(error)")
+      onError?(AudioError.recordingFailed("Recording error: \(error)"))
+  }
+  ```
+  
+  **7. Format Conversion Errors**
+  ```swift
+  guard let converter = AVAudioConverter(from: sourceFormat, to: inputFormat) else {
+      print("Failed to create format converter")
+      return nil
+  }
+  
+  let status = converter.convert(to: outputBuffer, error: &error) { ... }
+  if status == .error || error != nil {
+      print("Conversion error: \(error?.localizedDescription ?? "unknown error")")
+      return nil
+  }
+  ```
+  
+  ### Recording Delegate Error Handling
+  ```swift
+  func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {
+      if !flag {
+          onError?(AudioError.recordingFailed("Recording finished unsuccessfully"))
+      }
+  }
+  
+  func audioRecorderEncodeErrorDidOccur(_ recorder: AVAudioRecorder, error: Error?) {
+      if let error = error {
+          onError?(AudioError.recordingFailed("Recording error: \(error)"))
+      } else {
+          onError?(AudioError.recordingFailed("Unknown recording error occurred"))
+      }
+  }
+  ```
+  
+  ## ChatScreen.tsx Error Patterns
+  
+  **1. Voice Chat Service Error Handling**
+  ```typescript
+  voiceChatService.setCallbacks(
+      (role, text) => {
+          handleVoiceChatTranscript(role, text);
+      },
+      message => {
+          if (getTextModel().modelId.includes('nova-sonic')) {
+              handleVoiceChatTranscript('ASSISTANT', message);
+              endVoiceConversationRef.current?.();
+              saveCurrentMessages();
+              console.log('Voice chat error:', message);
+          }
+      }
+  );
+  ```
+  
+  **2. Request Cancellation Handling**
+  ```typescript
+  if (chatStatusRef.current === ChatStatus.Running) {
+      controllerRef.current?.abort();
+      chatStatusRef.current = ChatStatus.Init;
+      if (modeRef.current === ChatMode.Image) {
+          if (messagesRef.current[0].text === imagePlaceholder) {
+              messagesRef.current[0].text = 'Request interrupted';
+          }
+      }
+      saveCurrentMessages();
+  }
+  ```
+  
+  ## ollama-api.ts Error Handling
+  
+  **1. Network Request Timeouts**
+  ```typescript
+  const timeoutId = setTimeout(() => controller.abort(), 60000);
+  ```
+  
+  **2. Stream Reading Errors**
+  ```typescript
+  try {
+      const { done, value } = await reader.read();
+      // ... processing
+  } catch (readError) {
+      console.log('Error reading stream:', readError);
+      if (completeMessage === '') {
+          completeMessage = '...';
+      }
+      callback(completeMessage, true, true);
+      return;
+  }
+  ```
+  
+  **3. Network Fetch Errors**
+  ```typescript
+  .catch(error => {
+      console.log(error);
+      clearTimeout(timeoutId);
+      if (shouldStop()) {
+          if (completeMessage === '') {
+              completeMessage = '...';
+          }
+          callback(completeMessage, true, true);
+      } else {
+          const errorMsg = String(error);
+          const errorInfo = 'Request error: ' + errorMsg;
+          callback(completeMessage + '\n\n' + errorInfo, true, true);
+      }
+  });
+  ```
+  
+  **4. JSON Parsing Errors in Stream**
+  ```typescript
+  try {
+      const parsedData: OllamaResponse = JSON.parse(dataChunk);
+      // ... processing
+  } catch (error) {
+      if (lastChunk.length > 0) {
+          return { error: error + chunk };
+      }
+      if (content.length > 0) {
+          return { content, dataChunk, usage };
+      }
+  }
+  ```
+  
+  **5. HTTP Status Errors**
+  ```typescript
+  if (!response.ok) {
+      console.log(`HTTP error! status: ${response.status}`);
+      return [];
+  }
+  ```
+  
+  These error handling patterns indicate known issues with audio permissions, network connectivity, audio format conversion, stream parsing, and request cancellation scenarios.
+</message>
+
+<message type=ai>
+  
+  # Planning
+  ```❓ 
+  content: |
+    # Summary of Debug Indicators Found
+    
+    ## Console Logging & Debug Statements
+    ### Frontend (React Native/TypeScript)
+    - **bedrock-api.ts**: 9 console.log statements for stream errors, HTTP errors, token errors, parsing errors
+    - **open-api.ts**: 6 console.log statements for stream reading, HTTP status, model fetching errors  
+    - **ollama-api.ts**: 4 console.log statements for stream errors and HTTP failures
+    - **FileUtils.ts**: 4 console.warn/info statements for file operation errors
+    - **CustomMessageComponent.tsx**: 3 console.log statements for file viewer and sharing errors
+    - **BedrockMessageConvertor.ts**: 2 console.warn statements for file processing errors
+    - **CustomAddFileComponent.tsx**: 1 console.info for file selection errors
+    - **ChatScreen.tsx**: 1 console.log for voice chat errors
+    
+    ### Backend (Python)
+    - **main.py**: 4 print statements for bedrock errors, general errors, GitHub API errors, image generation errors
+    - **image_nl_processor.py**: 1 print statement for nova-lite analysis errors
+    
+    ### iOS Native (Swift)
+    - **ConversationManager.swift**: 3 print statements with ❌ emoji for conversation and audio errors
+    - **AudioManager.swift**: 7 print statements for audio session, recording, and conversion failures
+    
+    ## Error Handling Patterns
+    1. **Network & API Errors**: Comprehensive timeout handling, HTTP status error mapping, stream reading failures
+    2. **Authentication Issues**: API key validation, token expiration handling
+    3. **Audio Processing**: Recording failures, playback issues, microphone access denial
+    4. **File Operations**: Video compression, file sharing, size validation errors
+    5. **Stream Processing**: JSON parsing failures, data chunk errors, connection timeouts
+    
+    ## Critical Issues Identified
+    1. **Voice Chat Service**: Extensive error message mapping for 8+ specific error scenarios
+    2. **Audio Engine Failures**: AudioError enum with 4 error types, multiple failure points
+    3. **Stream Processing**: Multiple APIs with stream reading and parsing failures
+    4. **Video Processing**: Compression failures with 8MB size limits
+    
+    ## Missing Debugging Elements
+    - **No TODO/FIXME comments found** in any source files
+    - **No obvious test failures** in test file names
+    - **No stack traces or crash logs** in source code
+    
+    The codebase shows mature error handling with production-ready logging but lacks development-stage TODO markers.
+  description: Debug Analysis Summary
+  ```
+  Added text 'Debug Analysis Summary'.
+  ```🔍 Searching for substrings
+  patterns:
+    - stack trace
+    - stacktrace
+    - at .*:\d+
+    - \s+at 
+    - Caused by:
+    - Exception in thread
+    - Fatal Exception
+    - FATAL
+    - \*\*\* Terminating app due to
+    - libc\+\+abi
+    - abort\(\)
+    - SIGABRT
+    - SIGSEGV
+    - NSException
+    - uncaught exception
+    - unhandled exception
+  reasoning: Looking for actual crash logs, stack traces, and fatal error patterns that would indicate specific crash locations and causes
+  ```
+  Files with content matching patterns: react-native/android/gradlew, react-native/ios/Services/AudioManager.swift, CONTRIBUTING.md, react-native/--assets-dest, react-native/src/api/ollama-api.ts, react-native/src/chat/ChatScreen.tsx, react-native/src/api/open-api.ts, react-native/src/api/bedrock-api.ts, react-native/package-lock.json, README.md
+  ```🔍 Getting file contents
+  filenames:
+    - react-native/ios/SwiftChatTests/SwiftChatTests.m
+    - react-native/ios/TestAddBridge.swift
+  ```
+  <file name="react-native/ios/SwiftChatTests/SwiftChatTests.m">
+  #import <UIKit/UIKit.h>
+  #import <XCTest/XCTest.h>
+  
+  #import <React/RCTLog.h>
+  #import <React/RCTRootView.h>
+  
+  #define TIMEOUT_SECONDS 600
+  #define TEXT_TO_LOOK_FOR @"Welcome to React"
+  
+  @interface SwiftChatTests : XCTestCase
+  
+  @end
+  
+  @implementation SwiftChatTests
+  
+  - (BOOL)findSubviewInView:(UIView *)view matching:(BOOL (^)(UIView *view))test
+  {
+    if (test(view)) {
+      return YES;
+    }
+    for (UIView *subview in [view subviews]) {
+      if ([self findSubviewInView:subview matching:test]) {
+        return YES;
+      }
+    }
+    return NO;
+  }
+  
+  - (void)testRendersWelcomeScreen
+  {
+    UIViewController *vc = [[[RCTSharedApplication() delegate] window] rootViewController];
+    NSDate *date = [NSDate dateWithTimeIntervalSinceNow:TIMEOUT_SECONDS];
+    BOOL foundElement = NO;
+  
+    __block NSString *redboxError = nil;
+  #ifdef DEBUG
+    RCTSetLogFunction(
+        ^(RCTLogLevel level, RCTLogSource source, NSString *fileName, NSNumber *lineNumber, NSString *message) {
+          if (level >= RCTLogLevelError) {
+            redboxError = message;
+          }
+        });
+  #endif
+  
+    while ([date timeIntervalSinceNow] > 0 && !foundElement && !redboxError) {
+      [[NSRunLoop mainRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
+      [[NSRunLoop mainRunLoop] runMode:NSRunLoopCommonModes beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
+  
+      foundElement = [self findSubviewInView:vc.view
+                                    matching:^BOOL(UIView *view) {
+                                      if ([view.accessibilityLabel isEqualToString:TEXT_TO_LOOK_FOR]) {
+                                        return YES;
+                                      }
+                                      return NO;
+                                    }];
+    }
+  
+  #ifdef DEBUG
+    RCTSetLogFunction(RCTDefaultLogFunction);
+  #endif
+  
+    XCTAssertNil(redboxError, @"RedBox error: %@", redboxError);
+    XCTAssertTrue(foundElement, @"Couldn't find element with text '%@' in %d seconds", TEXT_TO_LOOK_FOR, TIMEOUT_SECONDS);
+  }
+  
+  @end
+  
+  </file>
+  
+  <file name="react-native/ios/TestAddBridge.swift">
+  import Foundation
+  
+  </file>
+</message>
+
+<message type=ai>
+  
+  # Planning
+</message>
+
+<message type=user>
+  <instructions>
+  Think about this request for changes to the supplied code.
+  If the request is ambiguous, ask questions.
+  
+  Once you understand the request you MUST:
+  
+  1. Decide if you need to propose *SEARCH/REPLACE* edits for any code whose source is not available.
+     You can create new files without asking!
+     But if you need to propose changes to code you can't see,
+     you *MUST* tell the user their full filename names and ask them to *add the files to the chat*;
+     end your reply and wait for their approval.
+     But if you only need to change individual functions whose code you can see,
+     you may do so without having the entire file in the Workspace.
+  
+  2. Explain the needed changes in a few short sentences.
+  
+  3. Describe each change with a *SEARCH/REPLACE* block.
+  
+  All changes to files must use this *SEARCH/REPLACE* block format.
+  
+  If a file is read-only or unavailable, ask the user to add it or make it editable.
+  
+  If you are struggling to use a dependency or API correctly, you MUST stop and ask the user for help.
+  <rules>
+  # *SEARCH/REPLACE block* Rules:
+  
+  Every *SEARCH/REPLACE block* must use this format:
+  1. The opening fence: ```
+  2. The *FULL* file path alone on a line, verbatim. No bold asterisks, no quotes around it, no escaping of characters, etc.
+  3. The start of search block: <<<<<<< SEARCH
+  4. A contiguous chunk of lines to search for in the existing source code
+  5. The dividing line: =======
+  6. The lines to replace into the source code
+  7. The end of the replace block: >>>>>>> REPLACE
+  8. The closing fence: ```
+  
+  Use the *FULL* file path, as shown to you by the user. No other text should appear on the marker lines.
+  
+  
+  Every *SEARCH* block must *EXACTLY MATCH* the existing filename content, character for character,
+  including all comments, docstrings, indentation, etc.
+  If the file contains code or other data wrapped in json/xml/quotes or other containers,
+  you need to propose edits to the literal contents, including that container markup.
+  
+  *SEARCH* and *REPLACE* blocks must both contain ONLY the lines to be matched or edited.
+  This means no +/- diff markers in particular!
+  
+  *SEARCH/REPLACE* blocks will *fail* to apply if the SEARCH text matches multiple occurrences.
+  Include enough lines to uniquely match each set of lines that need to change.
+  
+  Keep *SEARCH/REPLACE* blocks concise.
+  Break large changes into a series of smaller blocks that each change a small portion.
+  Include just the changing lines, plus a few surrounding lines if needed for uniqueness.
+  You should not need to include the entire function or block to change a line or two.
+  
+  Avoid generating overlapping *SEARCH/REPLACE* blocks, combine them into a single edit.
+  
+  If you want to move code within a filename, use 2 blocks: one to delete from the old location,
+  and one to insert in the new location.
+  
+  Pay attention to which filenames the user wants you to edit, especially if they are asking
+  you to create a new filename.
+  
+  Important! To create a new file OR to replace an *entire* existing file, use a *SEARCH/REPLACE*
+  block with nothing in between the search and divider marker lines, and the new file's full contents between
+  the divider and replace marker lines. Rule of thumb: replace the entire file if you will need to
+  change more than half of it.
+  
+  If the user just says something like "ok" or "go ahead" or "do that", they probably want you
+  to make SEARCH/REPLACE blocks for the code changes you just proposed.
+  The user will say when they've applied your edits.
+  If they haven't explicitly confirmed the edits have been applied, they probably want proper SEARCH/REPLACE blocks.
+  
+  NEVER use smart quotes in your *SEARCH/REPLACE* blocks, not even in comments.  ALWAYS
+  use vanilla ascii single and double quotes.
+  
+  # General
+  Always write elegant, well-encapsulated code that is easy to maintain and use without mistakes.
+  
+  Follow the existing code style, and ONLY EVER RETURN CHANGES IN A *SEARCH/REPLACE BLOCK*!
+  
+  Avoid changing code or comments that are not directly related to the request.
+  
+  Do not comment on your modifications, only on the resulting code in isolation.
+  You must never output any comments about the progress or type of changes of your refactoring or generation.
+  For example, you must NOT add comments like: 'Added dependency' or 'Changed to new style' or worst of all 'Keeping existing implementation'.
+  
+  </rules>
+  
+  <goal>
+  debug this program
+  execute npx react-native run-android
+  </goal>
+</message>
+
+# Tools:
+
+# Response:
+
+ChatResponse { aiMessage = AiMessage { text = "I can see this is a React Native application with both frontend and backend components. To debug the program when running `npx react-native run-android`, I need to understand what specific issues you're encountering.
+
+Based on my analysis of the codebase, I found extensive debug logging and error handling throughout the application, but I need more information to provide targeted debugging help.
+
+## Questions to clarify the debugging scope:
+
+1. **What specific error or issue are you seeing** when running `npx react-native run-android`?
+   - Build failures?
+   - Runtime crashes?
+   - Network connectivity issues?
+   - Specific feature not working?
+
+2. **What is the exact error message or behavior** you're experiencing?
+
+3. **Are you having issues with:**
+   - The React Native app startup?
+   - The Python FastAPI server connection?
+   - Specific features like voice chat, file upload, or AI model integration?
+
+From the debug analysis I performed, the most common issues in this codebase are related to:
+
+- **Network connectivity** (API timeouts, stream reading failures)
+- **Authentication** (API key validation, token issues)
+- **Audio processing** (microphone permissions, recording failures)
+- **File operations** (video compression, file sharing)
+- **Stream processing** (JSON parsing, data chunk errors)
+
+Once you provide the specific error or issue you're encountering, I can give you targeted debugging steps and potentially propose code fixes using *SEARCH/REPLACE* blocks.
+
+Could you please share:
+1. The exact command output/error when running `npx react-native run-android`
+2. Any relevant logs from the Metro bundler or Android logcat
+3. What specific functionality isn't working as expected" reasoningContent = null toolExecutionRequests = [] }, metadata = OpenAiChatResponseMetadata{id='chatcmpl-222c48d9-7c39-4168-9da6-531351c89a70', modelName='claude-sonnet-4-20250514', tokenUsage=OpenAiTokenUsage { inputTokenCount = 44158, inputTokensDetails = OpenAiTokenUsage.InputTokensDetails { cachedTokens = 0 }, outputTokenCount = 388, outputTokensDetails = OpenAiTokenUsage.OutputTokensDetails { reasoningTokens = 0 }, totalTokenCount = 44546 }, finishReason=STOP, created=1756791381, serviceTier='null', systemFingerprint='null'} }

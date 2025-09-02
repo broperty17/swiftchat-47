@@ -1,0 +1,347 @@
+{
+  "messages" : [ {
+    "text" : "You are the Search Agent.\nYour job:\n  - find and organize code relevant to the user's question or implementation goal,\n  - aggressively curate the Workspace so a Code Agent can implement next without confusion,\n  - never write code yourself.\n\nCritical rules:\n  1) At EVERY TURN, drop irrelevant fragments from the Workspace.\n     Prefer summaries over full files. Replace long fragments with concise summaries of content related to the goal first,\n     then drop the originals.\n  2) Use search and inspection tools to discover relevant code, including classes/methods/usages/call graphs.\n  3) The symbol-based tools only have visibility into the following file types: TYPESCRIPT\n     Use text-based tools if you need to search other file types.\n  4) Group related lookups into a single call when possible.\n  5) Make multiple tool calls at once when searching for different types of code.\n\nOutput discipline:\n  - Think before calling tools.\n  - If you already know what to add, use Workspace tools directly; do not search redundantly.\n"
+  }, {
+    "name" : null,
+    "contents" : [ {
+      "text" : "<workspace>\n<workspace_editable>\nHere are the EDITABLE files and code fragments in your Workspace.\nThis is *the only context in the Workspace to which you should make changes*.\n\n*Trust this message as the true contents of these files!*\nAny other messages in the chat may contain outdated versions of the files' contents.\n\n<file path=\"react-native/src/App.tsx\" fragmentid=\"1\">\nimport 'react-native-gesture-handler';\nimport * as React from 'react';\nimport { NavigationContainer } from '@react-navigation/native';\nimport {\n  createDrawerNavigator,\n  DrawerContentComponentProps,\n} from '@react-navigation/drawer';\nimport CustomDrawerContent from './history/CustomDrawerContent.tsx';\nimport { Dimensions, Keyboard, StatusBar } from 'react-native';\nimport ChatScreen from './chat/ChatScreen.tsx';\nimport { RouteParamList, DrawerParamList } from './types/RouteTypes.ts';\nimport { AppProvider, useAppContext } from './history/AppProvider.tsx';\nimport Toast from 'react-native-toast-message';\nimport TokenUsageScreen from './settings/TokenUsageScreen.tsx';\nimport { createNativeStackNavigator } from '@react-navigation/native-stack';\nimport PromptScreen from './prompt/PromptScreen.tsx';\nimport PresetPromptList from './prompt/PresetPromptList.tsx';\nimport WebViewScreen from './webview/WebViewScreen.tsx';\nimport MapsScreen from './maps/MapsScreen.tsx';\nimport { isAndroid, isMacCatalyst } from './utils/PlatformUtils';\nimport { ThemeProvider, useTheme } from './theme';\n\nexport const isMac = isMacCatalyst;\nconst { width: screenWidth, height: screenHeight } = Dimensions.get('window');\nconst minWidth = screenWidth > screenHeight ? screenHeight : screenWidth;\nconst width = minWidth > 434 ? 300 : minWidth * 0.83;\n\nconst Drawer = createDrawerNavigator<DrawerParamList>();\nconst Stack = createNativeStackNavigator();\n\nconst renderCustomDrawerContent = (\n  props: React.JSX.IntrinsicAttributes & DrawerContentComponentProps\n) => <CustomDrawerContent {...props} />;\n\nconst DrawerNavigator = () => {\n  const { drawerType } = useAppContext();\n  const { colors, isDark } = useTheme();\n  return (\n    <Drawer.Navigator\n      initialRouteName=\"Bedrock\"\n      screenOptions={{\n        overlayColor: isDark ? 'rgba(255, 255, 255, 0.1)' : undefined,\n        headerTintColor: colors.text,\n        headerTitleAlign: 'center',\n        drawerStyle: {\n          width: width,\n          backgroundColor: colors.background,\n          borderRightWidth: isMac ? 1 : isAndroid ? 0.3 : 0,\n          borderRightColor: colors.border,\n        },\n        headerStyle: {\n          height: isMac ? 66 : undefined,\n          backgroundColor: colors.background,\n          borderBottomWidth: isDark ? 0.3 : undefined,\n          borderBottomColor: isDark ? colors.chatScreenSplit : undefined,\n        },\n        drawerType: isMac ? drawerType : 'slide',\n      }}\n      drawerContent={renderCustomDrawerContent}>\n      <Drawer.Screen name=\"Bedrock\" component={ChatScreen} />\n    </Drawer.Navigator>\n  );\n};\nconst AppNavigator = () => {\n  const { colors } = useTheme();\n  return (\n    <Stack.Navigator initialRouteName=\"Drawer\" screenOptions={{}}>\n      <Stack.Screen\n        name=\"Drawer\"\n        component={DrawerNavigator}\n        options={{ headerShown: false, headerLargeTitleShadowVisible: false }}\n      />\n      <Stack.Screen\n        name=\"TokenUsage\"\n        component={TokenUsageScreen}\n        options={{\n          title: 'Usage',\n          contentStyle: {\n            height: isMac ? 66 : undefined,\n            backgroundColor: colors.background,\n          },\n          headerTitleAlign: 'center',\n          headerStyle: { backgroundColor: colors.background },\n          headerTintColor: colors.text,\n        }}\n      />\n      <Stack.Screen\n        name=\"Prompt\"\n        component={PromptScreen}\n        options={{\n          title: 'System Prompt',\n          contentStyle: {\n            height: isMac ? 66 : undefined,\n            backgroundColor: colors.background,\n          },\n          headerTitleAlign: 'center',\n          headerStyle: { backgroundColor: colors.background },\n          headerTintColor: colors.text,\n        }}\n      />\n          <Stack.Screen\n       name=\"PresetPrompts\"\n       component={PresetPromptList}\n       options={{\n         title: 'MENU',         \n          contentStyle: {\n          height: isMac ? 66 : undefined,\n          backgroundColor: colors.background,\n        },\n         headerTitleAlign: 'center',\n         headerStyle: { backgroundColor: colors.background },\n         headerTintColor: colors.text,\n       }}\n      />\n      <Stack.Screen\n        name=\"WebView\"\n        component={WebViewScreen}\n        options={{\n          title: 'Web Browser',\n          contentStyle: {\n            height: isMac ? 66 : undefined,\n            backgroundColor: colors.background,\n          },\n          headerTitleAlign: 'center',\n          headerStyle: { backgroundColor: colors.background },\n          headerTintColor: colors.text,\n        }}\n      />\n      <Stack.Screen\n        name=\"Maps\"\n        component={MapsScreen}\n        options={{\n          title: 'Peta Properti',\n          contentStyle: {\n            height: isMac ? 66 : undefined,\n            backgroundColor: colors.background,\n          },\n          headerTitleAlign: 'center',\n          headerStyle: { backgroundColor: colors.background },\n          headerTintColor: colors.text,\n        }}\n      />\n    </Stack.Navigator>\n  );\n};\n\nconst AppWithTheme = () => {\n  const { colors, isDark } = useTheme();\n  return (\n    <>\n      <StatusBar\n        barStyle={isDark ? 'light-content' : 'dark-content'}\n        backgroundColor={colors.background}\n      />\n      <NavigationContainer\n        onStateChange={_ => {\n          Keyboard.dismiss();\n        }}>\n        <AppNavigator />\n      </NavigationContainer>\n    </>\n  );\n};\n\nconst App = () => {\n  return (\n    <>\n      <ThemeProvider>\n        <AppProvider>\n          <AppWithTheme />\n        </AppProvider>\n      </ThemeProvider>\n      <Toast />\n    </>\n  );\n};\n\nexport default App;\n\n</file>\n</workspace_editable>\n</workspace>\n"
+    } ]
+  }, {
+    "text" : "Thank you for providing the Workspace contents.",
+    "reasoningContent" : null,
+    "toolExecutionRequests" : [ ]
+  }, {
+    "name" : null,
+    "contents" : [ {
+      "text" : "<related_classes>\nThese MAY be relevant. They are NOT in the Workspace yet.\nAdd summaries or sources if needed; otherwise ignore them.\n\nNo summaries found for: \n</related_classes>\n"
+    } ]
+  }, {
+    "text" : "Acknowledged. I will explicitly add only what is relevant.",
+    "reasoningContent" : null,
+    "toolExecutionRequests" : [ ]
+  }, {
+    "text" : "\n# Planning\nI need to understand what program needs to be debugged. Since no specific program or codebase has been provided in the workspace, I should first explore what's available in the current project.\n\nLet me start by searching for any programs or code files that might need debugging.\nTool call(s): `callSearchAgent`",
+    "reasoningContent" : null,
+    "toolExecutionRequests" : [ ]
+  }, {
+    "name" : null,
+    "contents" : [ {
+      "text" : "<goal>\nFind all main programs, executables, or entry points in this project that might need debugging\n</goal>\n\nDecide the next tool action(s) to make progress toward answering the question and preparing the Workspace\nfor follow-on code changes. If you already have enough to answer, use answerSearch. If we cannot answer,\nuse abortSearch with a clear explanation.\n\nYou are encouraged to invoke multiple Workspace tools at once (add summaries, drop fragments, etc).\nDo NOT invoke multiple answer/abort actions. Do NOT write code.\n\n\n"
+    } ]
+  } ],
+  "parameters" : {
+    "modelName" : null,
+    "temperature" : null,
+    "topP" : null,
+    "frequencyPenalty" : null,
+    "presencePenalty" : null,
+    "maxOutputTokens" : null,
+    "stopSequences" : [ ],
+    "toolSpecifications" : [ {
+      "name" : "searchSubstrings",
+      "description" : "Returns file names whose text contents match Java regular expression patterns.\nThis is slower than searchSymbols but can find references to external dependencies and comment strings.\n",
+      "parameters" : {
+        "description" : null,
+        "properties" : {
+          "patterns" : {
+            "description" : "Java-style regex patterns to search for within file contents. Unlike searchSymbols this does not automatically include any implicit anchors or case insensitivity.",
+            "items" : {
+              "description" : null
+            }
+          },
+          "reasoning" : {
+            "description" : "Explanation of what you're looking for in this request so the summarizer can accurately capture it."
+          }
+        },
+        "required" : [ "patterns", "reasoning" ],
+        "additionalProperties" : null,
+        "definitions" : { }
+      }
+    }, {
+      "name" : "searchFilenames",
+      "description" : "Returns filenames (relative to the project root) that match the given Java regular expression patterns.\nUse this to find configuration files, test data, or source files when you know part of their name.\n",
+      "parameters" : {
+        "description" : null,
+        "properties" : {
+          "patterns" : {
+            "description" : "Java-style regex patterns to match against filenames.",
+            "items" : {
+              "description" : null
+            }
+          },
+          "reasoning" : {
+            "description" : "Explanation of what you're looking for in this request so the summarizer can accurately capture it."
+          }
+        },
+        "required" : [ "patterns", "reasoning" ],
+        "additionalProperties" : null,
+        "definitions" : { }
+      }
+    }, {
+      "name" : "getFileContents",
+      "description" : "Returns the full contents of the specified files. Use this after searchFilenames or searchSubstrings, or when you need the content of a non-code file.\nThis can be expensive for large files.\n",
+      "parameters" : {
+        "description" : null,
+        "properties" : {
+          "filenames" : {
+            "description" : "List of filenames (relative to project root) to retrieve contents for.",
+            "items" : {
+              "description" : null
+            }
+          }
+        },
+        "required" : [ "filenames" ],
+        "additionalProperties" : null,
+        "definitions" : { }
+      }
+    }, {
+      "name" : "getFileSummaries",
+      "description" : "Retrieves summaries (fields and method signatures) for all classes defined within specified project files.\nSupports glob patterns: '*' matches files in a single directory, '**' matches files recursively.\nThis is a fast and efficient way to read multiple related files at once.\n(But if you don't know where what you want is located, you should use searchSymbols instead.)\n",
+      "parameters" : {
+        "description" : null,
+        "properties" : {
+          "filePaths" : {
+            "description" : "List of file paths relative to the project root. Supports glob patterns (* for single directory, ** for recursive). E.g., ['src/main/java/com/example/util/*.java', 'tests/foo/**.py']",
+            "items" : {
+              "description" : null
+            }
+          }
+        },
+        "required" : [ "filePaths" ],
+        "additionalProperties" : null,
+        "definitions" : { }
+      }
+    }, {
+      "name" : "addFilesToWorkspace",
+      "description" : "Edit project files to the Workspace. Use this when Code Agent will need to make changes to these files, or if you need to read the full source. Only call when you have identified specific filenames. DO NOT call this to create new files -- Code Agent can do that without extra steps.",
+      "parameters" : {
+        "description" : null,
+        "properties" : {
+          "relativePaths" : {
+            "description" : "List of file paths relative to the project root (e.g., 'src/main/java/com/example/MyClass.java'). Must not be empty.",
+            "items" : {
+              "description" : null
+            }
+          }
+        },
+        "required" : [ "relativePaths" ],
+        "additionalProperties" : null,
+        "definitions" : { }
+      }
+    }, {
+      "name" : "addClassesToWorkspace",
+      "description" : "Add classes to the Workspace by their fully qualified names. This maps class names to their containing files and adds those files for editing. Only call when you have identified specific class names.\")",
+      "parameters" : {
+        "description" : null,
+        "properties" : {
+          "classNames" : {
+            "description" : "List of fully qualified class names (e.g., ['com.example.MyClass', 'org.another.Util']). Must not be empty.",
+            "items" : {
+              "description" : null
+            }
+          }
+        },
+        "required" : [ "classNames" ],
+        "additionalProperties" : null,
+        "definitions" : { }
+      }
+    }, {
+      "name" : "addClassSummariesToWorkspace",
+      "description" : "Retrieves summaries (fields and method signatures) for specified classes and adds them to the Workspace.\nFaster and more efficient than reading entire files or classes when you just need the API and not the full source code.\nOnly call when you have identified specific class names.\")\n",
+      "parameters" : {
+        "description" : null,
+        "properties" : {
+          "classNames" : {
+            "description" : "List of fully qualified class names (e.g., ['com.example.ClassA', 'org.another.ClassB']) to get summaries for. Must not be empty.",
+            "items" : {
+              "description" : null
+            }
+          }
+        },
+        "required" : [ "classNames" ],
+        "additionalProperties" : null,
+        "definitions" : { }
+      }
+    }, {
+      "name" : "addMethodSourcesToWorkspace",
+      "description" : "Retrieves the full source code of specific methods and adds to the Workspace each as a separate read-only text fragment.\nFaster and more efficient than including entire files or classes when you only need a few methods.\n",
+      "parameters" : {
+        "description" : null,
+        "properties" : {
+          "methodNames" : {
+            "description" : "List of fully qualified method names (e.g., ['com.example.ClassA.method1', 'org.another.ClassB.processData']) to retrieve sources for. Must not be empty.",
+            "items" : {
+              "description" : null
+            }
+          }
+        },
+        "required" : [ "methodNames" ],
+        "additionalProperties" : null,
+        "definitions" : { }
+      }
+    }, {
+      "name" : "addFileSummariesToWorkspace",
+      "description" : "Retrieves summaries (fields and method signatures) for all classes defined within specified project files and adds them to the Workspace.\nSupports glob patterns: '*' matches files in a single directory, '**' matches files recursively.\nFaster and more efficient than reading entire files when you just need the API definitions.\n(But if you don't know where what you want is located, you should use Search Agent instead.)\n",
+      "parameters" : {
+        "description" : null,
+        "properties" : {
+          "filePaths" : {
+            "description" : "List of file paths relative to the project root. Supports glob patterns (* for single directory, ** for recursive). E.g., ['src/main/java/com/example/util/*.java', 'tests/foo/**.py']. Must not be empty.",
+            "items" : {
+              "description" : null
+            }
+          }
+        },
+        "required" : [ "filePaths" ],
+        "additionalProperties" : null,
+        "definitions" : { }
+      }
+    }, {
+      "name" : "addSymbolUsagesToWorkspace",
+      "description" : "Finds usages of a specific symbol (class, method, field) and adds the full source of the calling methods to the Workspace. Only call when you have identified specific symbols.\")\n",
+      "parameters" : {
+        "description" : null,
+        "properties" : {
+          "symbol" : {
+            "description" : "Fully qualified symbol name (e.g., 'com.example.MyClass', 'com.example.MyClass.myMethod', 'com.example.MyClass.myField') to find usages for."
+          }
+        },
+        "required" : [ "symbol" ],
+        "additionalProperties" : null,
+        "definitions" : { }
+      }
+    }, {
+      "name" : "addCallGraphInToWorkspace",
+      "description" : "Generates a call graph showing methods that call the specified target method (callers) up to a certain depth, and adds it to the Workspace.\nThe single line of the call sites (but not full method sources) are included\n",
+      "parameters" : {
+        "description" : null,
+        "properties" : {
+          "methodName" : {
+            "description" : "Fully qualified target method name (e.g., 'com.example.MyClass.targetMethod') to find callers for."
+          },
+          "depth" : {
+            "description" : "Maximum depth of the call graph to retrieve (e.g., 3 or 5). Higher depths can be large."
+          }
+        },
+        "required" : [ "methodName", "depth" ],
+        "additionalProperties" : null,
+        "definitions" : { }
+      }
+    }, {
+      "name" : "addCallGraphOutToWorkspace",
+      "description" : "Generates a call graph showing methods called by the specified source method (callees) up to a certain depth, and adds it to the workspace\nThe single line of the call sites (but not full method sources) are included\n",
+      "parameters" : {
+        "description" : null,
+        "properties" : {
+          "methodName" : {
+            "description" : "Fully qualified source method name (e.g., 'com.example.MyClass.sourceMethod') to find callees for."
+          },
+          "depth" : {
+            "description" : "Maximum depth of the call graph to retrieve (e.g., 3 or 5). Higher depths can be large."
+          }
+        },
+        "required" : [ "methodName", "depth" ],
+        "additionalProperties" : null,
+        "definitions" : { }
+      }
+    }, {
+      "name" : "addTextToWorkspace",
+      "description" : "Add an arbitrary block of text (e.g., notes that are independent of the Plan, a configuration snippet, or something learned from another Agent) to the Workspace as a read-only fragment",
+      "parameters" : {
+        "description" : null,
+        "properties" : {
+          "content" : {
+            "description" : "The text content to add to the Workspace"
+          },
+          "description" : {
+            "description" : "A short, descriptive label for this text fragment (e.g., 'User Requirements', 'API Key Snippet')"
+          }
+        },
+        "required" : [ "content", "description" ],
+        "additionalProperties" : null,
+        "definitions" : { }
+      }
+    }, {
+      "name" : "dropWorkspaceFragments",
+      "description" : "Remove specified fragments (files, text snippets, task history, analysis results) from the Workspace using their unique string IDs",
+      "parameters" : {
+        "description" : null,
+        "properties" : {
+          "fragmentIds" : {
+            "description" : "List of string IDs corresponding to the fragments visible in the workspace that you want to remove. Must not be empty.",
+            "items" : {
+              "description" : null
+            }
+          }
+        },
+        "required" : [ "fragmentIds" ],
+        "additionalProperties" : null,
+        "definitions" : { }
+      }
+    }, {
+      "name" : "getFiles",
+      "description" : "Returns the file paths relative to the project root for the given fully-qualified class names.",
+      "parameters" : {
+        "description" : null,
+        "properties" : {
+          "classNames" : {
+            "description" : "List of fully qualified class names (e.g., ['com.example.MyClass', 'org.another.Util']). Must not be empty.",
+            "items" : {
+              "description" : null
+            }
+          }
+        },
+        "required" : [ "classNames" ],
+        "additionalProperties" : null,
+        "definitions" : { }
+      }
+    }, {
+      "name" : "answerSearch",
+      "description" : "Provide a final answer to the user's question or goal. Use this when you have enough information.",
+      "parameters" : {
+        "description" : null,
+        "properties" : {
+          "explanation" : {
+            "description" : "Comprehensive explanation that answers the query. Include relevant code snippets and how they relate, formatted in Markdown."
+          },
+          "classNames" : {
+            "description" : "List of fully qualified class names (FQCNs) relevant to the explanation (exhaustive).",
+            "items" : {
+              "description" : null
+            }
+          }
+        },
+        "required" : [ "explanation", "classNames" ],
+        "additionalProperties" : null,
+        "definitions" : { }
+      }
+    }, {
+      "name" : "abortSearch",
+      "description" : "Abort when you determine the question is not answerable from this codebase or is out of scope.",
+      "parameters" : {
+        "description" : null,
+        "properties" : {
+          "explanation" : {
+            "description" : "Clear explanation of why the question cannot be answered from this codebase."
+          }
+        },
+        "required" : [ "explanation" ],
+        "additionalProperties" : null,
+        "definitions" : { }
+      }
+    } ],
+    "toolChoice" : null,
+    "responseFormat" : null,
+    "maxCompletionTokens" : null,
+    "logitBias" : { },
+    "parallelToolCalls" : true,
+    "seed" : null,
+    "user" : null,
+    "store" : null,
+    "metadata" : {
+      "tags" : "retain"
+    },
+    "serviceTier" : null,
+    "reasoningEffort" : null
+  }
+}

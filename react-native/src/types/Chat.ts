@@ -1,5 +1,4 @@
 import { IMessage } from 'react-native-gifted-chat';
-import { User } from 'react-native-gifted-chat/lib/Models';
 
 export type Chat = {
   id: number;
@@ -117,7 +116,10 @@ export interface SwiftChatMessage extends IMessage {
   metrics?: Metrics;
 }
 
-interface SwiftChatUser extends User {
+interface SwiftChatUser {
+  _id: string | number;
+  name?: string;
+  avatar?: string;
   modelTag?: string;
 }
 

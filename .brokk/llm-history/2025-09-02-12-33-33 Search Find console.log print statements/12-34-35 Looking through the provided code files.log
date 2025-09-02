@@ -1,0 +1,4503 @@
+# Request to claude-4-sonnet:
+
+<message type=system>
+  You are a code expert extracting ALL information relevant to the given goal
+  from the provided tool call result.
+  
+  Your output will be given to the agent running the search, and replaces the raw result.
+  Thus, you must include every relevant class/method name and any
+  relevant code snippets that may be needed later. DO NOT speculate; only use the provided content.
+</message>
+
+<message type=user>
+  <goal>
+  Find console.log, print statements, or debug logging that might indicate debugging efforts
+  </goal>
+  <reasoning>
+  
+  </reasoning>
+  <tool name="getFileContents">
+  <file name="react-native/src/chat/component/CustomAddFileComponent.tsx">
+  import { Actions } from 'react-native-gifted-chat';
+  import { Image, Platform, StyleSheet, Text } from 'react-native';
+  import React, { useRef } from 'react';
+  import {
+    ImagePickerResponse,
+    launchCamera,
+    launchImageLibrary,
+  } from 'react-native-image-picker';
+  import { ChatMode, FileInfo, FileType } from '../../types/Chat.ts';
+  import { pick, types } from 'react-native-document-picker';
+  import { saveFile } from '../util/FileUtils.ts';
+  import {
+    createVideoThumbnail,
+    getImageMetaData,
+    getVideoMetaData,
+    Image as Img,
+  } from 'react-native-compressor';
+  import { isMac } from '../../App.tsx';
+  import { getTextModel } from '../../storage/StorageUtils.ts';
+  import { showInfo } from '../util/ToastUtils.ts';
+  import { useTheme } from '../../theme';
+  import { isAndroid } from '../../utils/PlatformUtils.ts';
+  
+  interface CustomRenderActionsProps {
+    onFileSelected: (files: FileInfo[]) => void;
+    mode?: 'default' | 'list';
+    chatMode?: ChatMode;
+  }
+  
+  const DefaultIcon = () => {
+    const { isDark } = useTheme();
+    return (
+      <Image
+        style={styles.imageButton}
+        resizeMode="contain"
+        source={
+          isDark
+            ? require('../../assets/add_dark.png')
+            : require('../../assets/add.png')
+        }
+      />
+    );
+  };
+  
+  const ListIcon = ({ textColor }: { textColor: string }) => (
+    <Text style={[styles.addIcon, { color: textColor }]}>+</Text>
+  );
+  
+  export const CustomAddFileComponent: React.FC<CustomRenderActionsProps> = ({
+    onFileSelected,
+    mode = 'default',
+    chatMode = ChatMode.Text,
+  }) => {
+    const { colors } = useTheme();
+    const chatModeRef = useRef(chatMode);
+  
+    // Create a memoized ListIcon component with theme colors
+    const ThemedListIcon = React.useCallback(
+      () => <ListIcon textColor={colors.textSecondary} />,
+      [colors.textSecondary]
+    );
+    chatModeRef.current = chatMode;
+    const handleChooseFiles = async () => {
+      let chooseType = [];
+      const isImageMode = chatModeRef.current === ChatMode.Image;
+      try {
+        if (isImageMode) {
+          chooseType = [types.images];
+        } else {
+          chooseType = [types.allFiles];
+        }
+        const pickResults = await pick({
+          allowMultiSelection: !isImageMode,
+          type: chooseType,
+        });
+        const files: FileInfo[] = [];
+        await Promise.all(
+          pickResults.map(async pickResult => {
+            if (pickResult.name && pickResult.uri) {
+              const fileName = getFileNameWithoutExtension(pickResult.name);
+              const fileNameArr = pickResult.name.split('.');
+              let format = fileNameArr[fileNameArr.length - 1].toLowerCase();
+              const fileType = getFileType(format);
+              if (fileType === FileType.unSupported) {
+                const msg = 'Selected UnSupported Files format: .' + format;
+                showInfo(msg);
+                return;
+              }
+              if (
+                fileType === FileType.document &&
+                (pickResult.size ?? 0) >= MAX_FILE_SIZE
+              ) {
+                const msg = 'File size exceeds 4.5MB limit: ' + pickResult.name;
+                showInfo(msg);
+                return;
+              }
+              let localFileUrl: string | null;
+              let width = 0;
+              let height = 0;
+              if (fileType === FileType.image) {
+                pickResult.uri = decodeURI(pickResult.uri);
+                if (format === 'png' || format === 'jpg' || format === 'jpeg') {
+                  pickResult.uri = await Img.compress(pickResult.uri);
+                  const metaData = await getImageMetaData(pickResult.uri);
+                  format = metaData.extension;
+                  width = metaData.ImageWidth;
+                  height = metaData.ImageHeight;
+                }
+                localFileUrl = await saveFile(pickResult.uri, pickResult.name);
+              } else if (fileType === FileType.video) {
+                localFileUrl = pickResult.uri;
+              } else {
+                localFileUrl = await saveFile(
+                  decodeURI(pickResult.uri),
+                  pickResult.name
+                );
+              }
+  
+              let thumbnailUrl;
+              if (fileType === FileType.video) {
+                if (Platform.OS === 'android') {
+                  localFileUrl = await saveFile(pickResult.uri, fileName);
+                  pickResult.uri = localFileUrl!;
+                }
+                const thumbnail = await createVideoThumbnail(pickResult.uri);
+                thumbnailUrl =
+                  (await saveFile(thumbnail.path, fileName + '.jpeg')) ?? '';
+                const metaData = await getVideoMetaData(pickResult.uri);
+                width = metaData.width;
+                height = metaData.height;
+              }
+  
+              if (localFileUrl) {
+                files.push({
+                  fileName: fileName,
+                  url: localFileUrl,
+                  videoThumbnailUrl: thumbnailUrl,
+                  fileSize: pickResult.size ?? 0,
+                  type: fileType,
+                  format: format.toLowerCase() === 'jpg' ? 'jpeg' : format,
+                  width: width,
+                  height: height,
+                });
+              }
+            }
+          }) ?? []
+        );
+        if (files.length > 0) {
+          onFileSelected(files);
+        }
+      } catch (err: unknown) {
+        console.info(err);
+      }
+    };
+  
+    if (isMac) {
+      return (
+        <Actions
+          containerStyle={{
+            ...styles.containerStyle,
+            ...(mode === 'list' && {
+              width: '100%',
+              height: '100%',
+              marginRight: 10,
+            }),
+          }}
+          icon={mode === 'default' ? DefaultIcon : ThemedListIcon}
+          onPressActionButton={handleChooseFiles}
+        />
+      );
+    }
+    return (
+      <Actions
+        containerStyle={{
+          ...styles.containerStyle,
+          ...(mode === 'list' && {
+            width: '100%',
+            height: '100%',
+            marginRight: 10,
+          }),
+        }}
+        icon={mode === 'default' ? DefaultIcon : ThemedListIcon}
+        options={{
+          'Take Camera': () => {
+            launchCamera({
+              saveToPhotos: false,
+              mediaType:
+                chatModeRef.current === ChatMode.Text && isVideoSupported()
+                  ? 'mixed'
+                  : 'photo',
+              videoQuality: 'high',
+              durationLimit: 30,
+              includeBase64: false,
+              includeExtra: true,
+              presentationStyle: 'fullScreen',
+            }).then(async res => {
+              const files = await getFiles(res);
+              if (files.length > 0) {
+                onFileSelected(files);
+              }
+            });
+          },
+          'Choose From Photos': () => {
+            launchImageLibrary({
+              selectionLimit: chatModeRef.current === ChatMode.Text ? 0 : 1,
+              mediaType:
+                chatModeRef.current === ChatMode.Text && isVideoSupported()
+                  ? 'mixed'
+                  : 'photo',
+              includeBase64: false,
+              includeExtra: true,
+              assetRepresentationMode: 'current',
+            }).then(async res => {
+              const files = await getFiles(res);
+              if (files.length > 0) {
+                onFileSelected(files);
+              }
+            });
+          },
+          'Choose From Files': handleChooseFiles,
+          Cancel: () => {},
+        }}
+        optionTintColor={isAndroid ? colors.background : colors.text}
+      />
+    );
+  };
+  
+  const MAX_FILE_SIZE = 4.5 * 1024 * 1024;
+  export const IMAGE_FORMATS = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
+  export const VIDEO_FORMATS = ['mp4', 'mov', 'mkv', 'webm'];
+  export const EXTRA_DOCUMENT_FORMATS = [
+    'json',
+    'py',
+    'ts',
+    'tsx',
+    'js',
+    'kt',
+    'java',
+    'swift',
+    'c',
+    'm',
+    'h',
+    'sh',
+    'cpp',
+    'rs',
+    'go',
+    'class',
+    'cs',
+    'php',
+    'rb',
+    'dart',
+    'sql',
+    'css',
+    'xml',
+    'yaml',
+  ];
+  export const DOCUMENT_FORMATS = [
+    'pdf',
+    'csv',
+    'doc',
+    'docx',
+    'xls',
+    'xlsx',
+    'html',
+    'txt',
+    'md',
+    ...EXTRA_DOCUMENT_FORMATS,
+  ];
+  
+  export const getFileType = (format: string) => {
+    if (isImageFormat(format)) {
+      return FileType.image;
+    } else if (isVideoFormat(format)) {
+      return FileType.video;
+    } else if (isDocumentFormat(format)) {
+      return FileType.document;
+    } else {
+      return FileType.unSupported;
+    }
+  };
+  
+  export const isImageFormat = (format: string) => {
+    return IMAGE_FORMATS.includes(format);
+  };
+  
+  export const isVideoFormat = (format: string) => {
+    return VIDEO_FORMATS.includes(format);
+  };
+  
+  export const isDocumentFormat = (format: string) => {
+    return DOCUMENT_FORMATS.includes(format);
+  };
+  
+  const getFileNameWithoutExtension = (fileName: string) => {
+    return fileName.substring(0, fileName.lastIndexOf('.')).trim();
+  };
+  
+  export const isVideoSupported = (): boolean => {
+    const textModelId = getTextModel().modelId;
+    return textModelId.includes('nova-pro') || textModelId.includes('nova-lite');
+  };
+  
+  const getFiles = async (res: ImagePickerResponse) => {
+    const files: FileInfo[] = [];
+    await Promise.all(
+      res.assets?.map(async media => {
+        if (media.fileName && media.uri) {
+          const fileName = getFileNameWithoutExtension(media.fileName);
+          const fileNameArr = media.fileName.split('.');
+          let format = fileNameArr[fileNameArr.length - 1].toLowerCase();
+          const fileType = getFileType(format);
+          if (fileType === FileType.unSupported) {
+            const msg = 'Selected UnSupported Files format: .' + format;
+            showInfo(msg);
+            return;
+          }
+          let width = media.width;
+          let height = media.height;
+          if (format === 'png' || format === 'jpg' || format === 'jpeg') {
+            media.uri = await Img.compress(media.uri);
+            const metaData = await getImageMetaData(media.uri);
+            format = metaData.extension;
+            width = metaData.ImageWidth;
+            height = metaData.ImageHeight;
+          }
+          let thumbnailUrl;
+          if (fileType === FileType.video) {
+            const thumbnail = await createVideoThumbnail(media.uri);
+            thumbnailUrl =
+              (await saveFile(thumbnail.path, fileName + '.jpeg')) ?? '';
+          }
+          let localFileUrl: string | null;
+          if (fileType !== FileType.video) {
+            localFileUrl = await saveFile(media.uri, media.fileName);
+          } else {
+            localFileUrl = media.uri;
+          }
+  
+          if (localFileUrl) {
+            files.push({
+              fileName: fileName,
+              url: localFileUrl,
+              videoThumbnailUrl: thumbnailUrl,
+              fileSize: media.fileSize ?? 0,
+              type: fileType,
+              format: format === 'jpg' ? 'jpeg' : format,
+              width: width,
+              height: height,
+            });
+          }
+        }
+      }) ?? []
+    );
+    return files;
+  };
+  
+  const styles = StyleSheet.create({
+    containerStyle: {
+      height: 44,
+      width: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 0,
+      marginRight: 6,
+      marginLeft: 10,
+    },
+    listContainerStyle: {
+      height: 44,
+      width: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 0,
+      marginRight: 6,
+      marginLeft: 10,
+    },
+    imageButton: {
+      width: 26,
+      height: 26,
+    },
+    addIcon: {
+      fontSize: 24,
+      color: '#666',
+    },
+  });
+  
+  </file>
+  
+  <file name="react-native/src/chat/util/FileUtils.ts">
+  import RNFS from 'react-native-fs';
+  import { Platform } from 'react-native';
+  import { FileInfo, FileType } from '../../types/Chat.ts';
+  import { getTextModel } from '../../storage/StorageUtils.ts';
+  import { showInfo } from './ToastUtils.ts';
+  
+  export const saveImageToLocal = async (
+    base64ImageData: string
+  ): Promise<string> => {
+    try {
+      const imageName = `image_${Date.now()}.png`;
+      const filePath = `${RNFS.DocumentDirectoryPath}/${imageName}`;
+      await RNFS.writeFile(filePath, base64ImageData, 'base64');
+      return Platform.OS === 'android' ? `file://${filePath}` : imageName;
+    } catch (error) {
+      console.info('Error saving image:', error);
+      return '';
+    }
+  };
+  
+  export const saveFile = async (sourceUrl: string, fileName: string) => {
+    try {
+      const filesDir = `${RNFS.DocumentDirectoryPath}/files`;
+      const filesDirExists = await RNFS.exists(filesDir);
+      if (!filesDirExists) {
+        await RNFS.mkdir(filesDir);
+      }
+      const uniqueFileName = await getUniqueFileName(filesDir, fileName);
+      const destinationPath = `${filesDir}/${uniqueFileName}`;
+      await RNFS.copyFile(sourceUrl, destinationPath);
+      return Platform.OS === 'android'
+        ? `file://${destinationPath}`
+        : `files/${uniqueFileName}`;
+    } catch (error) {
+      console.warn('Error saving file:', error);
+    }
+    return null;
+  };
+  
+  export const getFileBytes = async (fileUrl: string) => {
+    try {
+      const fullFileUrl = getFullFileUrl(fileUrl);
+      return await RNFS.readFile(fullFileUrl, 'base64');
+    } catch (error) {
+      console.warn('Error reading image file:', fileUrl, error);
+      throw error;
+    }
+  };
+  
+  export const getFileTextContent = async (fileUrl: string): Promise<string> => {
+    try {
+      const fullFileUrl = getFullFileUrl(fileUrl);
+      return await RNFS.readFile(fullFileUrl, 'utf8');
+    } catch (error) {
+      console.warn('Error reading text file:', fileUrl, error);
+      throw error;
+    }
+  };
+  
+  const getUniqueFileName = async (
+    basePath: string,
+    originalFileName: string
+  ): Promise<string> => {
+    const lastDotIndex = originalFileName.lastIndexOf('.');
+    const nameWithoutExt = originalFileName.substring(0, lastDotIndex);
+    const extension = originalFileName.substring(lastDotIndex);
+  
+    let counter = 0;
+    let finalFileName = originalFileName;
+    let finalPath = `${basePath}/${finalFileName}`;
+  
+    while (await RNFS.exists(finalPath)) {
+      counter++;
+      finalFileName = `${nameWithoutExt}(${counter})${extension}`;
+      finalPath = `${basePath}/${finalFileName}`;
+    }
+    return finalFileName;
+  };
+  
+  export const getFullFileUrl = (url: string) => {
+    if (Platform.OS === 'android') {
+      return url;
+    } else if (url.startsWith('files/')) {
+      return `${RNFS.DocumentDirectoryPath}/${url}`;
+    } else {
+      return (
+        RNFS.DocumentDirectoryPath +
+        '/files' +
+        url.substring(url.lastIndexOf('/'))
+      );
+    }
+  };
+  
+  const MAX_IMAGES = 20;
+  const MAX_DOCUMENTS = 5;
+  const MAX_NOVA_FILES = 5;
+  const MAX_NOVA_VIDEOS = 1;
+  
+  export const checkFileNumberLimit = (
+    prevFiles: FileInfo[],
+    newFiles: FileInfo[]
+  ) => {
+    const existingImages = prevFiles.filter(file => file.type === FileType.image);
+    const existingDocs = prevFiles.filter(
+      file => file.type === FileType.document
+    );
+    const newImages = newFiles.filter(file => file.type === FileType.image);
+    const newDocs = newFiles.filter(file => file.type === FileType.document);
+  
+    const totalImages = existingImages.length + newImages.length;
+    const totalDocs = existingDocs.length + newDocs.length;
+  
+    let processedNewImages = newImages;
+    let processedNewDocs = newDocs;
+    let showWarning = false;
+  
+    if (isNova()) {
+      if (prevFiles.length + newFiles.length > MAX_NOVA_FILES) {
+        showInfo(`Maximum ${MAX_NOVA_FILES} files allowed`);
+      }
+      if (prevFiles.length >= MAX_NOVA_FILES) {
+        return prevFiles;
+      }
+      const existingVideos = prevFiles.filter(
+        file => file.type === FileType.video
+      ).length;
+      const newVideos = newFiles.filter(file => file.type === FileType.video);
+  
+      if (existingVideos + newVideos.length > MAX_NOVA_VIDEOS) {
+        showInfo(`Maximum ${MAX_NOVA_VIDEOS} video allowed`);
+      }
+  
+      const filteredNewFiles =
+        existingVideos >= MAX_NOVA_VIDEOS
+          ? newFiles.filter(file => file.type !== FileType.video)
+          : newFiles.filter(
+              file =>
+                file.type !== FileType.video ||
+                newVideos.indexOf(file) < MAX_NOVA_VIDEOS - existingVideos
+            );
+  
+      return [...prevFiles, ...filteredNewFiles].slice(0, MAX_NOVA_FILES);
+    }
+  
+    if (totalImages > MAX_IMAGES) {
+      const remainingSlots = Math.max(0, MAX_IMAGES - existingImages.length);
+      processedNewImages = newImages.slice(0, remainingSlots);
+      showWarning = true;
+    }
+  
+    if (totalDocs > MAX_DOCUMENTS) {
+      const remainingSlots = Math.max(0, MAX_DOCUMENTS - existingDocs.length);
+      processedNewDocs = newDocs.slice(0, remainingSlots);
+      showWarning = true;
+    }
+  
+    if (showWarning) {
+      if (totalImages > MAX_IMAGES) {
+        showInfo(`Image limit exceeded, maximum ${MAX_IMAGES} images allowed`);
+      }
+      if (totalDocs > MAX_DOCUMENTS) {
+        showInfo(
+          `Document limit exceeded, maximum ${MAX_DOCUMENTS} files allowed`
+        );
+      }
+    }
+    return [...prevFiles, ...processedNewImages, ...processedNewDocs];
+  };
+  
+  const isNova = (): boolean => {
+    const textModelId = getTextModel().modelId;
+    return textModelId.includes('nova-pro') || textModelId.includes('nova-lite');
+  };
+  
+  export const isAllFileReady = (files: FileInfo[]) => {
+    const videos = files.filter(file => file.type === FileType.video);
+    if (videos.length > 0) {
+      return videos.filter(video => video.videoUrl === undefined).length === 0;
+    } else {
+      return true;
+    }
+  };
+  
+  export const getFileTypeSummary = (files: FileInfo[]) => {
+    if (files.length === 1) {
+      return 'Summarize this';
+    }
+  
+    const imgCount = files.filter(file => file.type === FileType.image).length;
+    const docCount = files.filter(file => file.type === FileType.document).length;
+    const videoCount = files.filter(file => file.type === FileType.video).length;
+  
+    const types = [
+      imgCount && `${imgCount > 1 ? 'images' : 'image'}`,
+      docCount && `${docCount > 1 ? 'docs' : 'doc'}`,
+      videoCount && `${videoCount > 1 ? 'videos' : 'video'}`,
+    ].filter(Boolean);
+  
+    return `Summarize these ${types.join(' and ')}`;
+  };
+  
+  </file>
+  
+  <file name="react-native/src/chat/component/CustomMessageComponent.tsx">
+  import React, {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+  } from 'react';
+  import {
+    Dimensions,
+    Image,
+    NativeSyntheticEvent,
+    Platform,
+    StyleSheet,
+    Text,
+    TextInput,
+    TextInputSelectionChangeEventData,
+    TouchableOpacity,
+    View,
+  } from 'react-native';
+  import Share from 'react-native-share';
+  import { MessageProps } from 'react-native-gifted-chat';
+  import { CustomMarkdownRenderer } from './markdown/CustomMarkdownRenderer.tsx';
+  import { MarkedStyles } from 'react-native-marked/src/theme/types.ts';
+  import { ChatStatus, PressMode, SwiftChatMessage } from '../../types/Chat.ts';
+  import { trigger } from '../util/HapticUtils.ts';
+  import { HapticFeedbackTypes } from 'react-native-haptic-feedback/src/types.ts';
+  import Clipboard from '@react-native-clipboard/clipboard';
+  import {
+    CustomFileListComponent,
+    DisplayMode,
+  } from './CustomFileListComponent.tsx';
+  import FileViewer from 'react-native-file-viewer';
+  import { isMac } from '../../App.tsx';
+  import { CustomTokenizer } from './markdown/CustomTokenizer.ts';
+  import Markdown from './markdown/Markdown.tsx';
+  import ImageSpinner from './ImageSpinner.tsx';
+  import { State, TapGestureHandler } from 'react-native-gesture-handler';
+  import { getModelIcon, getModelTagByUserName } from '../../utils/ModelUtils.ts';
+  import { isAndroid } from '../../utils/PlatformUtils.ts';
+  import { useAppContext } from '../../history/AppProvider.tsx';
+  import { useTheme, ColorScheme } from '../../theme';
+  
+  interface CustomMessageProps extends MessageProps<SwiftChatMessage> {
+    chatStatus: ChatStatus;
+    isLastAIMessage?: boolean;
+    onRegenerate?: () => void;
+  }
+  
+  const { width: screenWidth } = Dimensions.get('window');
+  
+  const CustomMessageComponent: React.FC<CustomMessageProps> = ({
+    currentMessage,
+    chatStatus,
+    isLastAIMessage,
+    onRegenerate,
+  }) => {
+    const { colors, isDark } = useTheme();
+    const styles = useMemo(() => createStyles(colors), [colors]);
+    const [copied, setCopied] = useState(false);
+    const [clickTitleCopied, setClickTitleCopied] = useState(false);
+    const [isEdit, setIsEdit] = useState(false);
+  
+    const [inputHeight, setInputHeight] = useState(0);
+    const chatStatusRef = useRef(chatStatus);
+    const textInputRef = useRef<TextInput>(null);
+    const [inputTextSelection, setInputTextSelection] = useState<
+      { start: number; end: number } | undefined
+    >(undefined);
+    const isLoading =
+      chatStatus === ChatStatus.Running && currentMessage?.text === '...';
+    const [forceShowButtons, setForceShowButtons] = useState(false);
+    const isUser = useRef(currentMessage?.user?._id === 1);
+    const { drawerType } = useAppContext();
+    const chatScreenWidth =
+      isMac && drawerType === 'permanent' ? screenWidth - 300 : screenWidth;
+  
+    const setIsEditValue = useCallback(
+      (value: boolean) => {
+        if (chatStatus !== ChatStatus.Running) {
+          setIsEdit(value);
+          if (!value) {
+            setInputTextSelection(undefined);
+          }
+        }
+      },
+      [chatStatus]
+    );
+  
+    // Use useEffect with setTimeout to ensure selection happens after TextInput is fully rendered
+    useEffect(() => {
+      if (!isAndroid && isEdit && currentMessage?.text) {
+        const timer = setTimeout(() => {
+          textInputRef.current?.focus();
+          setInputTextSelection({
+            start: 0,
+            end: currentMessage.text.length,
+          });
+        }, 100);
+        return () => clearTimeout(timer);
+      }
+    }, [isEdit, currentMessage?.text]);
+  
+    const toggleButtons = useCallback(() => {
+      setForceShowButtons(prev => !prev);
+    }, []);
+  
+    // Handle selection changes made by the user
+    const handleSelectionChange = useCallback(
+      (event: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
+        const { selection } = event.nativeEvent;
+        setInputTextSelection(selection);
+      },
+      []
+    );
+  
+    const handleCopy = useCallback(() => {
+      const copyText = currentMessage?.reasoning
+        ? 'Reasoning: ' +
+            currentMessage.reasoning +
+            '\n\n' +
+            currentMessage?.text || ''
+        : currentMessage?.text || '';
+      Clipboard.setString(copyText);
+    }, [currentMessage?.reasoning, currentMessage?.text]);
+  
+    const currentUser = currentMessage?.user;
+    const showRefresh =
+      !isUser.current && !currentUser?.name?.includes('Nova Sonic');
+  
+    const userInfo = useMemo(() => {
+      if (!currentMessage || !currentMessage.user) {
+        return {
+          userName: '',
+          modelIcon: isDark
+            ? require('../../assets/broperty_dark.png')
+            : require('../../assets/broperty.png'),
+          avatarEmoji: null,
+        };
+      }
+      const user = currentMessage.user;
+      const userName = user.name ?? 'Broperty Ai';
+      const currentModelTag = getModelTagByUserName(user.modelTag, userName);
+  
+      const modelIcon = getModelIcon(currentModelTag, undefined, isDark);
+      const avatarEmoji = user.avatar || null;
+      return { userName, modelIcon, avatarEmoji };
+    }, [currentMessage, isDark]);
+  
+    const headerContent = useMemo(() => {
+      return (
+        <>
+         {userInfo.avatarEmoji ? (
+            <View style={styles.avatarEmojiContainer}>
+              <Text style={styles.avatarEmoji}>{userInfo.avatarEmoji}</Text>
+            </View>
+          ) : (
+            <Image source={userInfo.modelIcon} style={styles.avatar} />
+          )}
+          <Text style={styles.name}>{userInfo.userName}</Text>
+        </>
+      );
+     }, [userInfo, styles.avatar, styles.name, styles.avatarEmojiContainer, styles.avatarEmoji]);
+  
+    const copyButton = useMemo(() => {
+      return clickTitleCopied ? (
+        <Image
+          source={
+            isDark
+              ? require('../../assets/done_dark.png')
+              : require('../../assets/done.png')
+          }
+          style={styles.copy}
+        />
+      ) : null;
+    }, [clickTitleCopied, isDark, styles.copy]);
+  
+    const handleImagePress = useCallback((pressMode: PressMode, url: string) => {
+      if (pressMode === PressMode.Click) {
+        FileViewer.open(url)
+          .then(() => {})
+          .catch(error => {
+            console.log(error);
+          });
+      } else if (pressMode === PressMode.LongPress) {
+        trigger(HapticFeedbackTypes.notificationSuccess);
+        const shareOptions = { url: url, type: 'image/png', title: 'AI Image' };
+        Share.open(shareOptions)
+          .then(res => console.log(res))
+          .catch(err => err && console.log(err));
+      }
+    }, []);
+  
+    const customMarkdownRenderer = useMemo(
+      () => new CustomMarkdownRenderer(handleImagePress, colors, isDark),
+      [handleImagePress, colors, isDark]
+    );
+  
+    const customTokenizer = useMemo(() => new CustomTokenizer(), []);
+  
+    const reasoningSection = useMemo(() => {
+      if (
+        !currentMessage?.reasoning ||
+        currentMessage?.reasoning.length === 0 ||
+        isUser.current
+      ) {
+        return null;
+      }
+  
+      return (
+        <View style={styles.reasoningContainer}>
+          <View style={styles.reasoningHeader}>
+            <Text style={styles.reasoningTitle}>Reasoning</Text>
+          </View>
+  
+          <View style={styles.reasoningContent}>
+            <Markdown
+              value={currentMessage.reasoning}
+              flatListProps={{
+                style: {
+                  backgroundColor: colors.reasoningBackground,
+                },
+              }}
+              styles={customMarkedStyles}
+              renderer={customMarkdownRenderer}
+              tokenizer={customTokenizer}
+              chatStatus={chatStatusRef.current}
+            />
+          </View>
+        </View>
+      );
+    }, [
+      currentMessage,
+      customMarkdownRenderer,
+      customTokenizer,
+      colors.reasoningBackground,
+      styles.reasoningContainer,
+      styles.reasoningHeader,
+      styles.reasoningTitle,
+      styles.reasoningContent,
+    ]);
+  
+    const handleShowButton = useCallback(() => {
+      if (!isLoading) {
+        toggleButtons();
+      }
+    }, [isLoading, toggleButtons]);
+  
+    useEffect(() => {
+      if (copied) {
+        const timer = setTimeout(() => {
+          setCopied(false);
+        }, 2000);
+  
+        return () => clearTimeout(timer);
+      }
+    }, [copied]);
+  
+    useEffect(() => {
+      if (clickTitleCopied) {
+        handleCopy();
+        const timer = setTimeout(() => {
+          setClickTitleCopied(false);
+        }, 2000);
+  
+        return () => clearTimeout(timer);
+      }
+    }, [handleCopy, clickTitleCopied]);
+  
+    const messageContent = useMemo(() => {
+      if (!currentMessage) {
+        return null;
+      }
+  
+      if (!isUser.current) {
+        return (
+          <Markdown
+            value={currentMessage.text}
+            styles={customMarkedStyles}
+            renderer={customMarkdownRenderer}
+            tokenizer={customTokenizer}
+            chatStatus={chatStatusRef.current}
+          />
+        );
+      }
+  
+      return (
+        <Text
+          style={{
+            ...styles.questionText,
+            ...{ maxWidth: (chatScreenWidth * 3) / 4 },
+          }}
+          selectable>
+          {currentMessage.text}
+        </Text>
+      );
+    }, [
+      currentMessage,
+      customMarkdownRenderer,
+      customTokenizer,
+      chatScreenWidth,
+      styles.questionText,
+    ]);
+  
+    const messageActionButtons = useMemo(() => {
+      const metricsText = currentMessage?.metrics
+        ? `latency ${currentMessage.metrics.latencyMs}s | ${currentMessage.metrics.speed} tok/s`
+        : null;
+      return (
+        <View
+          style={{
+            ...styles.actionButtonsContainer,
+            ...{ justifyContent: isUser.current ? 'flex-end' : 'space-between' },
+          }}>
+          <View style={styles.actionButtonInnerContainer}>
+            <TouchableOpacity
+              onPress={() => {
+                handleCopy();
+                setCopied(true);
+              }}
+              style={styles.actionButton}>
+              <Image
+                source={
+                  copied
+                    ? isDark
+                      ? require('../../assets/done_dark.png')
+                      : require('../../assets/done.png')
+                    : require('../../assets/copy_grey.png')
+                }
+                style={styles.actionButtonIcon}
+              />
+            </TouchableOpacity>
+  
+            <TouchableOpacity
+              onPress={() => setIsEditValue(!isEdit)}
+              style={styles.actionButton}>
+              <Image
+                source={
+                  isEdit
+                    ? isDark
+                      ? require('../../assets/select_dark.png')
+                      : require('../../assets/select.png')
+                    : require('../../assets/select_grey.png')
+                }
+                style={styles.actionButtonIcon}
+              />
+            </TouchableOpacity>
+  
+            {showRefresh && (
+              <TouchableOpacity
+                onPress={onRegenerate}
+                style={styles.actionButton}>
+                <Image
+                  source={require('../../assets/refresh.png')}
+                  style={styles.actionButtonIcon}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
+  
+          {metricsText && !isUser.current && (
+            <Text style={styles.metricsText}>{metricsText}</Text>
+          )}
+        </View>
+      );
+    }, [
+      handleCopy,
+      copied,
+      isEdit,
+      onRegenerate,
+      setIsEditValue,
+      showRefresh,
+      currentMessage?.metrics,
+      isDark,
+      styles.actionButtonsContainer,
+      styles.actionButtonInnerContainer,
+      styles.actionButton,
+      styles.actionButtonIcon,
+      styles.metricsText,
+    ]);
+  
+    if (!currentMessage) {
+      return null;
+    }
+  
+    return (
+      <View style={styles.container}>
+        <TouchableOpacity
+          style={styles.header}
+          activeOpacity={1}
+          onPress={() => setClickTitleCopied(true)}>
+          {!isUser.current && headerContent}
+          {copyButton}
+        </TouchableOpacity>
+        <View style={styles.marked_box}>
+          {isLoading && (
+            <View style={styles.loading}>
+              <ImageSpinner
+                visible={true}
+                size={18}
+                source={require('../../assets/loading.png')}
+              />
+            </View>
+          )}
+          {!isLoading && reasoningSection}
+          {!isLoading && !isEdit && (
+            <TapGestureHandler
+              numberOfTaps={2}
+              onHandlerStateChange={({ nativeEvent }) => {
+                if (nativeEvent.state === State.ACTIVE) {
+                  handleShowButton();
+                }
+              }}>
+              <View>{messageContent}</View>
+            </TapGestureHandler>
+          )}
+          {isEdit && (
+            <TextInput
+              ref={textInputRef}
+              selection={inputTextSelection}
+              onSelectionChange={handleSelectionChange}
+              editable={Platform.OS === 'android'}
+              multiline
+              showSoftInputOnFocus={false}
+              onContentSizeChange={event => {
+                const { height } = event.nativeEvent.contentSize;
+                setInputHeight(height);
+              }}
+              style={{
+                ...styles.inputText,
+                ...{
+                  fontWeight: isMac ? '300' : 'normal',
+                  lineHeight: isMac ? 26 : Platform.OS === 'android' ? 24 : 28,
+                  paddingTop: Platform.OS === 'android' ? 7 : 3,
+                  marginBottom:
+                    -inputHeight * (isAndroid ? 0 : isMac ? 0.115 : 0.138) +
+                    (isMac ? 10 : 8),
+                },
+                ...(isUser.current && {
+                  flex: 1,
+                  alignSelf: 'flex-end',
+                  maxWidth: (chatScreenWidth * 3) / 4,
+                }),
+              }}
+              textAlignVertical="top">
+              {currentMessage.text}
+            </TextInput>
+          )}
+          {((isLastAIMessage && chatStatus !== ChatStatus.Running) ||
+            forceShowButtons) &&
+            messageActionButtons}
+          {currentMessage.image && (
+            <CustomFileListComponent
+              files={JSON.parse(currentMessage.image)}
+              mode={DisplayMode.Display}
+            />
+          )}
+        </View>
+      </View>
+    );
+  };
+  
+  const createStyles = (colors: ColorScheme) =>
+    StyleSheet.create({
+      container: {
+        marginLeft: 12,
+        marginVertical: 4,
+      },
+      marked_box: {
+        marginLeft: 28,
+        marginRight: 16,
+      },
+      header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 0,
+      },
+      titleContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+      },
+      avatar: {
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        marginRight: 6,
+      },
+       avatarEmojiContainer: {
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        marginRight: 6,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: colors.inputBackground,
+      },
+      avatarEmoji: {
+        fontSize: 14,
+      },
+      copy: {
+        width: 18,
+        height: 18,
+        marginRight: 20,
+        marginLeft: 'auto',
+      },
+      name: {
+        flex: 1,
+        fontSize: 16,
+        fontWeight: '500',
+        color: colors.text,
+      },
+      questionText: {
+        flex: 1,
+        alignSelf: 'flex-end',
+        backgroundColor: colors.messageBackground,
+        borderRadius: 22,
+        overflow: 'hidden',
+        marginVertical: 8,
+        paddingHorizontal: 16,
+        lineHeight: 24,
+        paddingVertical: 10,
+        fontSize: 16,
+        color: colors.text,
+      },
+      inputText: {
+        fontSize: 16,
+        lineHeight: 26,
+        textAlignVertical: 'top',
+        marginTop: 1,
+        padding: 0,
+        fontWeight: '300',
+        color: colors.text,
+        letterSpacing: 0,
+      },
+      reasoningContainer: {
+        marginBottom: 8,
+        borderRadius: 8,
+        backgroundColor: colors.reasoningBackground,
+        overflow: 'hidden',
+        marginTop: 8,
+      },
+      reasoningHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 8,
+        backgroundColor: colors.borderLight,
+      },
+      reasoningTitle: {
+        fontSize: 15,
+        fontWeight: '500',
+        color: colors.text,
+      },
+      reasoningContent: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+      },
+      loading: {
+        marginTop: 12,
+        marginBottom: 10,
+      },
+      actionButtonsContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginLeft: -8,
+        marginTop: -2,
+        marginBottom: 4,
+      },
+      actionButtonInnerContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+      },
+      actionButton: {
+        padding: 8,
+      },
+      actionButtonIcon: {
+        width: 16,
+        height: 16,
+      },
+      metricsText: {
+        fontSize: 12,
+        color: colors.textTertiary,
+        marginRight: 4,
+      },
+    });
+  
+  const customMarkedStyles: MarkedStyles = {
+    table: { marginVertical: 4 },
+    li: { paddingVertical: 4 },
+    h1: { fontSize: 28 },
+    h2: { fontSize: 24 },
+    h3: { fontSize: 20 },
+    h4: { fontSize: 18 },
+    blockquote: { marginVertical: 8 },
+    paragraph: { paddingVertical: 6 },
+  };
+  
+  export default React.memo(CustomMessageComponent, (prevProps, nextProps) => {
+    return (
+      prevProps.currentMessage?.text === nextProps.currentMessage?.text &&
+      prevProps.currentMessage?.image === nextProps.currentMessage?.image &&
+      prevProps.currentMessage?.reasoning ===
+        nextProps.currentMessage?.reasoning &&
+      prevProps.chatStatus === nextProps.chatStatus &&
+      prevProps.isLastAIMessage === nextProps.isLastAIMessage &&
+      prevProps.onRegenerate === nextProps.onRegenerate
+    );
+  });
+  
+  </file>
+  
+  <file name="react-native/src/api/ollama-api.ts">
+  import {
+    Model,
+    ModelTag,
+    OllamaModel,
+    SystemPrompt,
+    Usage,
+  } from '../types/Chat.ts';
+  import { getOllamaApiUrl, getTextModel } from '../storage/StorageUtils.ts';
+  import {
+    BedrockMessage,
+    ImageContent,
+    OpenAIMessage,
+    TextContent,
+  } from '../chat/util/BedrockMessageConvertor.ts';
+  
+  type CallbackFunction = (
+    result: string,
+    complete: boolean,
+    needStop: boolean,
+    usage?: Usage
+  ) => void;
+  export const invokeOllamaWithCallBack = async (
+    messages: BedrockMessage[],
+    prompt: SystemPrompt | null,
+    shouldStop: () => boolean,
+    controller: AbortController,
+    callback: CallbackFunction
+  ) => {
+    const bodyObject = {
+      model: getTextModel().modelId,
+      messages: getOllamaMessages(messages, prompt),
+    };
+    const options = {
+      method: 'POST',
+      headers: {
+        accept: '*/*',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(bodyObject),
+      signal: controller.signal,
+      reactNative: { textStreaming: true },
+    };
+    const url = getOllamaApiUrl() + '/api/chat';
+    let completeMessage = '';
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
+    fetch(url!, options)
+      .then(response => {
+        return response.body;
+      })
+      .then(async body => {
+        clearTimeout(timeoutId);
+        if (!body) {
+          return;
+        }
+        const reader = body.getReader();
+        const decoder = new TextDecoder();
+        let lastChunk = '';
+        while (true) {
+          if (shouldStop()) {
+            await reader.cancel();
+            if (completeMessage === '') {
+              completeMessage = '...';
+            }
+            callback(completeMessage, true, true);
+            return;
+          }
+  
+          try {
+            const { done, value } = await reader.read();
+            const chunk = decoder.decode(value, { stream: true });
+            if (!chunk) {
+              return;
+            }
+            const parsed = parseStreamData(chunk, lastChunk);
+            if (parsed.error) {
+              callback(parsed.error, true, true);
+              return;
+            }
+            completeMessage += parsed.content;
+            if (parsed.dataChunk) {
+              lastChunk = parsed.dataChunk;
+            } else {
+              lastChunk = '';
+            }
+            if (parsed.usage && parsed.usage.inputTokens) {
+              callback(completeMessage, true, false, parsed.usage);
+              return;
+            } else {
+              callback(completeMessage, done, false);
+            }
+            if (done) {
+              return;
+            }
+          } catch (readError) {
+            console.log('Error reading stream:', readError);
+            if (completeMessage === '') {
+              completeMessage = '...';
+            }
+            callback(completeMessage, true, true);
+            return;
+          }
+        }
+      })
+      .catch(error => {
+        console.log(error);
+        clearTimeout(timeoutId);
+        if (shouldStop()) {
+          if (completeMessage === '') {
+            completeMessage = '...';
+          }
+          callback(completeMessage, true, true);
+        } else {
+          const errorMsg = String(error);
+          const errorInfo = 'Request error: ' + errorMsg;
+          callback(completeMessage + '\n\n' + errorInfo, true, true);
+        }
+      });
+  };
+  
+  const parseStreamData = (chunk: string, lastChunk: string = '') => {
+    let content = '';
+    let usage: Usage | undefined;
+    const dataChunks = (lastChunk + chunk).split('\n');
+    for (let dataChunk of dataChunks) {
+      if (!dataChunk.trim()) {
+        continue;
+      }
+      if (dataChunk[0] === '\n') {
+        dataChunk = dataChunk.slice(1);
+      }
+      try {
+        const parsedData: OllamaResponse = JSON.parse(dataChunk);
+  
+        if (parsedData.message?.content) {
+          content += parsedData.message?.content;
+        }
+  
+        if (parsedData.done) {
+          usage = {
+            modelName: getTextModel().modelName,
+            inputTokens: parsedData.prompt_eval_count,
+            outputTokens: parsedData.eval_count,
+            totalTokens: parsedData.prompt_eval_count + parsedData.eval_count,
+          };
+        }
+      } catch (error) {
+        if (lastChunk.length > 0) {
+          return { error: error + chunk };
+        }
+        if (content.length > 0) {
+          return { content, dataChunk, usage };
+        }
+      }
+    }
+    return { content, usage };
+  };
+  
+  type OllamaResponse = {
+    model: string;
+    created_at: string;
+    message?: {
+      role: string;
+      content: string;
+    };
+    done: boolean;
+    prompt_eval_count: number;
+    eval_count: number;
+  };
+  
+  function getOllamaMessages(
+    messages: BedrockMessage[],
+    prompt: SystemPrompt | null
+  ): OpenAIMessage[] {
+    return [
+      ...(prompt ? [{ role: 'system', content: prompt.prompt }] : []),
+      ...messages.map(message => {
+        const images = message.content
+          .filter(content => (content as ImageContent).image)
+          .map(content => (content as ImageContent).image.source.bytes);
+  
+        return {
+          role: message.role,
+          content: message.content
+            .map(content => {
+              if ((content as TextContent).text) {
+                return (content as TextContent).text;
+              }
+              return '';
+            })
+            .join('\n'),
+          images: images.length > 0 ? images : undefined,
+        };
+      }),
+    ];
+  }
+  
+  export const requestAllOllamaModels = async (): Promise<Model[]> => {
+    const controller = new AbortController();
+    const modelsUrl = getOllamaApiUrl() + '/api/tags';
+    const options = {
+      method: 'GET',
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json',
+      },
+      signal: controller.signal,
+      reactNative: { textStreaming: true },
+    };
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    try {
+      const response = await fetch(modelsUrl, options);
+      clearTimeout(timeoutId);
+      if (!response.ok) {
+        console.log(`HTTP error! status: ${response.status}`);
+        return [];
+      }
+      const data = await response.json();
+      return data.models.map((item: OllamaModel) => ({
+        modelId: item.name,
+        modelName: item.name,
+        modelTag: ModelTag.Ollama,
+      }));
+    } catch (error) {
+      clearTimeout(timeoutId);
+      console.log('Error fetching models:', error);
+      return [];
+    }
+  };
+  
+  </file>
+  
+  <file name="react-native/src/chat/ChatScreen.tsx">
+  import React, { useCallback, useEffect, useRef, useState } from 'react';
+  import { Composer, GiftedChat, InputToolbar } from 'react-native-gifted-chat';
+  import {
+    AppState,
+    Dimensions,
+    FlatList,
+    Keyboard,
+    LayoutChangeEvent,
+    NativeScrollEvent,
+    NativeSyntheticEvent,
+    Platform,
+    SafeAreaView,
+    StyleSheet,
+    TextInput,
+  } from 'react-native';
+  import { voiceChatService } from './service/VoiceChatService';
+  import AudioWaveformComponent, {
+    AudioWaveformRef,
+  } from './component/AudioWaveformComponent';
+  import { useTheme, ColorScheme } from '../theme';
+  import {
+    invokeBedrockWithCallBack as invokeBedrockWithCallBack,
+    requestToken,
+  } from '../api/bedrock-api';
+  import CustomMessageComponent from './component/CustomMessageComponent.tsx';
+  import { CustomScrollToBottomComponent } from './component/CustomScrollToBottomComponent.tsx';
+  import { EmptyChatComponent } from './component/EmptyChatComponent.tsx';
+  import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+  import { DrawerParamList } from '../types/RouteTypes.ts';
+  import {
+    getCurrentSystemPrompt,
+    getCurrentVoiceSystemPrompt,
+    getImageModel,
+    getMessagesBySessionId,
+    getSessionId,
+    getTextModel,
+    isTokenValid,
+    saveCurrentSystemPrompt,
+    saveCurrentVoiceSystemPrompt,
+    saveMessageList,
+    saveMessages,
+    updateTotalUsage,
+  } from '../storage/StorageUtils.ts';
+  import {
+    ChatMode,
+    ChatStatus,
+    FileInfo,
+    Metrics,
+    SwiftChatMessage,
+    SystemPrompt,
+    Usage,
+  } from '../types/Chat.ts';
+  import { useAppContext } from '../history/AppProvider.tsx';
+  import { CustomHeaderRightButton } from './component/CustomHeaderRightButton.tsx';
+  import CustomSendComponent from './component/CustomSendComponent.tsx';
+  import {
+    BedrockMessage,
+    getBedrockMessage,
+    getBedrockMessagesFromChatMessages,
+  } from './util/BedrockMessageConvertor.ts';
+  import { trigger } from './util/HapticUtils.ts';
+  import { HapticFeedbackTypes } from 'react-native-haptic-feedback/src/types.ts';
+  import { isMac } from '../App.tsx';
+  import { CustomChatFooter } from './component/CustomChatFooter.tsx';
+  import {
+    checkFileNumberLimit,
+    getFileTypeSummary,
+    isAllFileReady,
+  } from './util/FileUtils.ts';
+  import HeaderTitle from './component/HeaderTitle.tsx';
+  import { showInfo } from './util/ToastUtils.ts';
+  import { HeaderOptions } from '@react-navigation/elements';
+  import { v4 as uuidv4 } from 'uuid';
+  import { PRESET_PROMPTS } from '../prompt/PresetPrompts.ts';
+  const generateId = () => uuidv4();
+  
+  const BOT_ID = 2;
+  
+  const createBotMessage = (mode: string, currentSystemPrompt?: SystemPrompt | null) => {
+    // Generate AI name based on system prompt
+  const getAIName = () => {
+   if (mode !== ChatMode.Text) {
+  return getImageModel().modelName;
+  }
+   
+  if (currentSystemPrompt?.name) {
+  switch (currentSystemPrompt.name) {
+  case 'Notaris Ai':
+     return 'Notaris Ai';
+  case 'Pengacara Ai':
+     return 'Pengacara Ai';
+  case 'Aparatur Pemerintah Ai':
+      return 'Aparatur Pemerintah Ai';
+   case 'Sertifikasi Elektronik Ai':
+      return 'Sertifikasi Elektronik Ai';
+   case 'Agensi Properti Ai':
+      return 'Agensi Properti Ai';
+   case 'KPR Bank Ai':
+      return 'KPR Bank Ai';
+  default:
+     return 'Broperty Ai';
+    }
+   }
+   
+   return 'Broperty Ai';
+  };
+  
+    // Generate avatar based on system prompt
+   const getAIAvatar = () => {
+   if (currentSystemPrompt?.avatar) {
+   return currentSystemPrompt.avatar;
+   }
+   return undefined; // Default avatar will be handled by the UI
+   };
+  
+    return {
+      _id: generateId(),
+      text: mode === ChatMode.Text ? textPlaceholder : imagePlaceholder,
+      createdAt: new Date(),
+      user: {
+        _id: BOT_ID,
+        name: getAIName(),
+        avatar: getAIAvatar(),
+        modelTag: mode === ChatMode.Text ? getTextModel().modelTag : undefined,
+      },
+    };
+  };
+  const imagePlaceholder = '![](bedrock://imgProgress)';
+  const textPlaceholder = '...';
+  type ChatScreenRouteProp = RouteProp<DrawerParamList, 'Bedrock'>;
+  let currentMode = ChatMode.Text;
+  
+  function ChatScreen(): React.JSX.Element {
+    const { colors, isDark } = useTheme();
+    const navigation = useNavigation();
+    const route = useRoute<ChatScreenRouteProp>();
+    const initialSessionId = route.params?.sessionId;
+    const tapIndex = route.params?.tapIndex;
+    const mode = route.params?.mode ?? currentMode;
+    const modeRef = useRef(mode);
+    const isNovaSonic =
+      getTextModel()?.modelId?.includes('nova-sonic') &&
+      modeRef.current === ChatMode.Text;
+  
+    // Seed initial messages with Broperty Ai welcome if no session/preset provided
+    const initialBropertyPreset =
+      !initialSessionId && !route.params?.presetPrompt
+        ? PRESET_PROMPTS.find(p => p.name === 'Broperty Ai')
+        : undefined;
+    const seededInitialMessages: SwiftChatMessage[] = initialBropertyPreset
+      ? [
+          {
+            _id: generateId(),
+            text: initialBropertyPreset.prompt,
+            createdAt: new Date(),
+            user: {
+              _id: 2,
+              name: initialBropertyPreset.name,
+              avatar: initialBropertyPreset.avatar,
+              modelTag: getTextModel().modelTag,
+            },
+          },
+        ]
+      : [];
+    const [messages, setMessages] = useState<SwiftChatMessage[]>(
+      seededInitialMessages
+    );
+    const [isLoadingMessages, setIsLoadingMessages] = useState<boolean>(false);
+    const [systemPrompt, setSystemPrompt] = useState<SystemPrompt | null>(
+      isNovaSonic ? getCurrentVoiceSystemPrompt : getCurrentSystemPrompt
+    );
+    const [showSystemPrompt, setShowSystemPrompt] = useState<boolean>(true);
+    const [screenDimensions, setScreenDimensions] = useState(
+      Dimensions.get('window')
+    );
+    const [chatStatus, setChatStatus] = useState<ChatStatus>(ChatStatus.Init);
+    const [usage, setUsage] = useState<Usage>();
+    const [userScrolled, setUserScrolled] = useState(false);
+    const chatStatusRef = useRef(chatStatus);
+    const messagesRef = useRef(messages);
+    const bedrockMessages = useRef<BedrockMessage[]>([]);
+    const flatListRef = useRef<FlatList<SwiftChatMessage>>(null);
+    const textInputRef = useRef<TextInput>(null);
+    const sessionIdRef = useRef(initialSessionId || getSessionId() + 1);
+    const isCanceled = useRef(false);
+    const { sendEvent, event, drawerType } = useAppContext();
+    const sendEventRef = useRef(sendEvent);
+    const inputTexRef = useRef('');
+    const controllerRef = useRef<AbortController | null>(null);
+    const [selectedFiles, setSelectedFiles] = useState<FileInfo[]>([]);
+    const selectedFilesRef = useRef(selectedFiles);
+    const usageRef = useRef(usage);
+    const systemPromptRef = useRef(systemPrompt);
+    const drawerTypeRef = useRef(drawerType);
+    const isVoiceLoading = useRef(false);
+    const contentHeightRef = useRef(0);
+    const containerHeightRef = useRef(0);
+    const [isShowVoiceLoading, setIsShowVoiceLoading] = useState(false);
+    const audioWaveformRef = useRef<AudioWaveformRef>(null);
+  
+    const endVoiceConversationRef = useRef<(() => Promise<boolean>) | null>(null);
+  
+    const endVoiceConversation = useCallback(async () => {
+      audioWaveformRef.current?.resetAudioLevels();
+      if (isVoiceLoading.current) {
+        return Promise.resolve(false);
+      }
+      isVoiceLoading.current = true;
+      setIsShowVoiceLoading(true);
+      await voiceChatService.endConversation();
+      setChatStatus(ChatStatus.Init);
+      isVoiceLoading.current = false;
+      setIsShowVoiceLoading(false);
+      return true;
+    }, []);
+  
+    useEffect(() => {
+      endVoiceConversationRef.current = endVoiceConversation;
+    }, [endVoiceConversation]);
+  
+    // update refs value with state
+    useEffect(() => {
+      messagesRef.current = messages;
+      chatStatusRef.current = chatStatus;
+      usageRef.current = usage;
+      systemPromptRef.current = systemPrompt;
+    }, [chatStatus, messages, usage, systemPrompt]);
+  
+    useEffect(() => {
+      drawerTypeRef.current = drawerType;
+    }, [drawerType]);
+  
+    useEffect(() => {
+      selectedFilesRef.current = selectedFiles;
+      if (selectedFiles.length > 0) {
+        setShowSystemPrompt(false);
+      }
+    }, [selectedFiles]);
+  
+    // Initialize voice chat service
+    useEffect(() => {
+      // Set up voice chat service callbacks
+      voiceChatService.setCallbacks(
+        // Handle transcript received
+        (role, text) => {
+          handleVoiceChatTranscript(role, text);
+        },
+        // Handle error
+        message => {
+          if (getTextModel().modelId.includes('nova-sonic')) {
+            handleVoiceChatTranscript('ASSISTANT', message);
+            endVoiceConversationRef.current?.();
+            saveCurrentMessages();
+            console.log('Voice chat error:', message);
+          }
+        }
+      );
+  
+      // Clean up on unmount
+      return () => {
+        voiceChatService.cleanup();
+      };
+    }, []);
+  
+    // start new chat
+    const startNewChat = useRef(
+      useCallback(() => {
+        trigger(HapticFeedbackTypes.impactMedium);
+        sessionIdRef.current = getSessionId() + 1;
+        sendEventRef.current('updateHistorySelectedId', {
+          id: sessionIdRef.current,
+        });
+  
+        setMessages([]);
+        bedrockMessages.current = [];
+        setShowSystemPrompt(true);
+        showKeyboard();
+      }, [])
+    );
+  
+    // header text and right button click
+    React.useLayoutEffect(() => {
+      currentMode = mode;
+      systemPromptRef.current = systemPrompt;
+      const headerOptions: HeaderOptions = {
+        // eslint-disable-next-line react/no-unstable-nested-components
+        headerTitle: () => (
+          <HeaderTitle
+            title={
+              mode === ChatMode.Text
+                ? systemPrompt
+                  ? systemPrompt.name
+                  : ''
+                : ''
+            }
+            usage={usage}
+            onDoubleTap={scrollToTop}
+            onShowSystemPrompt={() => setShowSystemPrompt(true)}
+            isShowSystemPrompt={showSystemPrompt}
+          />
+        ),
+        // eslint-disable-next-line react/no-unstable-nested-components
+        headerRight: () => (
+          <CustomHeaderRightButton  
+            onPress={() => {
+    // Define Broperty AI prompt directly
+    const bropertyPrompt = {
+      id: 1,
+      name: 'Broperty Ai',
+      prompt: `Saya adalah **Broperty Ai**, bot utama yang **HANYA merespon komunikasi terkait properti real estate**. Jika pertanyaan tidak sesuai dengan topik properti real estate, saya akan secara halus menolaknya.
+  
+  **PERAN UTAMA SAYA:**
+  1. **GERBANG UTAMA** - Selalu berkomunikasi dengan user dan internal Broperty, serta menghubungkan kedua pihak tersebut
+  2. **IDENTIFIKASI KEBUTUHAN USER** - Berusaha untuk selalu mengetahui & memenuhi kebutuhan spesifik user terkait properti
+  3. **MENYAMBUNGKAN KE BERBAGAI FITUR YANG ADA** - Menghubungkan user ke sub-bot profesional, web view, atau Google Maps
+  
+  **FITUR AKTIF YANG TERSEDIA:**
+  - **Sub Bot Profesional Ecosystem:**
+    1. 🏠 Agensi Properti Ai - Konsultasi jual beli properti
+    2. 📜 Notaris Ai - Pengurusan sertifikat dan dokumen legal
+    3. ⚖️ Pengacara Ai - Konsultasi hukum properti dan kontrak
+    4. 🏛 Aparatur Pemerintah Ai - Perangkat pemerintah untuk pengurusan properti
+    5. 💻 Sertifikasi Elektronik Ai - Bantuan sertifikat elektronik
+    6. 🏦 KPR Bank Ai - Informasi KPR berbagai bank
+  
+  - **Web View Integration** - Akses konten properti terkini
+  - **Google Maps Integration** - Lokasi dan navigasi properti
+  
+  Silakan ajukan pertanyaan terkait properti real estate, saya akan menyambungkan Anda ke fitur yang tepat!`,
+      description: 'Ai Utama sebagai **Gerbang Komunikasi** & **Konektor Fitur Properti**',
+      avatar: '🏠',
+      includeHistory: true,
+      category: 'Utama'
+    };
+    
+    //  Clear input content and selected files
+      textInputRef?.current?.clear();
+      setUsage(undefined);
+      setSelectedFiles([]);
+      
+    // Start new chat and load Broperty AI prompt
+    startNewChat.current();
+    
+    // Send event to load Broperty AI prompt
+    sendEvent('navigateToBedrockWithPrompt', {
+      sessionId: Date.now(),
+      presetPrompt: bropertyPrompt,
+    });
+  }}
+            imageSource={
+              isDark
+                ? require('../assets/home_dark.png')
+                : require('../assets/home.png')
+            }
+          />
+        ),
+      };
+      navigation.setOptions(headerOptions);
+    }, [usage, navigation, mode, systemPrompt, showSystemPrompt, isDark]);
+    
+    // Auto show Broperty Ai welcome when app/screen starts with no specific session or preset
+    useEffect(() => {
+      if (!initialSessionId && !route.params?.presetPrompt) {
+        const bropertyPrompt = PRESET_PROMPTS.find(p => p.name === 'Broperty Ai');
+        if (bropertyPrompt) {
+          // Clear input and selection, start new chat, then navigate with preset
+          textInputRef?.current?.clear();
+          setUsage(undefined);
+          setSelectedFiles([]);
+          startNewChat.current();
+          sendEvent('navigateToBedrockWithPrompt', {
+            sessionId: Date.now(),
+            presetPrompt: bropertyPrompt,
+          });
+        }
+      }
+      // run once on mount
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+  
+    // sessionId changes (start new chat or click another session)
+    useEffect(() => {
+      if (tapIndex && initialSessionId) {
+        if (sessionIdRef.current === initialSessionId) {
+          return;
+        }
+        if (chatStatusRef.current === ChatStatus.Running) {
+          // there are still a request sending, abort the request and save current messages
+          controllerRef.current?.abort();
+          chatStatusRef.current = ChatStatus.Init;
+          if (modeRef.current === ChatMode.Image) {
+            if (messagesRef.current[0].text === imagePlaceholder) {
+              messagesRef.current[0].text = 'Request interrupted';
+            }
+          }
+          saveCurrentMessages();
+        }
+        modeRef.current = mode;
+        setChatStatus(ChatStatus.Init);
+        sendEventRef.current('');
+        setUsage(undefined);
+        if (initialSessionId === 0 || initialSessionId === -1) {
+          startNewChat.current();
+          return;
+        }
+        // click from history
+        setMessages([]);
+        endVoiceConversationRef.current?.();
+        setIsLoadingMessages(true);
+        const msg = getMessagesBySessionId(initialSessionId);
+        sessionIdRef.current = initialSessionId;
+        setUsage((msg[0] as SwiftChatMessage).usage);
+        // Restore sub-bot (assistant) info from saved messages for header title and future replies
+        const aiMessage = msg.find(
+        m => m.user && m.user._id === BOT_ID
+        ) as SwiftChatMessage | undefined;
+        if (aiMessage && aiMessage.user && typeof aiMessage.user.name === 'string') {
+          const restoredPrompt: SystemPrompt = {
+            id: -1,
+            name: aiMessage.user.name,
+            prompt: '',
+            includeHistory: true,
+            avatar:
+              typeof (aiMessage.user as any).avatar === 'string'
+                ? ((aiMessage.user as any).avatar as string)
+                : undefined,
+          };
+          setSystemPrompt(restoredPrompt);
+          if (isNovaSonic) {
+            saveCurrentVoiceSystemPrompt(restoredPrompt);
+          } else {
+            saveCurrentSystemPrompt(restoredPrompt);
+          }
+        } else {
+          setSystemPrompt(null);
+          saveCurrentSystemPrompt(null);
+          saveCurrentVoiceSystemPrompt(null);
+       }
+        getBedrockMessagesFromChatMessages(msg).then(currentMessage => {
+          bedrockMessages.current = currentMessage;
+        });
+        if (isMac) {
+          setMessages(msg);
+          setIsLoadingMessages(false);
+          scrollToBottom();
+        } else {
+          setTimeout(() => {
+            setMessages(msg);
+            setIsLoadingMessages(false);
+            scrollToBottom();
+          }, 200);
+        }
+      }
+    }, [initialSessionId, mode, tapIndex]);
+  
+    // deleteChat listener
+    useEffect(() => {
+      if (event?.event === 'deleteChat' && event.params) {
+        const { id } = event.params;
+        if (sessionIdRef.current === id) {
+          sessionIdRef.current = getSessionId() + 1;
+          sendEventRef.current('updateHistorySelectedId', {
+            id: sessionIdRef.current,
+          });
+          setUsage(undefined);
+          bedrockMessages.current = [];
+          setMessages([]);
+        }
+      }
+    }, [event]);
+    
+    
+    
+    // navigateToBedrockWithPrompt listener
+    useEffect(() => {
+      if (event?.event === 'navigateToBedrockWithPrompt' && event.params) {
+        const { sessionId, presetPrompt } = event.params;
+        if (presetPrompt && sessionId) {
+          // Convert PresetPrompt to SystemPrompt
+          const systemPromptFromPreset: SystemPrompt = {
+            id: presetPrompt.id,
+            name: presetPrompt.name,
+            prompt: presetPrompt.prompt,
+            includeHistory: presetPrompt.includeHistory,
+            allowInterruption: presetPrompt.allowInterruption,
+            promptType: presetPrompt.promptType,
+            avatar: presetPrompt.avatar,
+          };
+         
+          setSystemPrompt(systemPromptFromPreset);
+          
+          // Save as current system prompt
+          if (isNovaSonic) {
+            saveCurrentVoiceSystemPrompt(systemPromptFromPreset);
+          } else {
+            saveCurrentSystemPrompt(systemPromptFromPreset);
+          }
+          
+          // Start new session with preset prompt
+          sessionIdRef.current = sessionId;
+          sendEventRef.current('updateHistorySelectedId', {
+            id: sessionIdRef.current,
+          });
+          setUsage(undefined);
+          bedrockMessages.current = [];
+          setMessages([]);
+          
+          // Send initial message from AI assistant
+          const welcomeMessage: SwiftChatMessage = {
+            _id: generateId(),
+            text: presetPrompt.prompt,
+            createdAt: new Date(),
+            user: {
+              _id: 2,
+              name: presetPrompt.name,
+              avatar: presetPrompt.avatar,
+              modelTag: getTextModel().modelTag,
+            },
+          };
+          
+          setMessages([welcomeMessage]);
+          bedrockMessages.current = [
+            {
+              role: 'assistant',
+              content: [{ text: presetPrompt.prompt }],
+            },
+          ];
+          
+          // Save the initial message
+          setTimeout(() => {
+            saveCurrentMessages();
+          }, 100);
+        }
+      }
+    }, [event, isNovaSonic]);
+    
+    // Handle preset prompt selection
+    useEffect(() => {
+    const presetPrompt = route.params?.presetPrompt;
+    if (presetPrompt) {
+          // Convert PresetPrompt to SystemPrompt
+          const systemPromptFromPreset: SystemPrompt = {
+          id: presetPrompt.id,
+          name: presetPrompt.name,
+          prompt: presetPrompt.prompt,
+          includeHistory: presetPrompt.includeHistory,
+          allowInterruption: presetPrompt.allowInterruption,
+          promptType: presetPrompt.promptType,
+          avatar: presetPrompt.avatar,
+        };
+       
+        setSystemPrompt(systemPromptFromPreset);
+        
+       // Save as current system prompt
+       if (isNovaSonic) {
+          saveCurrentVoiceSystemPrompt(systemPromptFromPreset);
+       } else {
+          saveCurrentSystemPrompt(systemPromptFromPreset);
+       }
+       
+       // Start new session with preset prompt
+       sessionIdRef.current = Date.now();
+       sendEventRef.current('updateHistorySelectedId', {
+       id: sessionIdRef.current,
+       });
+       setUsage(undefined);
+       bedrockMessages.current = [];
+       setMessages([]);
+       
+       // Send initial message from AI assistant
+       const welcomeMessage: SwiftChatMessage = {
+          _id: generateId(),
+          text: presetPrompt.prompt,
+          createdAt: new Date(),
+          user: {
+          _id: 2,
+          name: presetPrompt.name,
+          avatar: presetPrompt.avatar,
+          modelTag: getTextModel().modelTag,
+         },
+       };
+       
+        setMessages([welcomeMessage]);
+        bedrockMessages.current = [
+         {
+            role: 'assistant',
+            content: [{ text: presetPrompt.prompt }],
+          },
+       ];
+        
+        // Save the initial message
+        setTimeout(() => {
+          saveCurrentMessages();
+        }, 100);
+      }
+    }, [route.params?.presetPrompt, isNovaSonic]);
+  
+  
+    // keyboard show listener for scroll to bottom
+    useEffect(() => {
+      const keyboardDidShowListener = Platform.select({
+        ios: Keyboard.addListener('keyboardWillShow', scrollToBottom),
+        android: Keyboard.addListener('keyboardDidShow', scrollToBottom),
+      });
+  
+      return () => {
+        keyboardDidShowListener && keyboardDidShowListener.remove();
+      };
+    }, []);
+  
+    // show keyboard for open the app
+    useEffect(() => {
+      showKeyboard();
+    }, []);
+  
+    const showKeyboard = () => {
+      setTimeout(() => {
+        if (textInputRef.current) {
+          textInputRef.current.focus();
+        }
+      }, 100);
+    };
+  
+    // update screenWith and height when screen rotate
+    useEffect(() => {
+      const updateDimensions = () => {
+        setScreenDimensions(Dimensions.get('window'));
+      };
+  
+      const subscription = Dimensions.addEventListener(
+        'change',
+        updateDimensions
+      );
+  
+      return () => {
+        subscription?.remove();
+      };
+    }, []);
+  
+    // handle message complete update bedrockMessage and saveMessage
+    useEffect(() => {
+      if (chatStatus === ChatStatus.Complete) {
+        if (messagesRef.current.length <= 1) {
+          return;
+        }
+        saveCurrentMessages();
+        getBedrockMessage(messagesRef.current[0]).then(currentMsg => {
+          bedrockMessages.current.push(currentMsg);
+        });
+        if (drawerTypeRef.current === 'permanent') {
+          sendEventRef.current('updateHistory');
+        }
+        setChatStatus(ChatStatus.Init);
+      }
+    }, [chatStatus]);
+  
+    // app goes to background and save running messages.
+    useEffect(() => {
+      const handleAppStateChange = (nextAppState: string) => {
+        if (nextAppState === 'background' || nextAppState === 'inactive') {
+          if (chatStatusRef.current === ChatStatus.Running) {
+            saveCurrentMessages();
+          }
+        }
+        if (nextAppState === 'active') {
+          if (!isTokenValid()) {
+            requestToken().then();
+          }
+        }
+      };
+      const subscription = AppState.addEventListener(
+        'change',
+        handleAppStateChange
+      );
+      return () => {
+        subscription.remove();
+      };
+    }, []);
+  
+    // save current message
+    const saveCurrentMessages = () => {
+      if (messagesRef.current.length === 0) {
+        return;
+      }
+      const currentSessionId = getSessionId();
+      saveMessages(sessionIdRef.current, messagesRef.current, usageRef.current!);
+      if (sessionIdRef.current > currentSessionId) {
+        saveMessageList(
+          sessionIdRef.current,
+          messagesRef.current,
+          modeRef.current
+        );
+      }
+    };
+  
+    const { width: screenWidth, height: screenHeight } = screenDimensions;
+  
+    const chatScreenWidth =
+      isMac && drawerType === 'permanent' ? screenWidth - 300 : screenWidth;
+  
+    const scrollStyle = StyleSheet.create({
+      scrollToBottomContainerStyle: {
+        width: 30,
+        height: 30,
+        left:
+          Platform.OS === 'ios' &&
+          screenHeight < screenWidth &&
+          screenHeight < 500
+            ? screenWidth / 2 - 75 // iphone landscape
+            : chatScreenWidth / 2 - 15,
+        bottom: screenHeight > screenWidth ? '1.5%' : '2%',
+      },
+    });
+  
+    const scrollToTop = () => {
+      setUserScrolled(true);
+      if (flatListRef.current) {
+        if (messagesRef.current.length > 0) {
+          flatListRef.current.scrollToIndex({
+            index: messagesRef.current.length - 1,
+            animated: true,
+          });
+        }
+      }
+    };
+    const scrollToBottom = () => {
+      if (flatListRef.current) {
+        flatListRef.current.scrollToOffset({ offset: 0, animated: true });
+      }
+    };
+  
+    const handleUserScroll = (_: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (chatStatusRef.current === ChatStatus.Running) {
+        setUserScrolled(true);
+      }
+    };
+  
+    const handleMomentumScrollEnd = (
+      endEvent: NativeSyntheticEvent<NativeScrollEvent>
+    ) => {
+      if (chatStatusRef.current === ChatStatus.Running && userScrolled) {
+        const { contentOffset } = endEvent.nativeEvent;
+        if (contentOffset.y > 0 && contentOffset.y < 100) {
+          scrollToBottom();
+        }
+      }
+    };
+  
+    // invoke bedrock api
+    useEffect(() => {
+      const lastMessage = messages[0];
+      if (
+        lastMessage &&
+        lastMessage.user &&
+        lastMessage.user._id === BOT_ID &&
+        lastMessage.text ===
+          (modeRef.current === ChatMode.Text
+            ? textPlaceholder
+            : imagePlaceholder) &&
+        chatStatusRef.current === ChatStatus.Running
+      ) {
+        if (modeRef.current === ChatMode.Image) {
+          sendEventRef.current('onImageStart');
+        }
+        controllerRef.current = new AbortController();
+        isCanceled.current = false;
+        const startRequestTime = new Date().getTime();
+        let latencyMs = 0;
+        let metrics: Metrics | undefined;
+        invokeBedrockWithCallBack(
+          bedrockMessages.current,
+          modeRef.current,
+          systemPromptRef.current,
+          () => isCanceled.current,
+          controllerRef.current,
+          (
+            msg: string,
+            complete: boolean,
+            needStop: boolean,
+            usageInfo?: Usage,
+            reasoning?: string
+          ) => {
+            if (chatStatusRef.current !== ChatStatus.Running) {
+              return;
+            }
+            if (latencyMs === 0) {
+              latencyMs = new Date().getTime() - startRequestTime;
+            }
+            const updateMessage = () => {
+              if (usageInfo) {
+                setUsage(prevUsage => ({
+                  modelName: usageInfo.modelName,
+                  inputTokens:
+                    (prevUsage?.inputTokens || 0) + usageInfo.inputTokens,
+                  outputTokens:
+                    (prevUsage?.outputTokens || 0) + usageInfo.outputTokens,
+                  totalTokens:
+                    (prevUsage?.totalTokens || 0) + usageInfo.totalTokens,
+                }));
+                updateTotalUsage(usageInfo);
+                const renderSec =
+                  (new Date().getTime() - startRequestTime - latencyMs) / 1000;
+                const speed = usageInfo.outputTokens / renderSec;
+                if (!metrics && modeRef.current === ChatMode.Text) {
+                  metrics = {
+                    latencyMs: (latencyMs / 1000).toFixed(2),
+                    speed: speed.toFixed(speed > 100 ? 1 : 2),
+                  };
+                }
+              }
+              const previousMessage = messagesRef.current[0];
+              if (
+                previousMessage.text !== msg ||
+                previousMessage.reasoning !== reasoning ||
+                (!previousMessage.metrics && metrics)
+              ) {
+                setMessages(prevMessages => {
+                  const newMessages = [...prevMessages];
+                  newMessages[0] = {
+                    ...prevMessages[0],
+                    text:
+                      isCanceled.current &&
+                      (previousMessage.text === textPlaceholder ||
+                        previousMessage.text === '')
+                        ? 'Canceled...'
+                        : msg,
+                    reasoning: reasoning,
+                    metrics: metrics,
+                  };
+                  return newMessages;
+                });
+              }
+            };
+    const setComplete = () => {
+    trigger(HapticFeedbackTypes.notificationSuccess);
+    setChatStatus(ChatStatus.Complete);
+    setShowSystemPrompt(true); // Show MENU button after chat completes
+  };
+            
+            if (modeRef.current === ChatMode.Text) {
+              trigger(HapticFeedbackTypes.selection);
+              updateMessage();
+              if (complete) {
+                setComplete();
+              }
+            } else {
+              if (needStop) {
+                sendEventRef.current('onImageStop');
+              } else {
+                sendEventRef.current('onImageComplete');
+              }
+              setTimeout(() => {
+                updateMessage();
+                setComplete();
+              }, 1000);
+            }
+            if (needStop) {
+              isCanceled.current = true;
+            }
+          }
+        ).then();
+      }
+    }, [messages]);
+  
+    // handle onSend
+    const onSend = useCallback((message: SwiftChatMessage[] = []) => {
+      // Reset user scroll state when sending a new message
+      setUserScrolled(false);
+      setShowSystemPrompt(false);
+      const files = selectedFilesRef.current;
+      if (!isAllFileReady(files)) {
+        showInfo('please wait for all videos to be ready');
+        return;
+      }
+      if (message[0]?.text || files.length > 0) {
+        if (!message[0]?.text) {
+          message[0].text = getFileTypeSummary(files);
+        }
+        if (selectedFilesRef.current.length > 0) {
+          message[0].image = JSON.stringify(selectedFilesRef.current);
+          setSelectedFiles([]);
+        }
+        trigger(HapticFeedbackTypes.impactMedium);
+        scrollToBottom();
+        getBedrockMessage(message[0]).then(currentMsg => {
+          bedrockMessages.current.push(currentMsg);
+          setChatStatus(ChatStatus.Running);
+          setMessages(previousMessages => [
+            createBotMessage(modeRef.current, systemPromptRef.current),
+            ...GiftedChat.append(previousMessages, message),
+          ]);
+        });
+      }
+    }, []);
+  
+    const handleNewFileSelected = (files: FileInfo[]) => {
+      setSelectedFiles(prevFiles => {
+        return checkFileNumberLimit(prevFiles, files);
+      });
+    };
+  
+    const handleVoiceChatTranscript = (role: string, text: string) => {
+      const userId = role === 'USER' ? 1 : BOT_ID;
+      if (
+        messagesRef.current.length > 0 &&
+        messagesRef.current[0].user._id === userId
+      ) {
+        if (userId === 1) {
+          text = ' ' + text;
+        }
+        setMessages(previousMessages => {
+          const newMessages = [...previousMessages];
+          if (!newMessages[0].text.includes(text)) {
+            newMessages[0] = {
+              ...newMessages[0],
+              text: newMessages[0].text + text,
+            };
+          }
+          return newMessages;
+        });
+      } else {
+        const newMessage: SwiftChatMessage = {
+          _id: generateId(),
+          text: text,
+          createdAt: new Date(),
+          user: {
+            _id: userId,
+            name: role === 'USER' ? 'You' : getTextModel().modelName,
+            modelTag: role === 'USER' ? undefined : getTextModel().modelTag,
+          },
+        };
+  
+        setMessages(previousMessages => [newMessage, ...previousMessages]);
+      }
+    };
+  
+    const styles = createStyles(colors);
+  
+    return (
+      <SafeAreaView style={styles.container}>
+        <GiftedChat
+          messageContainerRef={flatListRef}
+          textInputRef={textInputRef}
+          keyboardShouldPersistTaps="never"
+          placeholder="Ketik pesan....."
+          bottomOffset={
+            Platform.OS === 'android'
+              ? 0
+              : screenHeight > screenWidth && screenWidth < 500
+              ? 32 // iphone in portrait
+              : 20
+          }
+          messages={messages}
+          onSend={onSend}
+          user={{
+            _id: 1,
+          }}
+          alignTop={false}
+          inverted={true}
+          renderChatEmpty={() => (
+            <EmptyChatComponent
+              chatMode={modeRef.current}
+              isLoadingMessages={isLoadingMessages}
+            />
+          )}
+          alwaysShowSend={
+            chatStatus !== ChatStatus.Init || selectedFiles.length > 0
+          }
+          renderComposer={props => {
+            if (isNovaSonic && mode === ChatMode.Text) {
+                       return <AudioWaveformComponent ref={AudioWaveformRef} />;
+                     }
+                       
+                       //Default input box
+                       return
+               <Composer {...props} textInputStyle={styles.composerTextInput} placeholder="Ketik pesan....." />
+             ;
+          }}
+          renderSend={props => (
+            <CustomSendComponent
+              {...props}
+              chatStatus={chatStatus}
+              chatMode={mode}
+              selectedFiles={selectedFiles}
+              isShowLoading={isShowVoiceLoading}
+              onStopPress={() => {
+                trigger(HapticFeedbackTypes.notificationWarning);
+                if (isNovaSonic) {
+                  // End voice chat conversation
+                  endVoiceConversation().then(success => {
+                    if (success) {
+                      trigger(HapticFeedbackTypes.impactMedium);
+                    }
+                  });
+                  saveCurrentMessages();
+                } else {
+                  isCanceled.current = true;
+                  controllerRef.current?.abort();
+                }
+              }}
+              onFileSelected={files => {
+                handleNewFileSelected(files);
+              }}
+              onVoiceChatToggle={() => {
+                if (isVoiceLoading.current) {
+                  return;
+                }
+                isVoiceLoading.current = true;
+                setIsShowVoiceLoading(true);
+                voiceChatService.startConversation().then(success => {
+                  if (!success) {
+                    setChatStatus(ChatStatus.Init);
+                  } else {
+                    setChatStatus(ChatStatus.Running);
+                  }
+                  isVoiceLoading.current = false;
+                  setIsShowVoiceLoading(false);
+                  trigger(HapticFeedbackTypes.impactMedium);
+                });
+              }}
+            />
+          )}
+          renderChatFooter={() => (
+            <CustomChatFooter
+              files={selectedFiles}
+              onFileUpdated={(files, isUpdate) => {
+                if (isUpdate) {
+                  setSelectedFiles(files);
+                } else {
+                  handleNewFileSelected(files);
+                }
+              }}
+              onSystemPromptUpdated={prompt => {
+                setSystemPrompt(prompt);
+                if (isNovaSonic) {
+                  saveCurrentVoiceSystemPrompt(prompt);
+                  if (chatStatus === ChatStatus.Running) {
+                    endVoiceConversationRef.current?.();
+                  }
+                } else {
+                  saveCurrentSystemPrompt(prompt);
+                }
+              }}
+              onSwitchedToTextModel={() => {
+                endVoiceConversationRef.current?.();
+              }}
+              chatMode={modeRef.current}
+              isShowSystemPrompt={showSystemPrompt}
+            />
+          )}
+          renderMessage={props => {
+            // Find the index of the current message in the messages array
+            const messageIndex = messages.findIndex(
+              msg => msg._id === props.currentMessage?._id
+            );
+  
+            return (
+              <CustomMessageComponent
+                {...props}
+                chatStatus={chatStatus}
+                isLastAIMessage={
+                  props.currentMessage?._id === messages[0]?._id &&
+                  props.currentMessage?.user._id !== 1
+                }
+                onRegenerate={() => {
+                  setUserScrolled(false);
+                  trigger(HapticFeedbackTypes.impactMedium);
+                  const userMessageIndex = messageIndex + 1;
+                  if (userMessageIndex < messages.length) {
+                    // Reset bedrockMessages to only include the user's message
+                    getBedrockMessage(messages[userMessageIndex]).then(
+                      userMsg => {
+                        bedrockMessages.current = [userMsg];
+                        setChatStatus(ChatStatus.Running);
+                        setMessages(previousMessages => [
+                          createBotMessage(modeRef.current, systemPromptRef.current),
+                          ...previousMessages.slice(userMessageIndex),
+                        ]);
+                      }
+                    );
+                  }
+                }}
+              />
+            );
+          }}
+          listViewProps={{
+            contentContainerStyle: styles.contentContainer,
+            contentInset: { top: 2 },
+            onLayout: (layoutEvent: LayoutChangeEvent) => {
+              containerHeightRef.current = layoutEvent.nativeEvent.layout.height;
+            },
+            onContentSizeChange: (_width: number, height: number) => {
+              contentHeightRef.current = height;
+            },
+            onScrollBeginDrag: handleUserScroll,
+            onMomentumScrollEnd: handleMomentumScrollEnd,
+            ...(userScrolled &&
+            chatStatus === ChatStatus.Running &&
+            contentHeightRef.current > containerHeightRef.current
+              ? {
+                  maintainVisibleContentPosition: {
+                    minIndexForVisible: 0,
+                    autoscrollToTopThreshold: 0,
+                  },
+                }
+              : {}),
+          }}
+          scrollToBottom={true}
+          scrollToBottomComponent={CustomScrollToBottomComponent}
+          scrollToBottomStyle={scrollStyle.scrollToBottomContainerStyle}
+          renderInputToolbar={props => (
+            <InputToolbar
+              {...props}
+              containerStyle={{
+                backgroundColor: colors.background,
+                borderTopColor: colors.chatScreenSplit,
+              }}
+            />
+          )}
+          textInputProps={{
+            ...styles.textInputStyle,
+            ...{
+              fontWeight: isMac ? '300' : 'normal',
+              color: colors.text,
+            },
+          }}
+          maxComposerHeight={isMac ? 360 : 200}
+          onInputTextChanged={text => {
+            if (
+              isMac &&
+              inputTexRef.current.length > 0 &&
+              text[text.length - 1] === '\n' &&
+              text[text.length - 2] !== ' ' &&
+              text.length - inputTexRef.current.length === 1 &&
+              chatStatusRef.current !== ChatStatus.Running
+            ) {
+              setTimeout(() => {
+                if (textInputRef.current) {
+                  textInputRef.current.clear();
+                }
+              }, 1);
+              const msg: SwiftChatMessage = {
+                text: inputTexRef.current,
+                user: { _id: 1 },
+                createdAt: new Date(),
+                _id: generateId(),
+              };
+              onSend([msg]);
+            }
+            inputTexRef.current = text;
+          }}
+        />
+      </SafeAreaView>
+    );
+  }
+  
+  const createStyles = (colors: ColorScheme) =>
+    StyleSheet.create({
+      container: {
+        flex: 1,
+        backgroundColor: colors.background,
+      },
+      contentContainer: {
+        paddingTop: 15,
+        paddingBottom: 15,
+        flexGrow: 1,
+        justifyContent: 'flex-end',
+      },
+      textInputStyle: {
+        marginLeft: 14,
+        lineHeight: 22,
+      },
+      composerTextInput: {
+        backgroundColor: colors.background,
+        color: colors.text,
+      },
+    });
+  
+  export default ChatScreen;
+  
+  </file>
+  
+  <file name="react-native/src/api/open-api.ts">
+  import { ModelTag, SystemPrompt, Usage } from '../types/Chat.ts';
+  import {
+    getApiUrl,
+    getDeepSeekApiKey,
+    getOpenAIApiKey,
+    getOpenAICompatApiKey,
+    getOpenAICompatApiURL,
+    getOpenAIProxyEnabled,
+    getTextModel,
+  } from '../storage/StorageUtils.ts';
+  import {
+    BedrockMessage,
+    ImageContent,
+    OpenAIMessage,
+    TextContent,
+  } from '../chat/util/BedrockMessageConvertor.ts';
+  import { isDev } from './bedrock-api.ts';
+  import { GITHUB_LINK } from '../settings/SettingsScreen.tsx';
+  
+  type CallbackFunction = (
+    result: string,
+    complete: boolean,
+    needStop: boolean,
+    usage?: Usage,
+    reasoning?: string
+  ) => void;
+  const OpenRouterTag = ': OPENROUTER PROCESSING';
+  
+  export const invokeOpenAIWithCallBack = async (
+    messages: BedrockMessage[],
+    prompt: SystemPrompt | null,
+    shouldStop: () => boolean,
+    controller: AbortController,
+    callback: CallbackFunction
+  ) => {
+    const isOpenRouter = isOpenRouterRequest();
+    const bodyObject = {
+      model: getTextModel().modelId,
+      messages: getOpenAIMessages(messages, prompt),
+      stream: true,
+      stream_options: {
+        include_usage: true,
+      },
+      // Kirim botId ke server untuk proxy requests
+      ...(prompt?.id ? { botId: prompt.id } : {}),
+    };
+  
+    const options = {
+      method: 'POST',
+      headers: {
+        accept: '*/*',
+        'content-type': 'application/json',
+        Authorization: 'Bearer ' + getApiKey(),
+      },
+      body: JSON.stringify(bodyObject),
+      signal: controller.signal,
+      reactNative: { textStreaming: true },
+    };
+    const proxyRequestUrl = getProxyRequestURL();
+    if (proxyRequestUrl.length > 0) {
+      options.headers['request_url' as keyof typeof options.headers] =
+        proxyRequestUrl;
+    }
+    if (isOpenRouter) {
+      options.headers['HTTP-Referer' as keyof typeof options.headers] =
+        GITHUB_LINK;
+      options.headers['X-Title' as keyof typeof options.headers] = 'SwiftChat';
+    }
+    const url = getApiURL();
+    let completeMessage = '';
+    let completeReasoning = '';
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
+    fetch(url!, options)
+      .then(response => {
+        return response.body;
+      })
+      .then(async body => {
+        clearTimeout(timeoutId);
+        if (!body) {
+          return;
+        }
+        const reader = body.getReader();
+        const decoder = new TextDecoder();
+        let lastChunk = '';
+        while (true) {
+          if (shouldStop()) {
+            await reader.cancel();
+            if (completeMessage === '') {
+              completeMessage = '...';
+            }
+            callback(completeMessage, true, true, undefined, completeReasoning);
+            return;
+          }
+  
+          try {
+            const { done, value } = await reader.read();
+            const chunk = decoder.decode(value, { stream: true });
+            if (isOpenRouter && chunk === OpenRouterTag + '\n\n') {
+              continue;
+            }
+            const parsed = parseStreamData(chunk, lastChunk);
+            if (parsed.error) {
+              callback(
+                completeMessage + '\n\n' + parsed.error,
+                true,
+                true,
+                undefined,
+                completeReasoning
+              );
+              return;
+            }
+            if (parsed.reason) {
+              completeReasoning += parsed.reason;
+            }
+            if (parsed.content) {
+              completeMessage += parsed.content;
+            }
+            if (parsed.dataChunk) {
+              lastChunk = parsed.dataChunk;
+            } else {
+              lastChunk = '';
+            }
+            if (parsed.usage && parsed.usage.inputTokens) {
+              callback(
+                completeMessage,
+                false,
+                false,
+                parsed.usage,
+                completeReasoning
+              );
+            } else {
+              callback(
+                completeMessage,
+                done,
+                false,
+                undefined,
+                completeReasoning
+              );
+            }
+            if (done) {
+              return;
+            }
+          } catch (readError) {
+            console.log('Error reading stream:', readError);
+            if (completeMessage === '') {
+              completeMessage = '...';
+            }
+            callback(completeMessage, true, true, undefined, completeReasoning);
+            return;
+          }
+        }
+      })
+      .catch(error => {
+        console.log(error);
+        clearTimeout(timeoutId);
+        if (shouldStop()) {
+          if (completeMessage === '') {
+            completeMessage = '...';
+          }
+          callback(completeMessage, true, true, undefined, completeReasoning);
+        } else {
+          const errorMsg = String(error);
+          const errorInfo = 'Request error: ' + errorMsg;
+          callback(
+            completeMessage + '\n\n' + errorInfo,
+            true,
+            true,
+            undefined,
+            completeReasoning
+          );
+        }
+      });
+  };
+  
+  const parseStreamData = (chunk: string, lastChunk: string = '') => {
+    const dataChunks = (lastChunk + chunk).split('\n\n');
+    let content = '';
+    let reason = '';
+    let usage: Usage | undefined;
+    for (let dataChunk of dataChunks) {
+      if (!dataChunk.trim()) {
+        continue;
+      }
+      if (dataChunk[0] === '\n') {
+        dataChunk = dataChunk.slice(1);
+      }
+      const cleanedData = dataChunk.replace(/^data: /, '');
+      if (cleanedData.trim() === '[DONE]') {
+        continue;
+      }
+      if (cleanedData.trim() === OpenRouterTag) {
+        continue;
+      }
+  
+      try {
+        const parsedData: ChatResponse = JSON.parse(cleanedData);
+        if (parsedData.error) {
+          let errorMessage = '**Error:** ' + (parsedData.error?.message ?? '');
+          if (parsedData.error?.metadata?.raw) {
+            errorMessage += ':\n' + parsedData.error.metadata.raw;
+          }
+          return { error: errorMessage };
+        }
+        if (parsedData.detail) {
+          return {
+            error:
+              `Error: Please upgrade your [server API](${GITHUB_LINK}?tab=readme-ov-file#upgrade-api), API ` +
+              parsedData.detail,
+          };
+        }
+        if (parsedData.choices[0]?.delta?.content) {
+          content += parsedData.choices[0].delta.content;
+        }
+  
+        if (parsedData.choices[0]?.delta?.reasoning_content) {
+          reason += parsedData.choices[0].delta.reasoning_content;
+        }
+        if (parsedData.choices[0]?.delta?.reasoning) {
+          reason += parsedData.choices[0].delta.reasoning;
+        }
+  
+        if (parsedData.usage) {
+          usage = {
+            modelName: getTextModel().modelName,
+            inputTokens:
+              parsedData.usage.prompt_tokens -
+              (parsedData.usage.prompt_cache_hit_tokens ?? 0),
+            outputTokens: parsedData.usage.completion_tokens,
+            totalTokens: parsedData.usage.total_tokens,
+          };
+        }
+      } catch (error) {
+        if (lastChunk.length > 0) {
+          return { reason, content, dataChunk, usage };
+        } else if (reason === '' && content === '') {
+          if (dataChunk === 'data: ') {
+            return { reason, content, dataChunk, usage };
+          }
+          return { error: chunk };
+        }
+        if (reason || content) {
+          return { reason, content, dataChunk, usage };
+        }
+      }
+    }
+    return { reason, content, usage };
+  };
+  
+  type ChatResponse = {
+    choices: Array<{
+      delta: {
+        content: string;
+        reasoning_content: string;
+        reasoning: string;
+      };
+    }>;
+    usage?: {
+      prompt_tokens: number;
+      completion_tokens: number;
+      total_tokens: number;
+      prompt_cache_hit_tokens: number;
+    };
+    error?: {
+      message?: string;
+      metadata?: {
+        raw?: string;
+      };
+    };
+    detail?: string;
+  };
+  
+  function getOpenAIMessages(
+    messages: BedrockMessage[],
+    prompt: SystemPrompt | null
+  ): OpenAIMessage[] {
+    // Untuk OpenAI, kita tetap menggunakan prompt yang ada karena system prompts
+    // akan ditangani oleh server melalui proxy (/api/openai)
+    return [
+      ...(prompt ? [{ role: 'system', content: prompt.prompt }] : []),
+      ...messages.map(message => {
+        const hasImage = message.content.some(content => 'image' in content);
+        if (hasImage) {
+          return {
+            role: message.role,
+            content: message.content.map(content => {
+              if ('text' in content) {
+                return {
+                  type: 'text' as const,
+                  text: (content as TextContent).text,
+                };
+              } else {
+                const base64Data = (content as ImageContent).image.source.bytes;
+                return {
+                  type: 'image_url' as const,
+                  image_url: {
+                    url: `data:image/png;base64,${base64Data}`,
+                  },
+                };
+              }
+            }),
+          };
+        }
+        return {
+          role: message.role,
+          content: message.content
+            .map(content => (content as TextContent).text)
+            .join('\n'),
+        };
+      }),
+    ];
+  }
+  
+  function getApiKey(): string {
+    if (getTextModel().modelTag === ModelTag.OpenAICompatible) {
+      return getOpenAICompatApiKey();
+    } else if (getTextModel().modelId.includes('deepseek')) {
+      return getDeepSeekApiKey();
+    } else {
+      return getOpenAIApiKey();
+    }
+  }
+  
+  function isOpenRouterRequest(): boolean {
+    return (
+      getTextModel().modelTag === ModelTag.OpenAICompatible &&
+      getOpenAICompatApiURL().startsWith('https://openrouter.ai/api')
+    );
+  }
+  
+  function getProxyRequestURL(): string {
+    if (getTextModel().modelTag === ModelTag.OpenAICompatible) {
+      return getOpenAICompatApiURL() + '/chat/completions';
+    } else if (getTextModel().modelId.includes('deepseek')) {
+      return '';
+    } else {
+      return 'https://api.openai.com/v1/chat/completions';
+    }
+  }
+  
+  function getApiURL(): string {
+    if (getTextModel().modelTag === ModelTag.OpenAICompatible) {
+      if (getOpenAIProxyEnabled()) {
+        return (isDev ? 'http://localhost:8080' : getApiUrl()) + '/api/openai';
+      } else {
+        return getOpenAICompatApiURL() + '/chat/completions';
+      }
+    } else if (getTextModel().modelId.includes('deepseek')) {
+      return 'https://api.deepseek.com/chat/completions';
+    } else {
+      if (getOpenAIProxyEnabled()) {
+        return (isDev ? 'http://localhost:8080' : getApiUrl()) + '/api/openai';
+      } else {
+        return 'https://api.openai.com/v1/chat/completions';
+      }
+    }
+  }
+  
+  </file>
+  
+  <file name="react-native/src/chat/util/BedrockMessageConvertor.ts">
+  import {
+    FileInfo,
+    FileType,
+    ModelTag,
+    SwiftChatMessage,
+  } from '../../types/Chat.ts';
+  import { getFileBytes, getFileTextContent } from './FileUtils.ts';
+  import { EXTRA_DOCUMENT_FORMATS } from '../component/CustomAddFileComponent.tsx';
+  import { getModelTag } from '../../utils/ModelUtils.ts';
+  import { getTextModel } from '../../storage/StorageUtils.ts';
+  
+  export async function getBedrockMessagesFromChatMessages(
+    messages: SwiftChatMessage[]
+  ): Promise<BedrockMessage[]> {
+    const bedrockMessages: BedrockMessage[] = [];
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = await getBedrockMessage(messages[i]);
+      bedrockMessages.push(msg);
+    }
+    return bedrockMessages;
+  }
+  
+  export async function getBedrockMessage(
+    message: SwiftChatMessage
+  ): Promise<BedrockMessage> {
+    const content: MessageContent[] = [{ text: message.text }];
+    const modelTag = getModelTag(getTextModel());
+    if (message.image) {
+      const files = JSON.parse(message.image) as FileInfo[];
+      for (const file of files) {
+        try {
+          const fileUrl =
+            file.type === FileType.video ? file.videoUrl! : file.url;
+          const fileBytes = await getFileBytes(fileUrl);
+          if (file.type === FileType.image) {
+            content.push({
+              image: {
+                format: file.format.toLowerCase(),
+                source: {
+                  bytes: fileBytes,
+                },
+              },
+            });
+          } else if (file.type === FileType.video) {
+            content.push({
+              video: {
+                format: file.format.toLowerCase(),
+                source: {
+                  bytes: fileBytes,
+                },
+              },
+            });
+          } else if (file.type === FileType.document) {
+            let fileName = file.fileName;
+            if (!isValidFilename(fileName)) {
+              fileName = normalizeFilename(fileName);
+            }
+            const fileFormat = file.format;
+            if (
+              EXTRA_DOCUMENT_FORMATS.includes(fileFormat) ||
+              modelTag !== ModelTag.Bedrock
+            ) {
+              try {
+                const fileTextContent = await getFileTextContent(fileUrl);
+                (
+                  content[0] as TextContent
+                ).text += `\n\n[File: ${fileName}.${fileFormat}]\n${fileTextContent}`;
+              } catch (error) {
+                console.warn(
+                  `Error reading text content from ${fileName}:`,
+                  error
+                );
+              }
+            } else {
+              content.push({
+                document: {
+                  format: file.format.toLowerCase(),
+                  name: fileName + '_' + new Date().getTime(),
+                  source: {
+                    bytes: fileBytes,
+                  },
+                },
+              });
+            }
+          }
+        } catch (error) {
+          console.warn(`Error processing file ${file.fileName}:`, error);
+        }
+      }
+    }
+    return {
+      role: message.user._id === 1 ? 'user' : 'assistant',
+      content: content,
+    };
+  }
+  
+  function normalizeFilename(filename: string): string {
+    return filename
+      .replace(/[^a-zA-Z0-9\s\-()[\]]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  
+  function isValidFilename(filename: string): boolean {
+    const validCharPattern = /^[a-zA-Z0-9\s\-()[\]]+$/;
+    const consecutiveSpacesPattern = /\s{2,}/;
+    if (!filename || filename.trim() === '') {
+      return false;
+    }
+    return (
+      validCharPattern.test(filename) && !consecutiveSpacesPattern.test(filename)
+    );
+  }
+  
+  export interface TextContent {
+    text: string;
+  }
+  
+  export interface ImageContent {
+    image: ImageInfo;
+  }
+  
+  export interface ImageInfo {
+    format: string;
+    source: {
+      bytes: string;
+    };
+  }
+  
+  export interface VideoContent {
+    video: {
+      format: string;
+      source: {
+        bytes: string;
+      };
+    };
+  }
+  
+  export interface DocumentContent {
+    document: {
+      format: string;
+      name: string;
+      source: {
+        bytes: string;
+      };
+    };
+  }
+  
+  export type MessageContent =
+    | TextContent
+    | ImageContent
+    | VideoContent
+    | DocumentContent;
+  
+  export type BedrockMessage = {
+    role: string;
+    content: MessageContent[];
+  };
+  
+  export type OpenAIMessage = {
+    role: string;
+    content:
+      | string
+      | Array<{
+          type: 'text' | 'image_url';
+          text?: string;
+          image_url?: {
+            url: string;
+          };
+        }>;
+  };
+  
+  </file>
+  
+  <file name="react-native/src/api/bedrock-api.ts">
+  import {
+    AllModel,
+    BedrockChunk,
+    ChatMode,
+    ImageRes,
+    Model,
+    ModelTag,
+    SystemPrompt,
+    TokenResponse,
+    UpgradeInfo,
+    Usage,
+  } from '../types/Chat.ts';
+  import {
+    getApiKey,
+    getApiUrl,
+    getDeepSeekApiKey,
+    getImageModel,
+    getImageSize,
+    getOpenAIApiKey,
+    getOpenAICompatApiURL,
+    getRegion,
+    getTextModel,
+    getThinkingEnabled,
+    saveTokenInfo,
+  } from '../storage/StorageUtils.ts';
+  import { saveImageToLocal } from '../chat/util/FileUtils.ts';
+  import {
+    BedrockMessage,
+    ImageContent,
+    ImageInfo,
+    TextContent,
+  } from '../chat/util/BedrockMessageConvertor.ts';
+  import { invokeOpenAIWithCallBack } from './open-api.ts';
+  import { invokeOllamaWithCallBack } from './ollama-api.ts';
+  import { BedrockThinkingModels } from '../storage/Constants.ts';
+  import { getModelTag } from '../utils/ModelUtils.ts';
+  
+  type CallbackFunction = (
+    result: string,
+    complete: boolean,
+    needStop: boolean,
+    usage?: Usage,
+    reasoning?: string
+  ) => void;
+  export const isDev = false;
+  export const invokeBedrockWithCallBack = async (
+    messages: BedrockMessage[],
+    chatMode: ChatMode,
+    prompt: SystemPrompt | null,
+    shouldStop: () => boolean,
+    controller: AbortController,
+    callback: CallbackFunction
+  ) => {
+    const currentModelTag = getModelTag(getTextModel());
+    if (chatMode === ChatMode.Text && currentModelTag !== ModelTag.Bedrock) {
+      if (
+        currentModelTag === ModelTag.Broperty &&
+        getDeepSeekApiKey().length === 0
+      ) {
+        callback('Please configure your DeepSeek API Key', true, true);
+        return;
+      }
+      if (currentModelTag === ModelTag.OpenAI && getOpenAIApiKey().length === 0) {
+        callback('Please configure your OpenAI API Key', true, true);
+        return;
+      }
+      if (
+        currentModelTag === ModelTag.OpenAICompatible &&
+        getOpenAICompatApiURL().length === 0
+      ) {
+        callback('Please configure your OpenAI Compatible API URL', true, true);
+        return;
+      }
+      if (currentModelTag === ModelTag.Ollama) {
+        await invokeOllamaWithCallBack(
+          messages,
+          prompt,
+          shouldStop,
+          controller,
+          callback
+        );
+      } else {
+        await invokeOpenAIWithCallBack(
+          messages,
+          prompt,
+          shouldStop,
+          controller,
+          callback
+        );
+      }
+      return;
+    }
+    if (!isConfigured()) {
+      callback('Please configure your API URL and API Key', true, true);
+      return;
+    }
+      if (chatMode === ChatMode.Text) {
+      const bodyObject = {
+        messages: messages,
+        modelId: getTextModel().modelId,
+        region: getRegion(),
+        enableThinking: isEnableThinking(),
+        system: prompt ? [{ text: prompt?.prompt }] : undefined,
+        botId: prompt?.id,  // Kirim ID bot ke server
+      };
+      if (prompt?.includeHistory === false) {
+        bodyObject.messages = messages.slice(-1);
+      }
+  
+      const options = {
+        method: 'POST',
+        headers: {
+          accept: '*/*',
+          'content-type': 'application/json',
+          Authorization: 'Bearer ' + getApiKey(),
+        },
+        body: JSON.stringify(bodyObject),
+        signal: controller.signal,
+        reactNative: { textStreaming: true },
+      };
+      const url = getApiPrefix() + '/converse/v3';
+      let completeMessage = '';
+      let completeReasoning = '';
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
+      fetch(url!, options)
+        .then(response => {
+          return response.body;
+        })
+        .then(async body => {
+          clearTimeout(timeoutId);
+          if (!body) {
+            return;
+          }
+          const reader = body.getReader();
+          const decoder = new TextDecoder();
+          let appendTimes = 0;
+          while (true) {
+            if (shouldStop()) {
+              await reader.cancel();
+              if (completeMessage === '') {
+                completeMessage = '...';
+              }
+              callback(completeMessage, true, true, undefined, completeReasoning);
+              return;
+            }
+  
+            try {
+              const { done, value } = await reader.read();
+              const chunk = decoder.decode(value, { stream: true });
+              const bedrockChunk = parseChunk(chunk);
+              if (bedrockChunk) {
+                if (bedrockChunk.reasoning) {
+                  completeReasoning += bedrockChunk.reasoning ?? '';
+                  callback(
+                    completeMessage,
+                    false,
+                    false,
+                    undefined,
+                    completeReasoning
+                  );
+                }
+                if (bedrockChunk.text) {
+                  completeMessage += bedrockChunk.text ?? '';
+                  appendTimes++;
+                  if (appendTimes > 5000 && appendTimes % 2 === 0) {
+                    continue;
+                  }
+                  callback(
+                    completeMessage,
+                    false,
+                    false,
+                    undefined,
+                    completeReasoning
+                  );
+                }
+                if (bedrockChunk.usage) {
+                  bedrockChunk.usage.modelName = getTextModel().modelName;
+                  callback(
+                    completeMessage,
+                    false,
+                    false,
+                    bedrockChunk.usage,
+                    completeReasoning
+                  );
+                }
+              }
+              if (done) {
+                callback(
+                  completeMessage,
+                  true,
+                  false,
+                  undefined,
+                  completeReasoning
+                );
+                return;
+              }
+            } catch (readError) {
+              console.log('Error reading stream:', readError);
+              if (completeMessage === '') {
+                completeMessage = '...';
+              }
+              callback(completeMessage, true, true, undefined, completeReasoning);
+              return;
+            }
+          }
+        })
+        .catch(error => {
+          clearTimeout(timeoutId);
+          if (shouldStop()) {
+            if (completeMessage === '') {
+              completeMessage = '...';
+            }
+            callback(completeMessage, true, true, undefined, completeReasoning);
+          } else {
+            let errorMsg = String(error);
+            if (errorMsg.endsWith('AbortError: Aborted')) {
+              errorMsg = 'Timed out';
+            }
+            if (errorMsg.indexOf('http') >= 0) {
+              errorMsg = 'Unable to resolve host';
+            }
+            const errorInfo = 'Request error: ' + errorMsg;
+            callback(completeMessage + '\n\n' + errorInfo, true, true);
+            console.log(errorInfo);
+          }
+        });
+    } else {
+      const imagePrompt = (
+        messages[messages.length - 1].content[0] as TextContent
+      ).text;
+      let image: ImageInfo | undefined;
+      if (messages[messages.length - 1].content[1]) {
+        image = (messages[messages.length - 1].content[1] as ImageContent).image;
+      }
+  
+      const imageRes = await genImage(imagePrompt, controller, image);
+      if (imageRes.image.length > 0) {
+        const localFilePath = await saveImageToLocal(imageRes.image);
+        const imageSize = getImageSize().split('x')[0].trim();
+        const usage: Usage = {
+          modelName: getImageModel().modelName,
+          inputTokens: 0,
+          outputTokens: 0,
+          totalTokens: 0,
+          smallImageCount: 0,
+          imageCount: 0,
+          largeImageCount: 0,
+        };
+        if (imageSize === '512') {
+          usage.smallImageCount = 1;
+        } else if (imageSize === '1024') {
+          usage.imageCount = 1;
+        } else if (imageSize === '2048') {
+          usage.largeImageCount = 1;
+        }
+        if (localFilePath) {
+          callback(`![](${localFilePath})`, true, false, usage);
+        }
+      } else {
+        if (imageRes.error.endsWith('AbortError: Aborted')) {
+          if (shouldStop()) {
+            imageRes.error = 'Request canceled';
+          } else {
+            imageRes.error = 'Request timed out';
+          }
+        }
+        if (imageRes.error.indexOf('http') >= 0) {
+          imageRes.error = 'Request error: Unable to resolve host';
+        }
+        callback(imageRes.error, true, true);
+      }
+    }
+  };
+  
+  export const requestAllModels = async (): Promise<AllModel> => {
+    if (getApiUrl() === '') {
+      return { imageModel: [], textModel: [] };
+    }
+    const controller = new AbortController();
+    const url = getApiPrefix() + '/models';
+    const bodyObject = {
+      region: getRegion(),
+    };
+    const options = {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json',
+        Authorization: 'Bearer ' + getApiKey(),
+      },
+      body: JSON.stringify(bodyObject),
+      reactNative: { textStreaming: true },
+    };
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    try {
+      const response = await fetch(url, options);
+      clearTimeout(timeoutId);
+      if (!response.ok) {
+        console.log(`HTTP error! status: ${response.status}`);
+        return { imageModel: [], textModel: [] };
+      }
+      const allModel = await response.json();
+      allModel.imageModel = allModel.imageModel.map((item: Model) => ({
+        modelId: item.modelId,
+        modelName: item.modelName,
+        modelTag: ModelTag.Bedrock,
+      }));
+      allModel.textModel = allModel.textModel.map((item: Model) => ({
+        modelId: item.modelId,
+        modelName: item.modelName,
+        modelTag: ModelTag.Bedrock,
+      }));
+      return allModel;
+    } catch (error) {
+      console.log('Error fetching models:', error);
+      clearTimeout(timeoutId);
+      return { imageModel: [], textModel: [] };
+    }
+  };
+  
+  export const requestToken = async (): Promise<TokenResponse | null> => {
+    if (getApiUrl() === '') {
+      return null;
+    }
+  
+    const url = getApiPrefix() + '/token';
+    const bodyObject = {
+      region: getRegion(),
+    };
+  
+    const options = {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json',
+        Authorization: 'Bearer ' + getApiKey(),
+      },
+      body: JSON.stringify(bodyObject),
+      reactNative: { textStreaming: true },
+    };
+  
+    try {
+      const response = await fetch(url, options);
+      if (!response.ok) {
+        console.log(`HTTP error! status: ${response.status}`);
+        return null;
+      }
+  
+      const tokenResponse = (await response.json()) as TokenResponse;
+      saveTokenInfo(tokenResponse);
+      return tokenResponse;
+    } catch (error) {
+      console.log('Error fetching token:', error);
+      return null;
+    }
+  };
+  
+  export const requestUpgradeInfo = async (
+    os: string,
+    version: string
+  ): Promise<UpgradeInfo> => {
+    const url = getApiPrefix() + '/upgrade';
+    const options = {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json',
+        Authorization: 'Bearer ' + getApiKey(),
+      },
+      body: JSON.stringify({
+        os: os,
+        version: version,
+      }),
+      reactNative: { textStreaming: true },
+    };
+  
+    try {
+      const response = await fetch(url, options);
+      return await response.json();
+    } catch (error) {
+      console.log('Error fetching upgrade info:', error);
+      return { needUpgrade: false, version: '', url: '' };
+    }
+  };
+  
+  export const genImage = async (
+    imagePrompt: string,
+    controller: AbortController,
+    image?: ImageInfo
+  ): Promise<ImageRes> => {
+    if (!isConfigured()) {
+      return {
+        image: '',
+        error: 'Please configure your API URL and API Key',
+      };
+    }
+    const url = getApiPrefix() + '/image';
+    const imageSize = getImageSize().split('x');
+    const width = imageSize[0].trim();
+    const height = imageSize[1].trim();
+    const bodyObject = {
+      prompt: imagePrompt,
+      refImages: image ? [image] : undefined,
+      modelId: getImageModel().modelId,
+      region: getRegion(),
+      width: width,
+      height: height,
+    };
+    const options = {
+      method: 'POST',
+      headers: {
+        accept: '*/*',
+        'content-type': 'application/json',
+        Authorization: 'Bearer ' + getApiKey(),
+      },
+      body: JSON.stringify(bodyObject),
+      signal: controller.signal,
+      reactNative: { textStreaming: true },
+    };
+  
+    try {
+      const timeoutMs = parseInt(width, 10) >= 1024 ? 120000 : 90000;
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      const response = await fetch(url, options);
+      if (!response.ok) {
+        const responseJson = await response.json();
+        const errMsg = responseJson.detail.includes(
+          "You don't have access to the model"
+        )
+          ? responseJson.detail +
+            ' Please enable your `Nova Lite` model in the US region to support generating images with Chinese prompts.'
+          : responseJson.detail;
+        console.log(errMsg);
+        return {
+          image: '',
+          error: errMsg,
+        };
+      }
+      const data = await response.json();
+      clearTimeout(timeoutId);
+      if (data.error) {
+        console.log(data.error);
+        return {
+          image: '',
+          error: data.error,
+        };
+      }
+      if (data.image && data.image.length > 0) {
+        return {
+          image: data.image,
+          error: '',
+        };
+      }
+      return {
+        image: '',
+        error: 'image is empty',
+      };
+    } catch (error) {
+      const errMsg = `Error fetching image: ${error}`;
+      console.log(errMsg);
+      return {
+        image: '',
+        error: errMsg,
+      };
+    }
+  };
+  
+  function parseChunk(rawChunk: string) {
+    if (rawChunk.length > 0) {
+      const dataChunks = rawChunk.split('\n\n');
+      if (dataChunks.length > 0) {
+        let combinedReasoning = '';
+        let combinedText = '';
+        let lastUsage;
+        for (let i = 0; i < dataChunks.length; i++) {
+          const part = dataChunks[i];
+          if (part.length === 0) {
+            continue;
+          }
+          try {
+            const chunk: BedrockChunk = JSON.parse(part);
+            const content = extractChunkContent(chunk, rawChunk);
+            if (content.reasoning) {
+              combinedReasoning += content.reasoning;
+            }
+            if (content.text) {
+              combinedText += content.text;
+            }
+            if (content.usage) {
+              lastUsage = content.usage;
+            }
+          } catch (innerError) {
+            console.log('DataChunk parse error:' + innerError, part);
+            return {
+              reasoning: combinedReasoning,
+              text: rawChunk,
+              usage: lastUsage,
+            };
+          }
+        }
+        return {
+          reasoning: combinedReasoning,
+          text: combinedText,
+          usage: lastUsage,
+        };
+      }
+    }
+    return null;
+  }
+  
+  /**
+   * Helper function to extract content from a BedrockChunk
+   */
+  function extractChunkContent(bedrockChunk: BedrockChunk, rawChunk: string) {
+    const reasoning =
+      bedrockChunk?.contentBlockDelta?.delta?.reasoningContent?.text;
+    let text = bedrockChunk?.contentBlockDelta?.delta?.text;
+    const usage = bedrockChunk?.metadata?.usage;
+    if (bedrockChunk?.detail) {
+      text = rawChunk;
+    }
+    return { reasoning, text, usage };
+  }
+  
+  function getApiPrefix(): string {
+    if (isDev) {
+      return 'http://localhost:8080/api';
+    } else {
+      return getApiUrl() + '/api';
+    }
+  }
+  
+  const isEnableThinking = (): boolean => {
+    return isThinkingModel() && getThinkingEnabled();
+  };
+  
+  const isThinkingModel = (): boolean => {
+    const textModelName = getTextModel().modelName;
+    return BedrockThinkingModels.includes(textModelName);
+  };
+  
+  function isConfigured(): boolean {
+    return getApiPrefix().startsWith('http') && getApiKey().length > 0;
+  }
+  
+  </file>
+  
+  <file name="server/src/main.py">
+  import base64
+  from typing import List
+  import uvicorn
+  from fastapi import FastAPI, HTTPException, Depends, Request as FastAPIRequest
+  from fastapi.responses import StreamingResponse, PlainTextResponse
+  import boto3
+  import json
+  import random
+  import os
+  import re
+  from pydantic import BaseModel
+  from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+  from typing import Annotated
+  from urllib.request import urlopen, Request
+  import time
+  from image_nl_processor import get_native_request_with_ref_image, get_analyse_result
+  import httpx
+  
+  app = FastAPI()
+  security = HTTPBearer()
+  
+  auth_token = ''
+  
+  # System prompts untuk setiap bot (hidden dari user)
+  BOT_SYSTEM_PROMPTS = {
+      1: """Saya adalah Broperty Ai, bot utama yang HANYA merespon komunikasi terkait properti real estate. Jika pertanyaan tidak sesuai dengan topik properti real estate, saya akan secara halus menolaknya.
+  
+  PERAN UTAMA SAYA:
+  1. GERBANG UTAMA - Selalu berkomunikasi dengan user dan internal Broperty, serta menghubungkan kedua pihak tersebut
+  2. IDENTIFIKASI KEBUTUHAN USER - Berusaha untuk selalu mengetahui & memenuhi kebutuhan spesifik user terkait properti
+  3. MENYAMBUNGKAN KE BERBAGAI FITUR YANG ADA - Menghubungkan user ke sub-bot profesional, web view, atau Google Maps
+  
+  FITUR AKTIF YANG TERSEDIA:
+  - Sub Bot Profesional Ecosystem: Agensi Properti Ai, Notaris Ai, Pengacara Ai, Aparatur Pemerintah Ai, Sertifikasi Elektronik Ai, KPR Bank Ai
+  - Web View Integration - Akses konten properti terkini
+  - Google Maps Integration - Lokasi dan navigasi properti
+  
+  Silakan ajukan pertanyaan terkait properti real estate, saya akan menyambungkan Anda ke fitur yang tepat!""",
+  
+      926: """Aku adalah Agensi Properti Ai berpengalaman puluhan tahun dalam membantu pembelian dan penjualan properti klien kami. 
+  
+  KEAHLIAN KHUSUS:
+  - Konsultasi strategi jual beli properti
+  - Analisis harga pasar properti
+  - Negosiasi transaksi properti
+  - Marketing dan promosi properti
+  - Legalitas dasar transaksi properti
+  
+  Saya TIDAK DAPAT menjawab pertanyaan di luar bidang jual beli properti, dokumen legal mendalam, atau masalah hukum kompleks.""",
+  
+      900: """Halo! Aku adalah Notaris Ai. Aku akan memberikan kamu berbagai info terkait apapun itu yang menjadi tugas Notaris.
+  
+  KEAHLIAN KHUSUS:
+  - Pembuatan akta jual beli properti
+  - Pengurusan sertifikat tanah dan bangunan
+  - Legaliasi dokumen properti
+  - Prosedur peralihan hak milik
+  - Pengurusan surat ke BPN
+  
+  Saya TIDAK DAPAT menjawab pertanyaan di luar bidang kenotariatan dan dokumen legal properti.""",
+  
+      901: """Halo! Aku adalah Pengacara Ai. Aku akan memberikan kamu berbagai info berita terkait tugas Pengacara yang berkaitan dengan properti.
+  
+  KEAHLIAN KHUSUS:
+  - Penanganan sengketa properti
+  - Pemeriksaan dokumen transaksi jual beli
+  - Pendampingan hukum di pengadilan untuk kasus properti
+  - Kontrak dan perjanjian properti
+  - Advokasi hak kepemilikan properti
+  
+  Saya TIDAK DAPAT menjawab pertanyaan di luar bidang hukum properti.""",
+  
+      911: """Halo! Aku adalah Aparatur Pemerintah Ai seperti kepala desa, Lurah, Camat, Bupati, Walikota dll yang membantu terkait segala sesuatu yang berhubungan dengan properti.
+  
+  KEAHLIAN KHUSUS:
+  - Pengurusan prosedur kepemilikan properti di pemerintahan
+  - Informasi perizinan bangunan
+  - Proses administrasi tanah
+  - Koordinasi dengan instansi pemerintah terkait properti
+  - Kebijakan pemerintah tentang properti
+  
+  Saya TIDAK DAPAT menjawab pertanyaan di luar bidang administrasi pemerintahan terkait properti.""",
+  
+      920: """Halo! Aku adalah asisten Program Sertifikasi Elektronik Ai yang akan membantu anda dalam pengurusan sertifikat elektronik di BPN.
+  
+  KEAHLIAN KHUSUS:
+  - Pembuatan Sertifikasi Elektronik
+  - Prosedur digitalisasi sertifikat
+  - Teknologi sertifikat elektronik
+  - Integrasi sistem elektronik BPN
+  - Keamanan sertifikat digital
+  
+  Saya TIDAK DAPAT menjawab pertanyaan di luar Program Sertifikasi Elektronik.""",
+  
+      922: """Halo! Aku adalah asisten pengajuan KPR Bank Ai yang bertugas memberikan info dan membantu anda terkait segala sesuatu mengenai KPR berbagai Bank di Indonesia.
+  
+  KEAHLIAN KHUSUS:
+  - Informasi KPR berbagai bank
+  - Syarat dan prosedur pengajuan KPR
+  - Perbandingan suku bunga KPR
+  - Kalkulasi angsuran KPR
+  - Restrukturisasi KPR
+  
+  Saya TIDAK DAPAT menjawab pertanyaan di luar KPR Bank."""
+  }
+  CACHE_DURATION = 120000
+  cache = {
+      "latest_version": "",
+      "last_check": 0
+  }
+  
+  
+  class ImageRequest(BaseModel):
+      prompt: str
+      refImages: List[dict] | None = None
+      modelId: str
+      region: str
+      width: int
+      height: int
+  
+  
+  class ConverseRequest(BaseModel):
+      messages: List[dict] = []
+      modelId: str
+      enableThinking: bool | None = None
+      region: str
+      system: List[dict] | None = None
+      botId: int | None = None
+  
+  
+  class StreamOptions(BaseModel):
+      include_usage: bool = True
+  
+  
+  class GPTRequest(BaseModel):
+      model: str
+      messages: List[dict]
+      stream: bool = True
+      stream_options: StreamOptions
+      botId: int | None = None
+  
+  
+  class ModelsRequest(BaseModel):
+      region: str
+  
+  
+  class TokenRequest(BaseModel):
+      region: str
+  
+  
+  class UpgradeRequest(BaseModel):
+      os: str
+      version: str
+  
+  
+  def get_api_key_from_ssm(use_cache_token: bool):
+      global auth_token
+      if use_cache_token and auth_token != '':
+          return auth_token
+      ssm_client = boto3.client('ssm')
+      api_key_name = os.environ['API_KEY_NAME']
+      try:
+          response = ssm_client.get_parameter(
+              Name=api_key_name,
+              WithDecryption=True
+          )
+          auth_token = response['Parameter']['Value']
+          return auth_token
+      except Exception as error:
+          raise HTTPException(status_code=401,
+                              detail=f"Error: Please create your API Key in Parameter Store, {str(error)}")
+  
+  
+  def verify_api_key(credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
+                     use_cache_token: bool = True):
+      if credentials.credentials != get_api_key_from_ssm(use_cache_token):
+          raise HTTPException(status_code=401, detail="Invalid API Key")
+      return credentials.credentials
+  
+  
+  def verify_and_refresh_token(credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)]):
+      return verify_api_key(credentials, use_cache_token=False)
+  
+  
+  async def create_bedrock_command(request: ConverseRequest) -> tuple[boto3.client, dict]:
+      model_id = request.modelId
+      region = request.region
+  
+      client = boto3.client("bedrock-runtime", region_name=region)
+  
+      max_tokens = 4096
+      if model_id.startswith('meta.llama'):
+          max_tokens = 2048
+      if 'deepseek.r1' in model_id or 'claude-opus-4' in model_id:
+          max_tokens = 32000
+      if 'claude-3-7-sonnet' in model_id or 'claude-sonnet-4' in model_id:
+          max_tokens = 64000
+  
+      for message in request.messages:
+          if message["role"] == "user":
+              for content in message["content"]:
+                  if 'image' in content:
+                      image_bytes = base64.b64decode(content['image']['source']['bytes'])
+                      content['image']['source']['bytes'] = image_bytes
+                  if 'video' in content:
+                      video_bytes = base64.b64decode(content['video']['source']['bytes'])
+                      content['video']['source']['bytes'] = video_bytes
+                  if 'document' in content:
+                      document_bytes = base64.b64decode(content['document']['source']['bytes'])
+                      content['document']['source']['bytes'] = document_bytes
+  
+      command = {
+          "inferenceConfig": {"maxTokens": max_tokens},
+          "messages": request.messages,
+          "modelId": model_id
+      }
+  
+      if request.enableThinking:
+          command['additionalModelRequestFields'] = {
+              "reasoning_config": {
+                  "type": "enabled",
+                  "budget_tokens": 16000
+              }
+          }
+  
+      # Prioritaskan system prompt dari botId jika tersedia
+      if request.botId is not None and request.botId in BOT_SYSTEM_PROMPTS:
+          command["system"] = [{"text": BOT_SYSTEM_PROMPTS[request.botId]}]
+      elif request.system is not None:
+          command["system"] = request.system
+  
+      return client, command
+  
+  
+  @app.post("/api/converse/v3")
+  async def converse_v3(request: ConverseRequest,
+                        _: Annotated[str, Depends(verify_api_key)]):
+      try:
+          client, command = await create_bedrock_command(request)
+  
+          def event_generator():
+              try:
+                  response = client.converse_stream(**command)
+                  for item in response['stream']:
+                      yield json.dumps(item) + '\n\n'
+              except Exception as err:
+                  yield f"Error: {str(err)}"
+  
+          return StreamingResponse(event_generator(), media_type="text/event-stream")
+  
+      except Exception as error:
+          return PlainTextResponse(f"Error: {str(error)}", status_code=500)
+  
+  
+  @app.post("/api/converse/v2")
+  async def converse_v2(request: ConverseRequest,
+                        _: Annotated[str, Depends(verify_api_key)]):
+      try:
+          client, command = await create_bedrock_command(request)
+  
+          def event_generator():
+              try:
+                  response = client.converse_stream(**command)
+                  for item in response['stream']:
+                      yield json.dumps(item)
+              except Exception as err:
+                  yield f"Error: {str(err)}"
+  
+          return StreamingResponse(event_generator(), media_type="text/event-stream")
+  
+      except Exception as error:
+          return PlainTextResponse(f"Error: {str(error)}", status_code=500)
+  
+  
+  @app.post("/api/image")
+  async def gen_image(request: ImageRequest,
+                      _: Annotated[str, Depends(verify_api_key)]):
+      model_id = request.modelId
+      prompt = request.prompt
+      ref_images = request.refImages
+      width = request.width
+      height = request.height
+      region = request.region
+      client = boto3.client("bedrock-runtime",
+                            region_name=region)
+      if (ref_images is None or model_id.startswith("stability.")) and contains_chinese(prompt):
+          prompt = get_english_prompt(client, prompt)
+      return get_image(client, model_id, prompt, ref_images, width, height)
+  
+  
+  @app.post("/api/token")
+  async def get_token(request: TokenRequest,
+                      _: Annotated[str, Depends(verify_api_key)]):
+      region = request.region
+      try:
+          client_role_arn = os.environ.get('CLIENT_ROLE_ARN')
+          if not client_role_arn:
+              return {"error": "CLIENT_ROLE_ARN environment variable not set"}
+          sts_client = boto3.client('sts', region_name=region)
+          session_name = f"SwiftChatClient-{int(time.time())}"
+          response = sts_client.assume_role(
+              RoleArn=client_role_arn,
+              RoleSessionName=session_name,
+              DurationSeconds=3600
+          )
+          credentials = response['Credentials']
+          return {
+              "accessKeyId": credentials['AccessKeyId'],
+              "secretAccessKey": credentials['SecretAccessKey'],
+              "sessionToken": credentials['SessionToken'],
+              "expiration": credentials['Expiration'].isoformat()
+          }
+      except Exception as e:
+          print(f"Error assuming role: {e}")
+          return {"error": str(e)}
+  
+  
+  @app.post("/api/models")
+  async def get_models(request: ModelsRequest,
+                       _: Annotated[str, Depends(verify_api_key)]):
+      region = request.region
+      client = boto3.client("bedrock",
+                            region_name=region)
+  
+      try:
+          response = client.list_foundation_models()
+          if response.get("modelSummaries"):
+              model_names = set()
+              text_model = []
+              image_model = []
+              for model in response["modelSummaries"]:
+                  need_cross_region = "INFERENCE_PROFILE" in model["inferenceTypesSupported"]
+                  if (model["modelLifecycle"]["status"] == "ACTIVE"
+                          and ("ON_DEMAND" in model["inferenceTypesSupported"] or need_cross_region)
+                          and not model["modelId"].endswith("k")
+                          and model["modelName"] not in model_names):
+                      if ("TEXT" in model.get("outputModalities", []) and
+                              model.get("responseStreamingSupported")):
+                          if need_cross_region:
+                              region_prefix = region.split("-")[0]
+                              if region_prefix == 'ap':
+                                  region_prefix = 'apac'
+                              model_id = region_prefix + "." + model["modelId"]
+                          else:
+                              model_id = model["modelId"]
+                          text_model.append({
+                              "modelId": model_id,
+                              "modelName": model["modelName"]
+                          })
+                      elif "IMAGE" in model.get("outputModalities", []):
+                          image_model.append({
+                              "modelId": model["modelId"],
+                              "modelName": model["modelName"]
+                          })
+                      model_names.add(model["modelName"])
+              return {"textModel": text_model, "imageModel": image_model}
+          else:
+              return []
+      except Exception as e:
+          print(f"bedrock error: {e}")
+          return {"error": str(e)}
+  
+  
+  @app.post("/api/upgrade")
+  async def upgrade(request: UpgradeRequest,
+                    _: Annotated[str, Depends(verify_and_refresh_token)]):
+      new_version = get_latest_version()
+      total_number = calculate_version_total(request.version)
+      need_upgrade = False
+      url = ''
+      if total_number > 0:
+          need_upgrade = total_number < calculate_version_total(new_version)
+          if need_upgrade:
+              download_prefix = "https://github.com/aws-samples/swift-chat/releases/download/"
+              if request.os == 'android':
+                  url = download_prefix + new_version + "/SwiftChat.apk"
+              elif request.os == 'mac':
+                  url = download_prefix + new_version + "/SwiftChat.dmg"
+      return {"needUpgrade": need_upgrade, "version": new_version, "url": url}
+  
+  
+  @app.post("/api/openai")
+  async def converse_openai(request: GPTRequest, raw_request: FastAPIRequest):
+      auth_header = raw_request.headers.get("Authorization")
+      if not auth_header or not auth_header.startswith("Bearer "):
+          raise HTTPException(status_code=401, detail="Invalid auth header")
+      openai_api_key = auth_header.split(" ")[1]
+      request_url = raw_request.headers.get("request_url")
+      if not request_url or not request_url.startswith("http"):
+          raise HTTPException(status_code=401, detail="Invalid request url")
+      http_referer = raw_request.headers.get("HTTP-Referer")
+      x_title = raw_request.headers.get("X-Title")
+  
+      # Tambahkan system prompt berdasarkan botId jika tersedia
+      request_data = request.model_dump()
+      if request.botId is not None and request.botId in BOT_SYSTEM_PROMPTS:
+          # Cari dan tambahkan system message jika belum ada
+          has_system_message = any(msg.get("role") == "system" for msg in request_data["messages"])
+          if not has_system_message:
+              request_data["messages"].insert(0, {
+                  "role": "system",
+                  "content": BOT_SYSTEM_PROMPTS[request.botId]
+              })
+  
+      async def event_generator():
+          async with httpx.AsyncClient() as client:
+              try:
+                  async with client.stream(
+                          "POST",
+                          request_url,
+                          json=request_data,
+                          headers={
+                              "Authorization": f"Bearer {openai_api_key}",
+                              "Content-Type": "application/json",
+                              "Accept": "text/event-stream",
+                              **({"HTTP-Referer": http_referer} if http_referer else {}),
+                              **({"X-Title": x_title} if x_title else {})
+                          }
+                  ) as response:
+                      async for line in response.aiter_bytes():
+                          if line:
+                              yield line
+  
+              except Exception as err:
+                  print("error:", err)
+                  yield f"Error: {str(err)}".encode('utf-8')
+  
+      return StreamingResponse(event_generator(), media_type="text/event-stream")
+  
+  
+  def calculate_version_total(version: str) -> int:
+      versions = version.split(".")
+      total_number = 0
+      if len(versions) == 3:
+          total_number = int(versions[0]) * 10000 + int(versions[1]) * 100 + int(versions[2])
+      return total_number
+  
+  
+  def get_latest_version() -> str:
+      timestamp = int(time.time() * 1000)
+      if cache["last_check"] > 0 and timestamp - cache["last_check"] < CACHE_DURATION:
+          return cache["latest_version"]
+      req = Request(
+          f"https://api.github.com/repos/aws-samples/swift-chat/tags",
+          headers={
+              'User-Agent': 'Mozilla/5.0'
+          }
+      )
+      try:
+          with urlopen(req) as response:
+              content = response.read().decode('utf-8')
+              latest_version = json.loads(content)[0]['name']
+              cache["latest_version"] = latest_version
+              cache["last_check"] = timestamp
+              return json.loads(content)[0]['name']
+      except Exception as error:
+          print(f"Error occurred when get github tag: {error}")
+      return '0.0.0'
+  
+  
+  def get_image(client, model_id, prompt, ref_image, width, height):
+      try:
+          seed = random.randint(0, 2147483647)
+          native_request = {}
+          if model_id.startswith("amazon"):
+              if ref_image is None:
+                  native_request = {
+                      "taskType": "TEXT_IMAGE",
+                      "textToImageParams": {"text": prompt},
+                      "imageGenerationConfig": {
+                          "numberOfImages": 1,
+                          "quality": "standard",
+                          "cfgScale": 8.0,
+                          "height": height,
+                          "width": width,
+                          "seed": seed,
+                      },
+                  }
+              else:
+                  native_request = get_native_request_with_ref_image(client, prompt, ref_image, width, height)
+          elif model_id.startswith("stability."):
+              native_request = {
+                  "prompt": prompt,
+                  "output_format": "jpeg",
+                  "mode": "text-to-image",
+              }
+              if ref_image:
+                  native_request['mode'] = 'image-to-image'
+                  native_request['image'] = ref_image[0]['source']['bytes']
+                  native_request['strength'] = 0.5
+              else:
+                  native_request['aspect_ratio'] = "1:1"
+          request = json.dumps(native_request)
+          response = client.invoke_model(modelId=model_id, body=request)
+          model_response = json.loads(response["body"].read())
+          base64_image_data = model_response["images"][0]
+          return {"image": base64_image_data}
+      except Exception as error:
+          error_msg = str(error)
+          print(f"Error occurred: {error_msg}")
+          return {"error": error_msg}
+  
+  
+  def get_english_prompt(client, prompt):
+      global_prompt = f"Translate to English image prompt, output only English translation."
+      return get_analyse_result(client, prompt, global_prompt)
+  
+  
+  def contains_chinese(text):
+      pattern = re.compile(r'[\u4e00-\u9fff]')
+      match = pattern.search(text)
+      return match is not None
+  
+  
+  if __name__ == "__main__":
+      print("Starting webserver...")
+      uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+  
+  </file>
+  
+  <file name="server/src/image_nl_processor.py">
+  import random
+  import json
+  from fastapi import HTTPException
+  
+  
+  def get_native_request_with_ref_image(client, prompt, ref_images, width, height):
+      result = get_analyse_result(client, prompt, get_prompt())
+      try:
+          result_objet = json.loads(result)
+          seed = random.randint(0, 2147483647)
+          if result_objet['target_task_type'] == 'BACKGROUND_REMOVAL':
+              return {
+                  "taskType": "BACKGROUND_REMOVAL",
+                  "backgroundRemovalParams": {
+                      "image": ref_images[0]['source']['bytes'],
+                  },
+              }
+          elif result_objet['target_task_type'] == 'TEXT_IMAGE':
+              return {
+                  "taskType": "TEXT_IMAGE",
+                  "textToImageParams": {"text": result_objet['optimized_prompt']},
+                  "imageGenerationConfig": {
+                      "numberOfImages": 1,
+                      "quality": "standard",
+                      "cfgScale": 6.5,
+                      "height": height,
+                      "width": width,
+                      "seed": seed,
+                  },
+              }
+          elif result_objet['target_task_type'] == 'COLOR_GUIDED_GENERATION':
+              return {
+                  "taskType": "COLOR_GUIDED_GENERATION",
+                  "colorGuidedGenerationParams": {
+                      "text": result_objet['optimized_prompt'],
+                      "negativeText": "bad quality, low res",
+                      "referenceImage": ref_images[0]['source']['bytes'],
+                      "colors": result_objet['colors']
+                  },
+                  "imageGenerationConfig": {
+                      "numberOfImages": 1,
+                      "cfgScale": 6.5,
+                      "height": height,
+                      "width": width
+                  }
+              }
+          elif result_objet['target_task_type'] == 'IMAGE_VARIATION':
+              return {
+                  "taskType": "IMAGE_VARIATION",
+                  "imageVariationParams": {
+                      "text": result_objet['optimized_prompt'],
+                      "negativeText": "bad quality, low resolution, cartoon",
+                      "images": [ref_images[0]['source']['bytes']],
+                      "similarityStrength": 0.7,
+                  },
+                  "imageGenerationConfig": {
+                      "numberOfImages": 1,
+                      "height": height,
+                      "width": width,
+                      "cfgScale": 6.5
+                  }
+              }
+          elif result_objet['target_task_type'] == 'INPAINTING':
+              return {
+                  "taskType": "INPAINTING",
+                  "inPaintingParams": {
+                      "text": result_objet['optimized_prompt'],
+                      "negativeText": "bad quality, low res",
+                      "image": ref_images[0]['source']['bytes'],
+                      "maskPrompt": result_objet['mask_prompt'],
+                  },
+                  "imageGenerationConfig": {
+                      "numberOfImages": 1,
+                      "height": height,
+                      "width": width,
+                      "cfgScale": 6.5
+                  }
+              }
+          elif result_objet['target_task_type'] == 'OUTPAINTING':
+              return {
+                  "taskType": "OUTPAINTING",
+                  "outPaintingParams": {
+                      "text": result_objet['optimized_prompt'],
+                      "negativeText": "bad quality, low res",
+                      "maskPrompt": result_objet['mask_prompt'],
+                      "image": ref_images[0]['source']['bytes'],
+                      "outPaintingMode": "PRECISE"
+                  },
+                  "imageGenerationConfig": {
+                      "numberOfImages": 1,
+                      "cfgScale": 6.5,
+                      "seed": seed
+                  }
+              }
+          else:
+              raise HTTPException(status_code=400, detail=f"Error: ${result_objet['error']}")
+      except Exception as error:
+          raise HTTPException(status_code=400, detail=f"Error: image analyse failed, {error}")
+  
+  
+  def get_analyse_result(client, prompt, global_prompt):
+      try:
+          messages = [
+              {
+                  "role": "user",
+                  "content": [
+                      {
+                          "text": prompt
+                      }
+                  ]
+              }
+          ]
+          command = {
+              "inferenceConfig": {"maxTokens": 512},
+              "messages": messages,
+              "system": [
+                  {"text": global_prompt}
+              ],
+              "modelId": 'us.amazon.nova-lite-v1:0'
+          }
+          response = client.converse_stream(**command)
+          complete_res = ''
+          for item in response['stream']:
+              if "contentBlockDelta" in item:
+                  text = item["contentBlockDelta"].get("delta", {}).get("text", "")
+                  if text:
+                      complete_res += text
+          return complete_res
+      except Exception as error:
+          print(f"Error analyse by nova-lite: {error}")
+          raise HTTPException(status_code=400, detail=f"Error: analyse failed, {error}")
+  
+  
+  def get_prompt():
+      return """You are an AI assistant that helps users analyze image tasks and generate structured JSON responses. Your role is to:
+  
+  1. Analyze user's input prompt
+  2. Determine the most appropriate image task type from these 6 types:
+  
+      - TEXT_IMAGE: Generate completely new image based on text prompt and giving image
+      - COLOR_GUIDED_GENERATION: Generate image with specific color palette/style
+      - IMAGE_VARIATION: Create variations of entire input image
+      - INPAINTING: Remove, replace or modify specific objects/areas while keeping rest of image intact (e.g. remove person/object, replace item, modify part of image)
+      - OUTPAINTING: Modify image background areas
+      - BACKGROUND_REMOVAL: Remove entire background, leaving only main subject with transparency
+  
+      Quick decision strategy - check these 6 rules in sequence:
+  
+          1. Only classify as BACKGROUND_REMOVAL if user specifically mentions "remove background" or "make background transparent"
+  
+          2. If user mentions image variations or similar style/alternatives, it must be IMAGE_VARIATION
+  
+          3. If user wants to generate content based on specific colors/palette, it must be COLOR_GUIDED_GENERATION
+  
+          4. Only classify as OUTPAINTING if user specifically wants to replace/extend background areas
+  
+          5. If user wants to replace, modify or remove specific objects/areas within the image, it must be INPAINTING
+  
+          6. Only classify as TEXT_IMAGE if user wants to create new image following reference image layout
+  
+          Check these rules in order until a match is found. If no rules match using None instead.
+  
+  3. Generate a JSON response with:
+      - target_task_type: The matched task type, or "None" if no match
+      - error: If no match, return "The current operation on the image is not supported. You can try these operations: Generate image, Generate variation, Remove Object, Replace Object, Replace Background, Remove Background."
+      - optimized_prompt: Optimize the user's input prompt in English based on the detected task type
+      - colors: Only For COLOR_GUIDED_GENERATION, array of 1-4 hex color codes (e.g. ["#ff8080"])
+      - mask_prompt: Only For INPAINTING and OUTPAINTING, the prompt is the mentioned subject, e.g.
+          1. for INPAINTING, if user prompt: 'Modernize the windows of the house' the mask_prompt should be "windows"
+          2. for OUTPAINTING, if use prompt: 'Change the bowl's background to a dining table' the mask_prompt should be "bowl"
+          mask_prompt can't be "background", if user do not provide the mask_prompt, the mask_prompt should be "main subject" as default.
+  
+  Example JSON response:
+  {
+    "target_task_type": "INPAINTING",
+    "optimized_prompt": "replace the red car with a blue sports car",
+    "mask_prompt": "windows",
+    "colors":["#ff8080", "#ffb280"],
+    "error": ""
+  }
+  
+  Out put rules:
+  1. Only include relevant fields based on the matched task type. Analyze the user's intent carefully to determine the most appropriate task type and generate optimal outputs.
+  2. Output content must start with "{" and end with "}". DO NOT use "```json" markup/format for any output responses.
+  3. DO NOT include any explanatory text or markdown in your response. Your entire response must be a single, valid JSON object.
+  """
+  
+  </file>
+  </tool>
+</message>
+
+# Tools:
+
+# Response:
+
+ChatResponse { aiMessage = AiMessage { text = "Looking through the provided code files, I found several instances of console.log, print statements, and debug logging that indicate debugging efforts:
+
+## React Native TypeScript Files
+
+### CustomAddFileComponent.tsx
+- **Line 168**: `console.info(err);` - Error logging in try-catch block when handling file selection
+
+### CustomMessageComponent.tsx
+- **Line 124**: `console.log(error);` - Error logging when opening files with FileViewer
+- **Line 128**: `console.log(res)` - Success response logging for Share.open
+- **Line 129**: `console.log(err)` - Error logging for Share.open
+
+### FileUtils.ts
+- **Line 19**: `console.info('Error saving image:', error);` - Error logging for image saving
+- **Line 45**: `console.warn('Error saving file:', error);` - Warning for file saving errors
+- **Line 54**: `console.warn('Error reading image file:', fileUrl, error);` - Warning for file reading errors
+- **Line 63**: `console.warn('Error reading text file:', fileUrl, error);` - Warning for text file reading errors
+
+### ollama-api.ts
+- **Line 83**: `console.log('Error reading stream:', readError);` - Stream reading error logging
+- **Line 93**: `console.log(error);` - General error logging
+- **Line 168**: `console.log(`HTTP error! status: ${response.status}`);` - HTTP status error logging
+- **Line 175**: `console.log('Error fetching models:', error);` - Model fetching error logging
+
+### ChatScreen.tsx
+- **Line 471**: `handleVoiceChatTranscript('ASSISTANT', message);` followed by `console.log('Voice chat error:', message);` on line 475 - Voice chat error logging
+
+### open-api.ts
+- **Line 95**: `console.log('Error reading stream:', readError);` - Stream reading error logging
+- **Line 105**: `console.log(error);` - General error logging
+- **Line 181**: `console.log(`HTTP error! status: ${response.status}`);` - HTTP status error logging
+- **Line 190**: `console.log('Error fetching models:', error);` - Model fetching error logging
+
+### BedrockMessageConvertor.ts
+- **Line 102**: `console.warn(`Error reading text content from ${fileName}:`, error);` - Warning for text content reading errors
+- **Line 121**: `console.warn(`Error processing file ${file.fileName}:`, error);` - Warning for file processing errors
+
+### bedrock-api.ts
+- **Line 150**: `console.log('Error reading stream:', readError);` - Stream reading error logging
+- **Line 175**: `console.log(errMsg);` - Error message logging for image generation
+- **Line 203**: `console.log(`HTTP error! status: ${response.status}`);` - HTTP status error logging
+- **Line 208**: `console.log('Error fetching models:', error);` - Model fetching error logging
+- **Line 222**: `console.log('Error fetching token:', error);` - Token fetching error logging
+- **Line 239**: `console.log('Error fetching upgrade info:', error);` - Upgrade info error logging
+- **Line 294**: `console.log(data.error);` - Image generation error logging
+- **Line 313**: `console.log(errMsg);` - Image generation error logging
+- **Line 341**: `console.log('DataChunk parse error:' + innerError, part);` - JSON parsing error logging
+
+## Server Python Files
+
+### main.py
+- **Line 264**: `print(f"bedrock error: {e}")` - Bedrock error logging
+- **Line 294**: `print("error:", err)` - General error logging
+- **Line 318**: `print(f"Error occurred when get github tag: {error}")` - GitHub API error logging
+- **Line 363**: `print(f"Error occurred: {error_msg}")` - Image generation error logging
+
+### image_nl_processor.py
+- **Line 115**: `print(f"Error analyse by nova-lite: {error}")` - Nova-lite analysis error logging
+
+These logging statements appear to be primarily for:
+1. **Error handling and debugging** - Most console.log/print statements are in catch blocks
+2. **API response logging** - Logging responses from external services
+3. **File operation debugging** - Logging file read/write operations
+4. **Stream processing debugging** - Logging stream reading errors
+5. **Service integration debugging** - Logging errors from various AWS services and APIs
+
+The logging indicates active debugging efforts for network requests, file operations, stream processing, and integration with external services like AWS Bedrock, OpenAI, and file system operations." reasoningContent = null toolExecutionRequests = [] }, metadata = OpenAiChatResponseMetadata{id='chatcmpl-b5041e08-f164-4320-a324-4e6ee2743d5c', modelName='claude-sonnet-4-20250514', tokenUsage=OpenAiTokenUsage { inputTokenCount = 40313, inputTokensDetails = OpenAiTokenUsage.InputTokensDetails { cachedTokens = 0 }, outputTokenCount = 1121, outputTokensDetails = OpenAiTokenUsage.OutputTokensDetails { reasoningTokens = 0 }, totalTokenCount = 41434 }, finishReason=STOP, created=1756791255, serviceTier='null', systemFingerprint='null'} }

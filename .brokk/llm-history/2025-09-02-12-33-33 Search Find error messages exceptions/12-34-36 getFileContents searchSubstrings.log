@@ -1,0 +1,597 @@
+# Request to claude-4-sonnet:
+
+<message type=system>
+  You are the Search Agent.
+  Your job:
+    - find and organize code relevant to the user's question or implementation goal,
+    - aggressively curate the Workspace so a Code Agent can implement next without confusion,
+    - never write code yourself.
+  
+  Critical rules:
+    1) At EVERY TURN, drop irrelevant fragments from the Workspace.
+       Prefer summaries over full files. Replace long fragments with concise summaries of content related to the goal first,
+       then drop the originals.
+    2) Use search and inspection tools to discover relevant code, including classes/methods/usages/call graphs.
+    3) The symbol-based tools only have visibility into the following file types: TYPESCRIPT
+       Use text-based tools if you need to search other file types.
+    4) Group related lookups into a single call when possible.
+    5) Make multiple tool calls at once when searching for different types of code.
+  
+  Output discipline:
+    - Think before calling tools.
+    - If you already know what to add, use Workspace tools directly; do not search redundantly.
+</message>
+
+<message type=user>
+  <workspace>
+  <workspace_editable>
+  Here are the EDITABLE files and code fragments in your Workspace.
+  This is *the only context in the Workspace to which you should make changes*.
+  
+  *Trust this message as the true contents of these files!*
+  Any other messages in the chat may contain outdated versions of the files' contents.
+  
+  <file path="react-native/src/App.tsx" fragmentid="1">
+  import 'react-native-gesture-handler';
+  import * as React from 'react';
+  import { NavigationContainer } from '@react-navigation/native';
+  import {
+    createDrawerNavigator,
+    DrawerContentComponentProps,
+  } from '@react-navigation/drawer';
+  import CustomDrawerContent from './history/CustomDrawerContent.tsx';
+  import { Dimensions, Keyboard, StatusBar } from 'react-native';
+  import ChatScreen from './chat/ChatScreen.tsx';
+  import { RouteParamList, DrawerParamList } from './types/RouteTypes.ts';
+  import { AppProvider, useAppContext } from './history/AppProvider.tsx';
+  import Toast from 'react-native-toast-message';
+  import TokenUsageScreen from './settings/TokenUsageScreen.tsx';
+  import { createNativeStackNavigator } from '@react-navigation/native-stack';
+  import PromptScreen from './prompt/PromptScreen.tsx';
+  import PresetPromptList from './prompt/PresetPromptList.tsx';
+  import WebViewScreen from './webview/WebViewScreen.tsx';
+  import MapsScreen from './maps/MapsScreen.tsx';
+  import { isAndroid, isMacCatalyst } from './utils/PlatformUtils';
+  import { ThemeProvider, useTheme } from './theme';
+  
+  export const isMac = isMacCatalyst;
+  const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+  const minWidth = screenWidth > screenHeight ? screenHeight : screenWidth;
+  const width = minWidth > 434 ? 300 : minWidth * 0.83;
+  
+  const Drawer = createDrawerNavigator<DrawerParamList>();
+  const Stack = createNativeStackNavigator();
+  
+  const renderCustomDrawerContent = (
+    props: React.JSX.IntrinsicAttributes & DrawerContentComponentProps
+  ) => <CustomDrawerContent {...props} />;
+  
+  const DrawerNavigator = () => {
+    const { drawerType } = useAppContext();
+    const { colors, isDark } = useTheme();
+    return (
+      <Drawer.Navigator
+        initialRouteName="Bedrock"
+        screenOptions={{
+          overlayColor: isDark ? 'rgba(255, 255, 255, 0.1)' : undefined,
+          headerTintColor: colors.text,
+          headerTitleAlign: 'center',
+          drawerStyle: {
+            width: width,
+            backgroundColor: colors.background,
+            borderRightWidth: isMac ? 1 : isAndroid ? 0.3 : 0,
+            borderRightColor: colors.border,
+          },
+          headerStyle: {
+            height: isMac ? 66 : undefined,
+            backgroundColor: colors.background,
+            borderBottomWidth: isDark ? 0.3 : undefined,
+            borderBottomColor: isDark ? colors.chatScreenSplit : undefined,
+          },
+          drawerType: isMac ? drawerType : 'slide',
+        }}
+        drawerContent={renderCustomDrawerContent}>
+        <Drawer.Screen name="Bedrock" component={ChatScreen} />
+      </Drawer.Navigator>
+    );
+  };
+  const AppNavigator = () => {
+    const { colors } = useTheme();
+    return (
+      <Stack.Navigator initialRouteName="Drawer" screenOptions={{}}>
+        <Stack.Screen
+          name="Drawer"
+          component={DrawerNavigator}
+          options={{ headerShown: false, headerLargeTitleShadowVisible: false }}
+        />
+        <Stack.Screen
+          name="TokenUsage"
+          component={TokenUsageScreen}
+          options={{
+            title: 'Usage',
+            contentStyle: {
+              height: isMac ? 66 : undefined,
+              backgroundColor: colors.background,
+            },
+            headerTitleAlign: 'center',
+            headerStyle: { backgroundColor: colors.background },
+            headerTintColor: colors.text,
+          }}
+        />
+        <Stack.Screen
+          name="Prompt"
+          component={PromptScreen}
+          options={{
+            title: 'System Prompt',
+            contentStyle: {
+              height: isMac ? 66 : undefined,
+              backgroundColor: colors.background,
+            },
+            headerTitleAlign: 'center',
+            headerStyle: { backgroundColor: colors.background },
+            headerTintColor: colors.text,
+          }}
+        />
+            <Stack.Screen
+         name="PresetPrompts"
+         component={PresetPromptList}
+         options={{
+           title: 'MENU',         
+            contentStyle: {
+            height: isMac ? 66 : undefined,
+            backgroundColor: colors.background,
+          },
+           headerTitleAlign: 'center',
+           headerStyle: { backgroundColor: colors.background },
+           headerTintColor: colors.text,
+         }}
+        />
+        <Stack.Screen
+          name="WebView"
+          component={WebViewScreen}
+          options={{
+            title: 'Web Browser',
+            contentStyle: {
+              height: isMac ? 66 : undefined,
+              backgroundColor: colors.background,
+            },
+            headerTitleAlign: 'center',
+            headerStyle: { backgroundColor: colors.background },
+            headerTintColor: colors.text,
+          }}
+        />
+        <Stack.Screen
+          name="Maps"
+          component={MapsScreen}
+          options={{
+            title: 'Peta Properti',
+            contentStyle: {
+              height: isMac ? 66 : undefined,
+              backgroundColor: colors.background,
+            },
+            headerTitleAlign: 'center',
+            headerStyle: { backgroundColor: colors.background },
+            headerTintColor: colors.text,
+          }}
+        />
+      </Stack.Navigator>
+    );
+  };
+  
+  const AppWithTheme = () => {
+    const { colors, isDark } = useTheme();
+    return (
+      <>
+        <StatusBar
+          barStyle={isDark ? 'light-content' : 'dark-content'}
+          backgroundColor={colors.background}
+        />
+        <NavigationContainer
+          onStateChange={_ => {
+            Keyboard.dismiss();
+          }}>
+          <AppNavigator />
+        </NavigationContainer>
+      </>
+    );
+  };
+  
+  const App = () => {
+    return (
+      <>
+        <ThemeProvider>
+          <AppProvider>
+            <AppWithTheme />
+          </AppProvider>
+        </ThemeProvider>
+        <Toast />
+      </>
+    );
+  };
+  
+  export default App;
+  
+  </file>
+  </workspace_editable>
+  </workspace>
+</message>
+
+<message type=ai>
+  Thank you for providing the Workspace contents.
+</message>
+
+<message type=user>
+  <related_classes>
+  These MAY be relevant. They are NOT in the Workspace yet.
+  Add summaries or sources if needed; otherwise ignore them.
+  
+  No summaries found for: 
+  </related_classes>
+</message>
+
+<message type=ai>
+  Acknowledged. I will explicitly add only what is relevant.
+</message>
+
+<message type=ai>
+  
+  # Planning
+  I need to understand what program needs to be debugged. Since no specific program or codebase has been provided in the workspace, I should first explore what's available in the current project.
+  
+  Let me start by searching for any programs or code files that might need debugging.
+  Tool call(s): `callSearchAgent`
+</message>
+
+<message type=user>
+  Search Agent engaged: Find all main programs, executables, or entry points in this project that might need debugging
+  Performing initial project scan
+  
+  Scan complete; added recommendations to the Workspace.
+</message>
+
+<message type=ai>
+  
+  # Planning
+  I need to explore the project structure to find all main programs, executables, or entry points. Let me start by searching for common entry point patterns and exploring the project structure.
+  ```🔍 Searching for filenames
+  patterns:
+    - .*main\..*
+    - .*index\..*
+    - .*app\..*
+    - .*App\..*
+    - package\.json
+    - .*\.config\..*
+  reasoning: Looking for common entry point files like main.*, index.*, App.*, package.json, and config files that might indicate project structure and entry points
+  ```
+  Matching filenames: react-native/jest.config.js, react-native/src/theme/index.ts, react-native/src/App.tsx, react-native/index.js, react-native/ios/SwiftChat/main.m, server/src/main.py, react-native/android/app/src/main/assets/index.android.bundle, react-native/babel.config.js, react-native/app.json, react-native/metro.config.js, react-native/package.json
+  ```🔍 Searching for substrings
+  patterns:
+    - "main":\s*"[^"]*"
+    - "scripts":\s*\{
+    - public static void main
+    - if __name__ == "__main__"
+    - def main\(
+    - function main\(
+    - export default
+    - module\.exports
+  reasoning: Searching for entry point patterns in various languages - Node.js main field, scripts in package.json, Java main method, Python main, JavaScript/TypeScript exports
+  ```
+  Files with content matching patterns: react-native/.eslintrc.js, react-native/src/chat/component/ImageProgressBar.tsx, react-native/.prettierrc.js, server/src/main.py, react-native/src/App.tsx, react-native/src/chat/component/markdown/Markdown.tsx, react-native/src/chat/component/markdown/Parser.tsx, react-native/src/settings/SettingsScreen.tsx, react-native/src/chat/component/CustomSendComponent.tsx, react-native/src/history/CustomDrawerContent.tsx, react-native/src/chat/component/AudioWaveformComponent.tsx, react-native/src/settings/DropdownComponent.tsx, react-native/src/settings/TabButton.tsx, react-native/src/prompt/PromptScreen.tsx, react-native/src/chat/component/markdown/useMarkdown.ts, react-native/jest.config.js, react-native/src/prompt/PresetPromptList.tsx, react-native/src/chat/component/markdown/CustomCodeHighlighter.tsx, react-native/src/chat/component/ImageSpinner.tsx, react-native/babel.config.js, react-native/metro.config.js, react-native/src/chat/component/CustomMessageComponent.tsx, react-native/src/settings/TokenUsageScreen.tsx, react-native/src/chat/component/HeaderTitle.tsx, react-native/src/chat/ChatScreen.tsx, react-native/package.json, react-native/src/settings/CustomTextInput.tsx
+</message>
+
+<message type=ai>
+  
+  # Planning
+  I can see there are multiple programs in this project. Let me examine the main entry points to provide a comprehensive answer.
+  ```❓ 
+  filePaths:
+    - server/src/*.py
+  ```
+  Added dynamic file summaries for: [server/src/image_nl_processor.py, server/src/main.py]
+  ```🔍 Getting file contents
+  filenames:
+    - react-native/package.json
+    - react-native/index.js
+    - server/src/main.py
+    - react-native/ios/SwiftChat/main.m
+  ```
+  Based on the provided files, here are all the main programs, executables, or entry points in this project that might need debugging:
+  
+  ## Main Entry Points
+  
+  ### 1. React Native Application Entry Point
+  **File:** `react-native/index.js`
+  - **Main component:** `App` (imported from `./src/App`)
+  - **Registration:** `AppRegistry.registerComponent('BropertyAi', () => App)`
+  - This is the primary entry point for the React Native application
+  
+  ### 2. Python FastAPI Server Entry Point
+  **File:** `server/src/main.py`
+  - **Main function:** `if __name__ == "__main__":` block at the end
+  - **Server startup:** `uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))`
+  - This is the main server application that handles API requests
+  
+  ### 3. iOS Native Entry Point
+  **File:** `react-native/ios/SwiftChat/main.m`
+  - **Function:** `int main(int argc, char *argv[])`
+  - **Delegates to:** `AppDelegate` class via `UIApplicationMain`
+  - This is the iOS-specific native entry point
+  
+  ## Package.json Scripts (Executable Commands)
+  
+  **File:** `react-native/package.json`
+  
+  ### Development Scripts:
+  - `"start": "react-native start"` - Metro bundler entry point
+  - `"android": "react-native run-android"` - Android app launcher
+  - `"ios": "react-native run-ios"` - iOS app launcher
+  
+  ### Build Scripts:
+  - `"build:ios": "cd ios && xcodebuild -workspace BropertyAi.xcworkspace -scheme BropertyAi..."` - iOS build process
+  
+  ### Testing/Quality Scripts:
+  - `"test": "jest"` - Test runner entry point
+  - `"lint": "npx eslint ."` - Linting process
+  - `"format": "npx prettier --check '*.{js,ts}'"` - Code formatting check
+  
+  ## Key Application Details
+  
+  ### React Native App:
+  - **App Name:** "BropertyAi" 
+  - **Version:** "2.4.0"
+  - **Main App Component:** Located at `./src/App` (referenced in index.js)
+  
+  ### FastAPI Server:
+  - **Port:** Configurable via PORT environment variable (default: 8080)
+  - **Host:** "0.0.0.0" (all interfaces)
+  - **Framework:** FastAPI with uvicorn server
+  - **Main app instance:** `app = FastAPI()`
+  
+  These entry points represent the primary locations where debugging efforts should be focused, as they control the application startup and execution flow.
+</message>
+
+<message type=ai>
+  
+  # Planning
+  # Answer
+  # Main Programs, Executables, and Entry Points for Debugging
+  
+  This project contains multiple main programs and entry points across different platforms and technologies. Here are all the key entry points that might need debugging:
+  
+  ## 1. React Native Application Entry Points
+  
+  ### Primary JavaScript Entry Point
+  - **File:** `react-native/index.js`
+  - **Purpose:** Main React Native application entry point
+  - **Key Code:** `AppRegistry.registerComponent('BropertyAi', () => App)`
+  - **Imports:** App component from `./src/App`
+  
+  ### Main App Component
+  - **File:** `react-native/src/App.tsx` (already in workspace)
+  - **Purpose:** Root React component with navigation, theming, and providers
+  - **Key Features:**
+    - Navigation setup with drawer and stack navigators
+    - Theme provider integration
+    - App context provider
+    - Toast notifications
+    - Multiple screen components (ChatScreen, TokenUsageScreen, PromptScreen, etc.)
+  
+  ### iOS Native Entry Point
+  - **File:** `react-native/ios/SwiftChat/main.m`
+  - **Purpose:** iOS-specific native application entry point
+  - **Key Code:** `int main(int argc, char *argv[])` function
+  - **Delegates to:** AppDelegate class via UIApplicationMain
+  
+  ## 2. Python FastAPI Server Entry Point
+  
+  ### Main Server Application
+  - **File:** `server/src/main.py`
+  - **Purpose:** Backend API server using FastAPI
+  - **Key Code:** `if __name__ == "__main__":` block
+  - **Server Startup:** `uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))`
+  - **Configuration:** Configurable port via PORT environment variable (default: 8080)
+  
+  ### Image Processing Module
+  - **File:** `server/src/image_nl_processor.py`
+  - **Purpose:** Supporting module for image processing functionality
+  - **Note:** May contain additional entry points or main functions for image processing tasks
+  
+  ## 3. Development and Build Entry Points
+  
+  ### Package.json Scripts (react-native/package.json)
+  These are executable commands that serve as entry points for various development tasks:
+  
+  #### Development Entry Points:
+  - `"start": "react-native start"` - Metro bundler for development
+  - `"android": "react-native run-android"` - Android app launcher
+  - `"ios": "react-native run-ios"` - iOS app launcher
+  
+  #### Build Entry Points:
+  - `"build:ios": "cd ios && xcodebuild -workspace BropertyAi.xcworkspace..."` - iOS production build
+  
+  #### Testing/Quality Entry Points:
+  - `"test": "jest"` - Jest test runner
+  - `"lint": "npx eslint ."` - ESLint code linting
+  - `"format": "npx prettier --check '*.{js,ts}'"` - Prettier code formatting check
+  
+  ## 4. Configuration Entry Points
+  
+  These configuration files can affect application behavior and may need debugging:
+  
+  - **react-native/jest.config.js** - Jest testing configuration
+  - **react-native/babel.config.js** - Babel transpilation configuration  
+  - **react-native/metro.config.js** - Metro bundler configuration
+  - **react-native/.eslintrc.js** - ESLint linting configuration
+  
+  ## Application Details
+  
+  - **App Name:** "BropertyAi"
+  - **Version:** "2.4.0" 
+  - **Architecture:** React Native frontend with FastAPI Python backend
+  - **Platforms:** iOS and Android mobile apps
+  
+  ## Debugging Priority
+  
+  For debugging purposes, focus on these primary entry points in order of importance:
+  
+  1. **React Native App (`react-native/src/App.tsx`)** - Main UI and navigation logic
+  2. **FastAPI Server (`server/src/main.py`)** - Backend API and business logic
+  3. **Platform-specific entry points** (`react-native/index.js`, `react-native/ios/SwiftChat/main.m`) - Platform initialization
+  4. **Development scripts** (package.json scripts) - Build and development issues
+  
+  Each of these entry points controls different aspects of the application lifecycle and would be key locations for debugging application startup, runtime issues, or build problems.
+</message>
+
+<message type=ai>
+  
+  # Planning
+  I need to understand what specific debugging issue needs to be addressed. The goal is simply "debug this program" but there's no indication of what problem exists. Let me search for common debugging indicators like error messages, TODO comments, or failing tests.
+  Tool call(s): `callSearchAgent`, `callSearchAgent`, `callSearchAgent`
+</message>
+
+<message type=user>
+  What tools do you want to use next?
+</message>
+
+<message type=ai>
+  
+  Tool calls:
+  searchSubstrings({"patterns": ["TODO","FIXME","BUG","HACK","XXX","TEMP","TEMPORARY"], "reasoning": "Searching for common debugging indicators like TODO comments, FIXME comments, bug markers, and temporary code that might indicate known issues"})
+  searchSubstrings({"patterns": ["Error:","Exception:","throw new","catch\\s*\\(","try\\s*\\{","console\\.error","console\\.warn","print\\(.*error","raise\\s+\\w+Error"], "reasoning": "Searching for error handling patterns, exception throwing, console errors, and Python exceptions that might indicate debugging issues"})
+  searchSubstrings({"patterns": ["it\\.skip","test\\.skip","describe\\.skip","FAIL","failed","failing","broken","not working","doesn't work"], "reasoning": "Searching for skipped tests, test failures, and comments indicating broken functionality"})
+</message>
+
+<message type=tool_execution_result>
+  searchSubstrings -> Files with content matching patterns: react-native/android/gradlew.bat, react-native/ios/SwiftChat.xcodeproj/project.pbxproj, react-native/ios/SwiftChatTests/SwiftChatTests.m, react-native/ios/SwiftChat/AppDelegate.mm
+</message>
+
+<message type=tool_execution_result>
+  searchSubstrings -> Files with content matching patterns: react-native/ios/Services/ConversationManager.swift, react-native/src/history/AppProvider.tsx, server/src/main.py, react-native/src/api/ollama-api.ts, react-native/ios/Services/NovaSonicService.swift, react-native/src/theme/ThemeContext.tsx, server/src/image_nl_processor.py, react-native/src/api/bedrock-api.ts, react-native/src/chat/component/PromptListComponent.tsx, react-native/src/chat/component/CustomAddFileComponent.tsx, react-native/ios/Services/AudioManager.swift, react-native/src/chat/util/FileUtils.ts, react-native/src/chat/component/CustomFileListComponent.tsx, react-native/src/chat/component/CustomMessageComponent.tsx, react-native/src/api/open-api.ts, react-native/src/chat/util/BedrockMessageConvertor.ts, react-native/src/chat/service/VoiceChatService.ts, react-native/android/app/src/main/res/drawable/rn_edit_text_material.xml
+</message>
+
+<message type=tool_execution_result>
+  searchSubstrings -> Files with content matching patterns: react-native/ios/Services/AudioManager.swift, react-native/src/chat/component/CustomFileListComponent.tsx, server/src/image_nl_processor.py, react-native/src/chat/service/VoiceChatService.ts
+</message>
+
+<message type=user>
+  What tools do you want to use next?
+</message>
+
+<message type=ai>
+  
+  Tool calls:
+  getFileContents({"filenames": ["react-native/ios/Services/ConversationManager.swift","react-native/src/api/bedrock-api.ts","react-native/src/chat/service/VoiceChatService.ts","server/src/image_nl_processor.py"]})
+  searchSubstrings({"patterns": ["\\bERROR\\b","\\bWARNING\\b","\\bFAILED\\b","debug","Debug","DEBUG","log\\.","console\\.log","print\\(","NSLog"], "reasoning": "Searching for debug statements, logging calls, error messages, and debugging-related code that might indicate areas needing debugging attention"})
+  dropWorkspaceFragments({"fragmentIds": ["5"]})
+</message>
+
+<message type=tool_execution_result>
+  dropWorkspaceFragments -> Dropped 1 fragment(s): [FileSummaries(['server/src/image_nl_processor.py', 'server/src/main.py'])]
+</message>
+
+<message type=tool_execution_result>
+  searchSubstrings -> Files with content matching patterns: server/src/main.py, react-native/ios/Podfile.lock, react-native/ios/SwiftChat.xcodeproj/xcshareddata/xcschemes/SwiftChat.xcscheme, react-native/package-lock.json, react-native/ios/SwiftChat.xcworkspace/xcshareddata/swiftpm/Package.resolved, react-native/android/gradlew.bat, react-native/src/chat/component/CustomFileListComponent.tsx, react-native/src/history/CustomDrawerContent.tsx, react-native/src/api/open-api.ts, react-native/ios/Services/ConversationManager.swift, react-native/src/api/ollama-api.ts, react-native/android/app/build.gradle, react-native/ios/Services/NovaSonicService.swift, server/src/image_nl_processor.py, react-native/src/api/bedrock-api.ts, react-native/src/chat/component/PromptListComponent.tsx, react-native/ios/SwiftChat/AppDelegate.mm, react-native/.gitignore, react-native/android/gradlew, react-native/ios/Services/AudioManager.swift, react-native/src/chat/component/CustomMessageComponent.tsx, react-native/android/gradle.properties, react-native/src/chat/ChatScreen.tsx, react-native/ios/SwiftChat.xcodeproj/project.pbxproj, react-native/ios/SwiftChatTests/SwiftChatTests.m
+</message>
+
+<message type=tool_execution_result>
+  getFileContents -> Based on the provided code, I found several debugging-related items:
+  
+  ## Error Messages & Exception Handling
+  
+  ### ConversationManager.swift
+  - **Error logging with print statements**:
+    - `print("❌ Start Conversation error", error)` (line 53)
+    - `print("❌ End Conversation error", error)` (line 74)
+    - `print("❌ Error playing audio in AudioManager: \(error)")` (line 83)
+  
+  - **Error handling patterns**:
+    - NSError creation for uninitialized service: `NSError(domain: "ConversationError", code: -1, userInfo: [NSLocalizedDescriptionKey: "Service not initialized"])`
+    - Multiple try-catch blocks with error propagation
+  
+  ### bedrock-api.ts
+  - **Console logging for debugging**:
+    - `console.log('Error reading stream:', readError)` (line 130)
+    - `console.log(errorInfo)` (line 155)
+    - `console.log(`HTTP error! status: ${response.status}`)` (line 190, 218)
+    - `console.log('Error fetching models:', error)` (line 198)
+    - `console.log('Error fetching token:', error)` (line 225)
+    - `console.log('Error fetching upgrade info:', error)` (line 250)
+    - `console.log(errMsg)` (line 283)
+    - `console.log('DataChunk parse error:' + innerError, part)` (line 329)
+  
+  - **Error handling patterns**:
+    - Timeout handling with `setTimeout(() => controller.abort(), 60000)`
+    - Network error detection and transformation
+    - Stream reading error recovery
+  
+  ### VoiceChatService.ts
+  - **Comprehensive error message mapping** (lines 50-76):
+    ```typescript
+    let errorMsg = event.message ?? '';
+    if (errorMsg.includes('The network connection was lost')) {
+      errorMsg = '\n**The network connection was lost**';
+    } else if (errorMsg.includes('The request timed out')) {
+      errorMsg = '\n**The request timed out**';
+    } else if (errorMsg.includes('messages cannot be null or empty')) {
+      errorMsg = '\n**Messages cannot be null or empty**';
+    }
+    // ... more error mappings
+    ```
+  
+  - **Error callback patterns** throughout the class for initialization, conversation management, and credential validation
+  
+  ### image_nl_processor.py
+  - **Exception handling with HTTPException**:
+    - `raise HTTPException(status_code=400, detail=f"Error: ${result_objet['error']}")` (line 86)
+    - `raise HTTPException(status_code=400, detail=f"Error: image analyse failed, {error}")` (line 88)
+    - `raise HTTPException(status_code=400, detail=f"Error: analyse failed, {error}")` (line 107)
+  
+  - **Debug print statement**:
+    - `print(f"Error analyse by nova-lite: {error}")` (line 106)
+  
+  ## Key Debugging Issues Found
+  
+  1. **Inconsistent error logging**: Mix of `console.log` and `print` statements across different platforms
+  2. **Network error handling**: Multiple timeout and connection error scenarios handled
+  3. **Stream processing errors**: Error recovery in stream reading operations
+  4. **Credential validation**: AWS token validation and refresh error handling
+  5. **Audio processing errors**: Error handling in audio playback and recording operations
+  6. **HTTP error status handling**: Various HTTP status code error scenarios
+  
+  These debugging elements indicate areas where the application may encounter issues with network connectivity, credential management, audio processing, and stream handling.
+</message>
+
+<message type=user>
+  <goal>
+  Find error messages, exceptions, TODO comments, FIXME comments, or failing tests that indicate debugging issues
+  </goal>
+  
+  Decide the next tool action(s) to make progress toward answering the question and preparing the Workspace
+  for follow-on code changes. If you already have enough to answer, use answerSearch. If we cannot answer,
+  use abortSearch with a clear explanation.
+  
+  You are encouraged to invoke multiple Workspace tools at once (add summaries, drop fragments, etc).
+  Do NOT invoke multiple answer/abort actions. Do NOT write code.
+</message>
+
+# Tools:
+
+searchSubstrings
+searchFilenames
+getFileContents
+getFileSummaries
+addFilesToWorkspace
+addClassesToWorkspace
+addClassSummariesToWorkspace
+addMethodSourcesToWorkspace
+addFileSummariesToWorkspace
+addSymbolUsagesToWorkspace
+addCallGraphInToWorkspace
+addCallGraphOutToWorkspace
+addTextToWorkspace
+dropWorkspaceFragments
+getFiles
+answerSearch
+abortSearch# Response:
+
+ChatResponse { aiMessage = AiMessage { text = null reasoningContent = null toolExecutionRequests = [ToolExecutionRequest { id = "toolu_017h3JwgJ9FZvLNS11j52yvr", name = "getFileContents", arguments = "{"filenames": ["react-native/src/api/open-api.ts","react-native/src/api/ollama-api.ts","react-native/ios/Services/AudioManager.swift","react-native/src/chat/component/CustomFileListComponent.tsx"]}" }, ToolExecutionRequest { id = "toolu_01BttNTXXhPrM7Ksd854kGhZ", name = "searchSubstrings", arguments = "{"patterns": ["/\\*.*TODO.*\\*/","//.*TODO","#.*TODO","//.*FIXME","/\\*.*FIXME.*\\*/","#.*FIXME"], "reasoning": "Searching specifically for TODO and FIXME comments in various comment formats (JavaScript/TypeScript, Swift, Python)"}" }, ToolExecutionRequest { id = "toolu_014qajTz2ri5gQmP4GKEaoZB", name = "searchFilenames", arguments = "{"patterns": [".*test.*",".*spec.*",".*Test.*",".*Spec.*"], "reasoning": "Looking for test files to check for failing tests or test-related debugging issues"}" }] }, metadata = OpenAiChatResponseMetadata{id='chatcmpl-ff42088b-edf1-4f2c-a9fb-eb7a53cbfc99', modelName='claude-sonnet-4-20250514', tokenUsage=OpenAiTokenUsage { inputTokenCount = 10402, inputTokensDetails = OpenAiTokenUsage.InputTokensDetails { cachedTokens = 0 }, outputTokenCount = 322, outputTokensDetails = OpenAiTokenUsage.OutputTokensDetails { reasoningTokens = 0 }, totalTokenCount = 10724 }, finishReason=TOOL_EXECUTION, created=1756791271, serviceTier='null', systemFingerprint='null'} }

@@ -1,0 +1,1699 @@
+# Request to claude-4-sonnet:
+
+<message type=system>
+  You are a code expert extracting ALL information relevant to the given goal
+  from the provided tool call result.
+  
+  Your output will be given to the agent running the search, and replaces the raw result.
+  Thus, you must include every relevant class/method name and any
+  relevant code snippets that may be needed later. DO NOT speculate; only use the provided content.
+</message>
+
+<message type=user>
+  <goal>
+  Find error messages, exceptions, TODO comments, FIXME comments, or failing tests that indicate debugging issues
+  </goal>
+  <reasoning>
+  
+  </reasoning>
+  <tool name="getFileContents">
+  <file name="react-native/src/api/open-api.ts">
+  import { ModelTag, SystemPrompt, Usage } from '../types/Chat.ts';
+  import {
+    getApiUrl,
+    getDeepSeekApiKey,
+    getOpenAIApiKey,
+    getOpenAICompatApiKey,
+    getOpenAICompatApiURL,
+    getOpenAIProxyEnabled,
+    getTextModel,
+  } from '../storage/StorageUtils.ts';
+  import {
+    BedrockMessage,
+    ImageContent,
+    OpenAIMessage,
+    TextContent,
+  } from '../chat/util/BedrockMessageConvertor.ts';
+  import { isDev } from './bedrock-api.ts';
+  import { GITHUB_LINK } from '../settings/SettingsScreen.tsx';
+  
+  type CallbackFunction = (
+    result: string,
+    complete: boolean,
+    needStop: boolean,
+    usage?: Usage,
+    reasoning?: string
+  ) => void;
+  const OpenRouterTag = ': OPENROUTER PROCESSING';
+  
+  export const invokeOpenAIWithCallBack = async (
+    messages: BedrockMessage[],
+    prompt: SystemPrompt | null,
+    shouldStop: () => boolean,
+    controller: AbortController,
+    callback: CallbackFunction
+  ) => {
+    const isOpenRouter = isOpenRouterRequest();
+    const bodyObject = {
+      model: getTextModel().modelId,
+      messages: getOpenAIMessages(messages, prompt),
+      stream: true,
+      stream_options: {
+        include_usage: true,
+      },
+      // Kirim botId ke server untuk proxy requests
+      ...(prompt?.id ? { botId: prompt.id } : {}),
+    };
+  
+    const options = {
+      method: 'POST',
+      headers: {
+        accept: '*/*',
+        'content-type': 'application/json',
+        Authorization: 'Bearer ' + getApiKey(),
+      },
+      body: JSON.stringify(bodyObject),
+      signal: controller.signal,
+      reactNative: { textStreaming: true },
+    };
+    const proxyRequestUrl = getProxyRequestURL();
+    if (proxyRequestUrl.length > 0) {
+      options.headers['request_url' as keyof typeof options.headers] =
+        proxyRequestUrl;
+    }
+    if (isOpenRouter) {
+      options.headers['HTTP-Referer' as keyof typeof options.headers] =
+        GITHUB_LINK;
+      options.headers['X-Title' as keyof typeof options.headers] = 'SwiftChat';
+    }
+    const url = getApiURL();
+    let completeMessage = '';
+    let completeReasoning = '';
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
+    fetch(url!, options)
+      .then(response => {
+        return response.body;
+      })
+      .then(async body => {
+        clearTimeout(timeoutId);
+        if (!body) {
+          return;
+        }
+        const reader = body.getReader();
+        const decoder = new TextDecoder();
+        let lastChunk = '';
+        while (true) {
+          if (shouldStop()) {
+            await reader.cancel();
+            if (completeMessage === '') {
+              completeMessage = '...';
+            }
+            callback(completeMessage, true, true, undefined, completeReasoning);
+            return;
+          }
+  
+          try {
+            const { done, value } = await reader.read();
+            const chunk = decoder.decode(value, { stream: true });
+            if (isOpenRouter && chunk === OpenRouterTag + '\n\n') {
+              continue;
+            }
+            const parsed = parseStreamData(chunk, lastChunk);
+            if (parsed.error) {
+              callback(
+                completeMessage + '\n\n' + parsed.error,
+                true,
+                true,
+                undefined,
+                completeReasoning
+              );
+              return;
+            }
+            if (parsed.reason) {
+              completeReasoning += parsed.reason;
+            }
+            if (parsed.content) {
+              completeMessage += parsed.content;
+            }
+            if (parsed.dataChunk) {
+              lastChunk = parsed.dataChunk;
+            } else {
+              lastChunk = '';
+            }
+            if (parsed.usage && parsed.usage.inputTokens) {
+              callback(
+                completeMessage,
+                false,
+                false,
+                parsed.usage,
+                completeReasoning
+              );
+            } else {
+              callback(
+                completeMessage,
+                done,
+                false,
+                undefined,
+                completeReasoning
+              );
+            }
+            if (done) {
+              return;
+            }
+          } catch (readError) {
+            console.log('Error reading stream:', readError);
+            if (completeMessage === '') {
+              completeMessage = '...';
+            }
+            callback(completeMessage, true, true, undefined, completeReasoning);
+            return;
+          }
+        }
+      })
+      .catch(error => {
+        console.log(error);
+        clearTimeout(timeoutId);
+        if (shouldStop()) {
+          if (completeMessage === '') {
+            completeMessage = '...';
+          }
+          callback(completeMessage, true, true, undefined, completeReasoning);
+        } else {
+          const errorMsg = String(error);
+          const errorInfo = 'Request error: ' + errorMsg;
+          callback(
+            completeMessage + '\n\n' + errorInfo,
+            true,
+            true,
+            undefined,
+            completeReasoning
+          );
+        }
+      });
+  };
+  
+  const parseStreamData = (chunk: string, lastChunk: string = '') => {
+    const dataChunks = (lastChunk + chunk).split('\n\n');
+    let content = '';
+    let reason = '';
+    let usage: Usage | undefined;
+    for (let dataChunk of dataChunks) {
+      if (!dataChunk.trim()) {
+        continue;
+      }
+      if (dataChunk[0] === '\n') {
+        dataChunk = dataChunk.slice(1);
+      }
+      const cleanedData = dataChunk.replace(/^data: /, '');
+      if (cleanedData.trim() === '[DONE]') {
+        continue;
+      }
+      if (cleanedData.trim() === OpenRouterTag) {
+        continue;
+      }
+  
+      try {
+        const parsedData: ChatResponse = JSON.parse(cleanedData);
+        if (parsedData.error) {
+          let errorMessage = '**Error:** ' + (parsedData.error?.message ?? '');
+          if (parsedData.error?.metadata?.raw) {
+            errorMessage += ':\n' + parsedData.error.metadata.raw;
+          }
+          return { error: errorMessage };
+        }
+        if (parsedData.detail) {
+          return {
+            error:
+              `Error: Please upgrade your [server API](${GITHUB_LINK}?tab=readme-ov-file#upgrade-api), API ` +
+              parsedData.detail,
+          };
+        }
+        if (parsedData.choices[0]?.delta?.content) {
+          content += parsedData.choices[0].delta.content;
+        }
+  
+        if (parsedData.choices[0]?.delta?.reasoning_content) {
+          reason += parsedData.choices[0].delta.reasoning_content;
+        }
+        if (parsedData.choices[0]?.delta?.reasoning) {
+          reason += parsedData.choices[0].delta.reasoning;
+        }
+  
+        if (parsedData.usage) {
+          usage = {
+            modelName: getTextModel().modelName,
+            inputTokens:
+              parsedData.usage.prompt_tokens -
+              (parsedData.usage.prompt_cache_hit_tokens ?? 0),
+            outputTokens: parsedData.usage.completion_tokens,
+            totalTokens: parsedData.usage.total_tokens,
+          };
+        }
+      } catch (error) {
+        if (lastChunk.length > 0) {
+          return { reason, content, dataChunk, usage };
+        } else if (reason === '' && content === '') {
+          if (dataChunk === 'data: ') {
+            return { reason, content, dataChunk, usage };
+          }
+          return { error: chunk };
+        }
+        if (reason || content) {
+          return { reason, content, dataChunk, usage };
+        }
+      }
+    }
+    return { reason, content, usage };
+  };
+  
+  type ChatResponse = {
+    choices: Array<{
+      delta: {
+        content: string;
+        reasoning_content: string;
+        reasoning: string;
+      };
+    }>;
+    usage?: {
+      prompt_tokens: number;
+      completion_tokens: number;
+      total_tokens: number;
+      prompt_cache_hit_tokens: number;
+    };
+    error?: {
+      message?: string;
+      metadata?: {
+        raw?: string;
+      };
+    };
+    detail?: string;
+  };
+  
+  function getOpenAIMessages(
+    messages: BedrockMessage[],
+    prompt: SystemPrompt | null
+  ): OpenAIMessage[] {
+    // Untuk OpenAI, kita tetap menggunakan prompt yang ada karena system prompts
+    // akan ditangani oleh server melalui proxy (/api/openai)
+    return [
+      ...(prompt ? [{ role: 'system', content: prompt.prompt }] : []),
+      ...messages.map(message => {
+        const hasImage = message.content.some(content => 'image' in content);
+        if (hasImage) {
+          return {
+            role: message.role,
+            content: message.content.map(content => {
+              if ('text' in content) {
+                return {
+                  type: 'text' as const,
+                  text: (content as TextContent).text,
+                };
+              } else {
+                const base64Data = (content as ImageContent).image.source.bytes;
+                return {
+                  type: 'image_url' as const,
+                  image_url: {
+                    url: `data:image/png;base64,${base64Data}`,
+                  },
+                };
+              }
+            }),
+          };
+        }
+        return {
+          role: message.role,
+          content: message.content
+            .map(content => (content as TextContent).text)
+            .join('\n'),
+        };
+      }),
+    ];
+  }
+  
+  function getApiKey(): string {
+    if (getTextModel().modelTag === ModelTag.OpenAICompatible) {
+      return getOpenAICompatApiKey();
+    } else if (getTextModel().modelId.includes('deepseek')) {
+      return getDeepSeekApiKey();
+    } else {
+      return getOpenAIApiKey();
+    }
+  }
+  
+  function isOpenRouterRequest(): boolean {
+    return (
+      getTextModel().modelTag === ModelTag.OpenAICompatible &&
+      getOpenAICompatApiURL().startsWith('https://openrouter.ai/api')
+    );
+  }
+  
+  function getProxyRequestURL(): string {
+    if (getTextModel().modelTag === ModelTag.OpenAICompatible) {
+      return getOpenAICompatApiURL() + '/chat/completions';
+    } else if (getTextModel().modelId.includes('deepseek')) {
+      return '';
+    } else {
+      return 'https://api.openai.com/v1/chat/completions';
+    }
+  }
+  
+  function getApiURL(): string {
+    if (getTextModel().modelTag === ModelTag.OpenAICompatible) {
+      if (getOpenAIProxyEnabled()) {
+        return (isDev ? 'http://localhost:8080' : getApiUrl()) + '/api/openai';
+      } else {
+        return getOpenAICompatApiURL() + '/chat/completions';
+      }
+    } else if (getTextModel().modelId.includes('deepseek')) {
+      return 'https://api.deepseek.com/chat/completions';
+    } else {
+      if (getOpenAIProxyEnabled()) {
+        return (isDev ? 'http://localhost:8080' : getApiUrl()) + '/api/openai';
+      } else {
+        return 'https://api.openai.com/v1/chat/completions';
+      }
+    }
+  }
+  
+  </file>
+  
+  <file name="react-native/src/api/ollama-api.ts">
+  import {
+    Model,
+    ModelTag,
+    OllamaModel,
+    SystemPrompt,
+    Usage,
+  } from '../types/Chat.ts';
+  import { getOllamaApiUrl, getTextModel } from '../storage/StorageUtils.ts';
+  import {
+    BedrockMessage,
+    ImageContent,
+    OpenAIMessage,
+    TextContent,
+  } from '../chat/util/BedrockMessageConvertor.ts';
+  
+  type CallbackFunction = (
+    result: string,
+    complete: boolean,
+    needStop: boolean,
+    usage?: Usage
+  ) => void;
+  export const invokeOllamaWithCallBack = async (
+    messages: BedrockMessage[],
+    prompt: SystemPrompt | null,
+    shouldStop: () => boolean,
+    controller: AbortController,
+    callback: CallbackFunction
+  ) => {
+    const bodyObject = {
+      model: getTextModel().modelId,
+      messages: getOllamaMessages(messages, prompt),
+    };
+    const options = {
+      method: 'POST',
+      headers: {
+        accept: '*/*',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(bodyObject),
+      signal: controller.signal,
+      reactNative: { textStreaming: true },
+    };
+    const url = getOllamaApiUrl() + '/api/chat';
+    let completeMessage = '';
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
+    fetch(url!, options)
+      .then(response => {
+        return response.body;
+      })
+      .then(async body => {
+        clearTimeout(timeoutId);
+        if (!body) {
+          return;
+        }
+        const reader = body.getReader();
+        const decoder = new TextDecoder();
+        let lastChunk = '';
+        while (true) {
+          if (shouldStop()) {
+            await reader.cancel();
+            if (completeMessage === '') {
+              completeMessage = '...';
+            }
+            callback(completeMessage, true, true);
+            return;
+          }
+  
+          try {
+            const { done, value } = await reader.read();
+            const chunk = decoder.decode(value, { stream: true });
+            if (!chunk) {
+              return;
+            }
+            const parsed = parseStreamData(chunk, lastChunk);
+            if (parsed.error) {
+              callback(parsed.error, true, true);
+              return;
+            }
+            completeMessage += parsed.content;
+            if (parsed.dataChunk) {
+              lastChunk = parsed.dataChunk;
+            } else {
+              lastChunk = '';
+            }
+            if (parsed.usage && parsed.usage.inputTokens) {
+              callback(completeMessage, true, false, parsed.usage);
+              return;
+            } else {
+              callback(completeMessage, done, false);
+            }
+            if (done) {
+              return;
+            }
+          } catch (readError) {
+            console.log('Error reading stream:', readError);
+            if (completeMessage === '') {
+              completeMessage = '...';
+            }
+            callback(completeMessage, true, true);
+            return;
+          }
+        }
+      })
+      .catch(error => {
+        console.log(error);
+        clearTimeout(timeoutId);
+        if (shouldStop()) {
+          if (completeMessage === '') {
+            completeMessage = '...';
+          }
+          callback(completeMessage, true, true);
+        } else {
+          const errorMsg = String(error);
+          const errorInfo = 'Request error: ' + errorMsg;
+          callback(completeMessage + '\n\n' + errorInfo, true, true);
+        }
+      });
+  };
+  
+  const parseStreamData = (chunk: string, lastChunk: string = '') => {
+    let content = '';
+    let usage: Usage | undefined;
+    const dataChunks = (lastChunk + chunk).split('\n');
+    for (let dataChunk of dataChunks) {
+      if (!dataChunk.trim()) {
+        continue;
+      }
+      if (dataChunk[0] === '\n') {
+        dataChunk = dataChunk.slice(1);
+      }
+      try {
+        const parsedData: OllamaResponse = JSON.parse(dataChunk);
+  
+        if (parsedData.message?.content) {
+          content += parsedData.message?.content;
+        }
+  
+        if (parsedData.done) {
+          usage = {
+            modelName: getTextModel().modelName,
+            inputTokens: parsedData.prompt_eval_count,
+            outputTokens: parsedData.eval_count,
+            totalTokens: parsedData.prompt_eval_count + parsedData.eval_count,
+          };
+        }
+      } catch (error) {
+        if (lastChunk.length > 0) {
+          return { error: error + chunk };
+        }
+        if (content.length > 0) {
+          return { content, dataChunk, usage };
+        }
+      }
+    }
+    return { content, usage };
+  };
+  
+  type OllamaResponse = {
+    model: string;
+    created_at: string;
+    message?: {
+      role: string;
+      content: string;
+    };
+    done: boolean;
+    prompt_eval_count: number;
+    eval_count: number;
+  };
+  
+  function getOllamaMessages(
+    messages: BedrockMessage[],
+    prompt: SystemPrompt | null
+  ): OpenAIMessage[] {
+    return [
+      ...(prompt ? [{ role: 'system', content: prompt.prompt }] : []),
+      ...messages.map(message => {
+        const images = message.content
+          .filter(content => (content as ImageContent).image)
+          .map(content => (content as ImageContent).image.source.bytes);
+  
+        return {
+          role: message.role,
+          content: message.content
+            .map(content => {
+              if ((content as TextContent).text) {
+                return (content as TextContent).text;
+              }
+              return '';
+            })
+            .join('\n'),
+          images: images.length > 0 ? images : undefined,
+        };
+      }),
+    ];
+  }
+  
+  export const requestAllOllamaModels = async (): Promise<Model[]> => {
+    const controller = new AbortController();
+    const modelsUrl = getOllamaApiUrl() + '/api/tags';
+    const options = {
+      method: 'GET',
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json',
+      },
+      signal: controller.signal,
+      reactNative: { textStreaming: true },
+    };
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    try {
+      const response = await fetch(modelsUrl, options);
+      clearTimeout(timeoutId);
+      if (!response.ok) {
+        console.log(`HTTP error! status: ${response.status}`);
+        return [];
+      }
+      const data = await response.json();
+      return data.models.map((item: OllamaModel) => ({
+        modelId: item.name,
+        modelName: item.name,
+        modelTag: ModelTag.Ollama,
+      }));
+    } catch (error) {
+      clearTimeout(timeoutId);
+      console.log('Error fetching models:', error);
+      return [];
+    }
+  };
+  
+  </file>
+  
+  <file name="react-native/ios/Services/AudioManager.swift">
+  import Foundation
+  import AVFoundation
+  
+  enum AudioError: Error {
+      case recordingFailed(String)
+      case playbackFailed(String)
+      case audioSessionFailed(String)
+      case microphoneAccessDenied(String)
+  }
+  
+  class AudioManager: NSObject {
+      // Basic components
+      private var audioSession = AVAudioSession.sharedInstance()
+      private var audioRecorder: AVAudioRecorder?
+      
+      // Audio engine components
+      private var audioEngine = AVAudioEngine()
+      private var playerNode = AVAudioPlayerNode()
+      
+      // Microphone capture related
+      private var isCapturing = false
+    
+      private var isAudioContentEnd = true
+      private var isPlaying = false
+      private var isActive = false
+  
+      // Barge-in related
+      private var bargeIn = false
+    
+      private var allowInterruption = true
+      
+      // Standard format for audio processing (48kHz is widely supported)
+      private var iOSAudioFormat: AVAudioFormat = AVAudioFormat(standardFormatWithSampleRate: 48000, channels: 1)!
+      
+      // Input format for Nova Sonic (16kHz)
+      private var inputFormat: AVAudioFormat = AVAudioFormat(
+          commonFormat: .pcmFormatInt16,
+          sampleRate: 16000,
+          channels: 1,
+          interleaved: false
+      )!
+    
+      private var outputFormat: AVAudioFormat = AVAudioFormat(
+          commonFormat: .pcmFormatInt16,
+          sampleRate: 24000,
+          channels: 1,
+          interleaved: false
+      )!
+      
+      // Pre-created converter for better performance
+      private var converter: AVAudioConverter?
+      
+      // Audio processing queue
+      private let audioQueue = DispatchQueue(label: "com.swiftchat.audio", qos: .userInteractive)
+      
+      // Simple audio data queue
+      private var audioDataQueue = [Data]()
+      private var isProcessingQueue = false
+      
+      // Recording settings
+      private let recordSettings: [String: Any] = [
+          AVFormatIDKey: Int(kAudioFormatLinearPCM),
+          AVSampleRateKey: 16000.0,
+          AVNumberOfChannelsKey: 1,
+          AVLinearPCMBitDepthKey: 16,
+          AVLinearPCMIsFloatKey: false,
+          AVLinearPCMIsBigEndianKey: false
+      ]
+      
+      // Callbacks
+      var onError: ((Error) -> Void)?
+      var onAudioCaptured: ((Data) -> Void)?  // New callback for captured audio data
+      var onAudioLevelChanged: ((String, Int) -> Void)? // Callback for audio level changes (source, level 1-10)
+      
+      // Audio level tracking
+      private var lastInputLevel: Int = 0
+      private var lastOutputLevel: Int = 0
+      
+      override init() {
+          super.init()
+      }
+      
+      deinit {
+          audioEngine.stop()
+      }
+  
+      func setAllowInterruption(_ allowInterruption: Bool) {
+          self.allowInterruption = allowInterruption
+      }
+  
+      func setIsActive(_ isActive: Bool) {
+          if !isActive {
+              isAudioContentEnd = true
+              onAudioEnd()
+          }
+          self.isActive = isActive
+      }
+  
+      // MARK: - Audio Setup
+      private func setupAudio() {
+          // Setup audio session with speaker output
+          do {
+              // Changed to voiceChat mode - better for VoIP applications
+              try audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetooth, .duckOthers])
+              try audioSession.setActive(true)
+              if audioSession.isInputGainSettable {
+                  try audioSession.setInputGain(1.0)
+              }
+          } catch {
+              print("Failed to setup audio session: \(error)")
+          }
+          // Setup audio engine with explicit format
+          audioEngine.attach(playerNode)
+          audioEngine.connect(playerNode, to: audioEngine.mainMixerNode, format: iOSAudioFormat)
+          audioEngine.connect(audioEngine.mainMixerNode, to: audioEngine.outputNode, format: nil)
+          // Enable voice processing (echo cancellation)
+          do {
+              try audioEngine.inputNode.setVoiceProcessingEnabled(true)
+              print("Voice processing enabled successfully")
+          } catch {
+              print("Failed to enable voice processing: \(error)")
+          }
+          
+          // Set player node volume higher (for playback volume)
+          playerNode.volume = 2.0
+          // Pre-create converter for better performance
+          converter = AVAudioConverter(from: outputFormat, to: iOSAudioFormat)
+      }
+      
+      // MARK: - Recording
+      
+      func startRecording() throws -> URL {
+          print("start Recording")
+          let tempDir = FileManager.default.temporaryDirectory
+          let fileName = UUID().uuidString + ".wav"
+          let fileURL = tempDir.appendingPathComponent(fileName)
+          
+          do {
+              audioRecorder = try AVAudioRecorder(url: fileURL, settings: recordSettings)
+              audioRecorder?.delegate = self
+              
+              guard let recorder = audioRecorder, recorder.prepareToRecord() else {
+                  throw AudioError.recordingFailed("Failed to prepare recorder")
+              }
+              
+              if recorder.record() {
+                  return fileURL
+              } else {
+                  throw AudioError.recordingFailed("Failed to start recording")
+              }
+          } catch {
+              if let audioError = error as? AudioError {
+                  throw audioError
+              } else {
+                  throw AudioError.recordingFailed("Recording error: \(error)")
+              }
+          }
+      }
+      
+      func stopRecording() -> URL? {
+          guard let recorder = audioRecorder, recorder.isRecording else {
+              return nil
+          }
+          
+          let fileURL = recorder.url
+          recorder.stop()
+          audioRecorder = nil
+          return fileURL
+      }
+      
+      // MARK: - Barge-in handling
+      
+      func setBargeIn(_ value: Bool) {
+          audioQueue.async { [weak self] in
+              guard let self = self else { return }
+              self.bargeIn = value
+              
+              // If set to interrupt state, process queue immediately
+              if value {
+                  self.processQueue()
+              }
+          }
+      }
+      
+      // MARK: - Playback
+      // Helper method to convert nova sonic output format(24kHz) audio data to a buffer with iOS Format(48kHz)
+      private func convertOutputAudioToBuffer(data: Data) -> AVAudioPCMBuffer? {
+          // Create input buffer with 24kHz format (data.count / 2 because each sample is 2 bytes)
+          let frameCapacity = AVAudioFrameCount(data.count / 2)
+          
+          guard let inputBuffer = AVAudioPCMBuffer(pcmFormat: outputFormat, frameCapacity: frameCapacity) else {
+              return nil
+          }
+          inputBuffer.frameLength = inputBuffer.frameCapacity
+          
+          // Fill input buffer with audio data
+          data.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
+              if let baseAddress = bytes.baseAddress {
+                  memcpy(inputBuffer.int16ChannelData![0], baseAddress, data.count)
+              }
+          }
+          
+          // Use pre-created converter
+          guard let converter = self.converter else {
+              return nil
+          }
+          
+          // Calculate output buffer size based on sample rate conversion ratio
+          let ratio = iOSAudioFormat.sampleRate / outputFormat.sampleRate
+          let outputFrames = AVAudioFrameCount(Double(inputBuffer.frameLength) * ratio)
+          
+          // Create output buffer with 48kHz format
+          guard let outputBuffer = AVAudioPCMBuffer(pcmFormat: iOSAudioFormat, frameCapacity: outputFrames) else {
+              return nil
+          }
+          
+          // Perform conversion
+          var error: NSError?
+          let status = converter.convert(to: outputBuffer, error: &error) { inNumPackets, outStatus in
+              outStatus.pointee = .haveData
+              return inputBuffer
+          }
+          
+          if status == .error || error != nil {
+              return nil
+          }
+          
+          return outputBuffer
+      }
+      
+      func playAudio(data: Data) throws {
+          // Ensure engine is running
+          isPlaying = true
+          isAudioContentEnd = false
+  
+          // Process audio on dedicated queue
+          audioQueue.async { [weak self] in
+              guard let self = self else { return }
+              
+              // Add to queue
+              self.audioDataQueue.append(data)
+              
+              // If not already processing, start processing
+              if !self.isProcessingQueue {
+                  self.processQueue()
+              }
+          }
+      }
+      
+      private func processQueue() {
+          // Check if interruption is needed
+          if bargeIn {
+              print("Barge-in detected. Clearing audio queue.")
+              audioDataQueue.removeAll()
+              bargeIn = false
+              isProcessingQueue = false
+              
+              if playerNode.isPlaying {
+                  playerNode.stop()
+              }
+              
+              return
+          }
+        
+          guard !audioDataQueue.isEmpty else {
+              isProcessingQueue = false
+              if isPlaying, isAudioContentEnd {
+                  self.onAudioEnd()
+              }
+              return
+          }
+          
+          isProcessingQueue = true
+          
+          // Process up to 20 audio data blocks at once
+          let batchSize = min(20, audioDataQueue.count)
+          var combinedData = Data()
+          // Combine multiple audio data blocks
+          for _ in 0..<batchSize {
+              let audioData = audioDataQueue.removeFirst()
+              combinedData.append(audioData)
+          }
+          
+          // Convert combined audio data to buffer with sample rate conversion
+          if let buffer = convertOutputAudioToBuffer(data: combinedData) {
+              // Calculate audio level from output buffer
+              let level = calculateAudioLevel(buffer: buffer)
+              let normalizedLevel = normalizeToScale(level: level)
+              
+              // Only send callback if level changed
+              if normalizedLevel != lastOutputLevel {
+                  lastOutputLevel = normalizedLevel
+                  onAudioLevelChanged?("speaker", normalizedLevel)
+              }
+              
+              // Schedule buffer for playback
+              playerNode.scheduleBuffer(buffer, at: nil, options: [], completionHandler: { [weak self] in
+                  guard let self = self else { return }
+                  self.processQueue() // Process next batch
+              })
+              
+              // Start playback if not already playing
+              if !playerNode.isPlaying && audioEngine.isRunning {
+                  playerNode.play()
+              }
+          } else {
+              // If conversion failed, try next batch
+              processQueue()
+          }
+      }
+    
+      func readAudioChunk(from url: URL, chunkSize: Int = 1024) -> Data? {
+          do {
+              let data = try Data(contentsOf: url)
+              return data
+          } catch {
+              onError?(AudioError.playbackFailed("Failed to read audio file: \(error)"))
+              return nil
+          }
+      }
+      
+      // MARK: - Microphone Capturing
+      
+      func startCapturing() throws {
+          if audioEngine.isRunning {
+              audioEngine.inputNode.removeTap(onBus: 0)
+              audioEngine.stop()
+          }
+          setupAudio()
+          // Check microphone permission
+          switch audioSession.recordPermission {
+              case .denied:
+                  throw AudioError.microphoneAccessDenied("Microphone access denied")
+              case .undetermined:
+                  // Request permission
+                  var permissionGranted = false
+                  let semaphore = DispatchSemaphore(value: 0)
+                  
+                  audioSession.requestRecordPermission { granted in
+                      permissionGranted = granted
+                      semaphore.signal()
+                  }
+                  
+                  _ = semaphore.wait(timeout: .now() + 5.0)
+                  
+                  if !permissionGranted {
+                      throw AudioError.microphoneAccessDenied("Microphone access denied")
+                  }
+              case .granted:
+                  break
+              @unknown default:
+                  throw AudioError.microphoneAccessDenied("Unknown microphone permission status")
+          }
+          
+          // Ensure audio session is active
+          if !audioSession.isInputAvailable {
+              throw AudioError.recordingFailed("Audio input is not available")
+          }
+          do {
+              // Get input node
+              let inputNode = audioEngine.inputNode
+              let singleChannelFormat = AVAudioFormat(
+                  standardFormatWithSampleRate: inputNode.outputFormat(forBus: 0).sampleRate,
+                  channels: 1
+              )
+              let bufferSize: AVAudioFrameCount = 1024
+              print("Start Listening...")
+              inputNode.installTap(onBus: 0, bufferSize: bufferSize, format: singleChannelFormat) { [weak self] (buffer, time) in
+                  guard let self = self, self.isCapturing else { return }
+                  if isPlaying, !allowInterruption {
+                      if self.lastInputLevel != 1 {
+                          self.onAudioLevelChanged?("microphone", 1)
+                      }
+                      return
+                  }
+                  // Calculate audio level from input buffer
+                  var level = self.calculateAudioLevel(buffer: buffer)
+                  level = min(1, level * 1.5)
+                  let normalizedLevel = self.normalizeToScale(level: level)
+                  
+                  // Only send callback if level changed
+                  if normalizedLevel != self.lastInputLevel {
+                      self.lastInputLevel = normalizedLevel
+                      self.onAudioLevelChanged?("microphone", normalizedLevel)
+                  }
+                  // Convert buffer to target format (16kHz, 16-bit PCM)
+                  if let convertedBuffer = self.convertInputBufferToNovaSonicFormat(buffer, sourceFormat: buffer.format) {
+                      // Convert the converted buffer to Data
+                      if let data = self.bufferToData(convertedBuffer) {
+                          // Send data through callback in background thread
+                          self.onAudioCaptured?(data)
+                      }
+                  }
+              }
+              try audioEngine.start()
+              isCapturing = true
+              print("Audio engine started successfully")
+          } catch {
+              print("Failed to start audio engine or install tap: \(error)")
+              onError?(AudioError.recordingFailed("Recording error: \(error)"))
+          }
+      }
+      
+      // Convert device input buffer format(48kHz) to nova sonic target format (16kHz)
+      private func convertInputBufferToNovaSonicFormat(_ buffer: AVAudioPCMBuffer, sourceFormat: AVAudioFormat) -> AVAudioPCMBuffer? {
+          // Create a converter from source format to target format
+          guard let converter = AVAudioConverter(from: sourceFormat, to: inputFormat) else {
+              print("Failed to create format converter")
+              return nil
+          }
+          
+          // Calculate output buffer size based on sample rate conversion ratio
+          let ratio = Double(inputFormat.sampleRate) / Double(sourceFormat.sampleRate)
+          let outputFrames = AVAudioFrameCount(Double(buffer.frameLength) * ratio)
+          
+          // Create output buffer with target format
+          guard let outputBuffer = AVAudioPCMBuffer(pcmFormat: inputFormat, frameCapacity: outputFrames) else {
+              print("Failed to create output buffer")
+              return nil
+          }
+          
+          // Perform conversion
+          var error: NSError?
+          let status = converter.convert(to: outputBuffer, error: &error) { inNumPackets, outStatus in
+              outStatus.pointee = .haveData
+              return buffer
+          }
+          
+          if status == .error || error != nil {
+              print("Conversion error: \(error?.localizedDescription ?? "unknown error")")
+              return nil
+          }
+          
+          return outputBuffer
+      }
+      
+      // MARK: - Handle End Conversation
+      func stopCapturing() {
+          guard isCapturing else { return }
+          
+          // Remove tap
+          audioEngine.inputNode.removeTap(onBus: 0)
+          isCapturing = false
+          audioEngine.stop()
+          print("Microphone capturing stopped")
+      }
+      
+      func onAudioEnd() {
+          isPlaying = false
+          lastOutputLevel = 1
+          onAudioLevelChanged?("speaker", 1)
+      }
+  
+      func onContentEnd() {
+          self.isAudioContentEnd = true
+      }
+      
+      func stopPlayback() {
+        // Clear queue
+        audioQueue.async { [weak self] in
+            guard let self = self else { return }
+            
+            // Clear queue
+            self.audioDataQueue.removeAll()
+            self.isProcessingQueue = false
+            
+            if self.playerNode.isPlaying {
+                self.playerNode.stop()
+            }
+            print("Audio playback stopped")
+        }
+      }
+      
+      func deactivateAudioSession() throws {
+          do {
+              try audioSession.setActive(false, options: .notifyOthersOnDeactivation)
+          } catch {
+              throw AudioError.audioSessionFailed("Failed to deactivate audio session: \(error)")
+          }
+      }
+      
+      // Calculate audio level from buffer (0.0-1.0 range)
+      private func calculateAudioLevel(buffer: AVAudioPCMBuffer) -> Float {
+          guard let channelData = buffer.floatChannelData?[0] else { return 0.0 }
+          
+          let channelDataLength = Int(buffer.frameLength)
+          var sum: Float = 0.0
+          
+          // Calculate RMS (Root Mean Square) of audio samples
+          for i in 0..<channelDataLength {
+              let sample = channelData[i]
+              sum += sample * sample
+          }
+          
+          // Avoid division by zero
+          if channelDataLength > 0 {
+              let rms = sqrt(sum / Float(channelDataLength))
+              // Convert RMS to 0-1 range with logarithmic scaling
+              return min(1.0, max(0.0, 20 * log10(rms) + 60) / 60)
+          }
+          
+          return 0.0
+      }
+      
+      // Normalize level to target scale (e.g., 1-10)
+      private func normalizeToScale(level: Float, min: Float = 0.0, max: Float = 1.0, targetMin: Int = 1, targetMax: Int = 10) -> Int {
+          let normalizedValue = (level - min) / (max - min)
+          let scaledValue = normalizedValue * Float(targetMax - targetMin) + Float(targetMin)
+          return Int(round(scaledValue))
+      }
+      
+      // Convert PCM buffer to Data
+      private func bufferToData(_ buffer: AVAudioPCMBuffer) -> Data? {
+          guard let int16ChannelData = buffer.int16ChannelData else { return nil }
+          
+          let frameLength = Int(buffer.frameLength)
+          let channelCount = Int(buffer.format.channelCount)
+          let bytesPerSample = 2 // 16-bit = 2 bytes
+          let dataSize = frameLength * bytesPerSample * channelCount
+          
+          var data = Data(capacity: dataSize)
+          
+          // Copy int16 data to Data
+          for frame in 0..<frameLength {
+              let sample = int16ChannelData[0][frame]
+              var byteOrderedSample = sample.littleEndian // Ensure little-endian byte order
+              withUnsafePointer(to: &byteOrderedSample) { pointer in
+                   data.append(UnsafeBufferPointer(start: pointer, count: 1))
+               }
+          }
+          
+          return data
+      }
+  }
+  
+  // MARK: - AVAudioRecorderDelegate
+  extension AudioManager: AVAudioRecorderDelegate {
+      func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {
+          if !flag {
+              onError?(AudioError.recordingFailed("Recording finished unsuccessfully"))
+          }
+      }
+      
+      func audioRecorderEncodeErrorDidOccur(_ recorder: AVAudioRecorder, error: Error?) {
+          if let error = error {
+              onError?(AudioError.recordingFailed("Recording error: \(error)"))
+          } else {
+              onError?(AudioError.recordingFailed("Unknown recording error occurred"))
+          }
+      }
+  }
+  
+  </file>
+  
+  <file name="react-native/src/chat/component/CustomFileListComponent.tsx">
+  import React, { useCallback, useEffect, useRef, useState } from 'react';
+  import {
+    Image,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+  } from 'react-native';
+  import { FileInfo, FileType } from '../../types/Chat.ts';
+  import { CustomAddFileComponent } from './CustomAddFileComponent.tsx';
+  import ImageView from 'react-native-image-viewing';
+  import { ImageSource } from 'react-native-image-viewing/dist/@types';
+  import Share from 'react-native-share';
+  import FileViewer from 'react-native-file-viewer';
+  import { isMac } from '../../App.tsx';
+  import { getFullFileUrl, saveFile } from '../util/FileUtils.ts';
+  import { getVideoMetaData, Video } from 'react-native-compressor';
+  import * as Progress from 'react-native-progress';
+  import { showInfo } from '../util/ToastUtils.ts';
+  import { ColorScheme, useTheme } from '../../theme';
+  
+  interface CustomFileProps {
+    files: FileInfo[];
+    onFileUpdated?: (files: FileInfo[], isUpdate?: boolean) => void;
+    mode?: DisplayMode;
+  }
+  
+  export enum DisplayMode {
+    Edit = 'edit',
+    Display = 'display',
+    GenImage = 'genImage',
+  }
+  
+  const MAX_VIDEO_SIZE = 8;
+  
+  const openInFileViewer = (url: string) => {
+    FileViewer.open(url)
+      .then(() => {})
+      .catch(error => {
+        console.log(error);
+      });
+  };
+  
+  const CircularProgress = ({
+    progress,
+    colors,
+  }: {
+    progress: number;
+    colors: ColorScheme;
+  }) => {
+    const styles = getStyles(colors);
+    return (
+      <View style={styles.progressContainer}>
+        <Progress.Pie
+          size={32}
+          color="rgba(180, 180, 180, 1)"
+          borderColor="rgba(180, 180, 180, 1)"
+          progress={progress}
+        />
+      </View>
+    );
+  };
+  
+  export const CustomFileListComponent: React.FC<CustomFileProps> = ({
+    files,
+    onFileUpdated,
+    mode = DisplayMode.Edit,
+  }) => {
+    const { colors, isDark } = useTheme();
+    const [visible, setIsVisible] = useState(false);
+    const [index, setIndex] = useState<number>(0);
+    const [imageUrls, setImageUrls] = useState<ImageSource[]>([]);
+  
+    const scrollViewRef = useRef<ScrollView>(null);
+    const [compressionProgress, setCompressionProgress] = useState<number>(0);
+    const compressingFiles = useRef<string>('');
+    const filesRef = useRef(files);
+    const isCompressing = useRef(false);
+  
+    useEffect(() => {
+      filesRef.current = files;
+      if (scrollViewRef.current && mode !== DisplayMode.Display) {
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      }
+    }, [files, mode]);
+  
+    const handleCompression = useCallback(async () => {
+      for (const file of filesRef.current) {
+        if (
+          !isCompressing.current &&
+          file.type === FileType.video &&
+          !file.videoUrl &&
+          compressingFiles.current !== file.url
+        ) {
+          compressingFiles.current = file.url;
+          try {
+            isCompressing.current = true;
+            const uri = await Video.compress(
+              file.url,
+              { progressDivider: 1, maxSize: 960 },
+              progress => {
+                setCompressionProgress(progress);
+              }
+            );
+            const metaData = await getVideoMetaData(uri);
+            console.log('metaData', metaData);
+            isCompressing.current = false;
+            compressingFiles.current = '';
+            const currentSize = metaData.size / 1024 / 1024;
+            if (currentSize < MAX_VIDEO_SIZE) {
+              // save video to files and update video url
+              const localFileUrl = await saveFile(
+                uri,
+                file.fileName + '.' + metaData.extension
+              );
+              if (localFileUrl) {
+                const updatedFiles = filesRef.current.map(f =>
+                  f.url === file.url
+                    ? { ...f, videoUrl: localFileUrl, format: metaData.extension }
+                    : f
+                );
+                onFileUpdated!(updatedFiles, true);
+              }
+            } else {
+              // remove the video
+              const newFiles = filesRef.current.filter(f => f.url !== file.url);
+              onFileUpdated!(newFiles, true);
+              showInfo(
+                `Video too large: ${currentSize.toFixed(
+                  1
+                )}MB (max ${MAX_VIDEO_SIZE}MB)`
+              );
+            }
+          } catch (error) {
+            showInfo('Video process failed');
+            compressingFiles.current = '';
+            isCompressing.current = false;
+            // remove the failed video
+            const newFiles = filesRef.current.filter(f => f.url !== file.url);
+            onFileUpdated!(newFiles, true);
+          }
+        }
+      }
+    }, [onFileUpdated]);
+  
+    useEffect(() => {
+      const checkAndCompressVideos = async () => {
+        await handleCompression();
+      };
+      checkAndCompressVideos().then();
+    }, [files, handleCompression]);
+  
+    const renderFileItem = (file: FileInfo, fileIndex: number) => {
+      const isImage = file.type === FileType.image;
+      const isDocument = file.type === FileType.document;
+      const isVideo = file.type === FileType.video;
+      const fullFileUrl =
+        isVideo && !file.videoUrl
+          ? file.url
+          : getFullFileUrl(file.videoUrl || file.url);
+      const itemKey = `file-${fileIndex}-${file.url}`;
+  
+      const isFileCompressing = compressingFiles.current === file.url;
+      let ratio = 1;
+      if (file.width && file.height) {
+        ratio = file.width / file.height;
+        ratio = ratio < 1 ? 1 : ratio;
+      }
+      const isHideDelete = file.type === FileType.video && !file.videoUrl;
+      const isShowDelete =
+        mode === DisplayMode.GenImage ||
+        (mode === DisplayMode.Edit && !isHideDelete);
+      return (
+        <View
+          key={itemKey}
+          style={{
+            ...styles.fileItem,
+            ...(isDocument && {
+              width: 158,
+            }),
+            ...(isVideo && {
+              width: 72 * ratio,
+            }),
+          }}>
+          {isShowDelete && (
+            <TouchableOpacity
+              style={styles.deleteTouchable}
+              onPress={() => {
+                const newFiles = files.filter(f => f.url !== file.url);
+                onFileUpdated!(newFiles, true);
+              }}>
+              <View style={styles.deleteLayout}>
+                <Text style={styles.deleteText}>×</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+  
+          <TouchableOpacity
+            onLongPress={() => {
+              try {
+                const options = {
+                  type: 'text/plain',
+                  url: fullFileUrl,
+                  showAppsToView: true,
+                };
+                Share.open(options).then();
+              } catch (error) {
+                console.log('Error opening file:', error);
+              }
+            }}
+            onPress={() => {
+              if (isVideo && isFileCompressing) {
+                return;
+              }
+              if (
+                isMac ||
+                mode === DisplayMode.GenImage ||
+                file.type === FileType.document ||
+                file.type === FileType.video
+              ) {
+                openInFileViewer(fullFileUrl);
+              } else {
+                const images = files
+                  .filter(item => item.type === FileType.image)
+                  .map(item => ({ uri: getFullFileUrl(item.url) }));
+                const currentIndex = images.findIndex(
+                  img => img.uri === fullFileUrl
+                );
+                setImageUrls(images);
+                setIndex(currentIndex);
+                setIsVisible(true);
+              }
+            }}>
+            {isImage || isVideo ? (
+              <View style={styles.thumbnailContainer}>
+                <Image
+                  source={{
+                    uri: isVideo
+                      ? getFullFileUrl(file.videoThumbnailUrl!)
+                      : fullFileUrl,
+                  }}
+                  style={styles.thumbnail}
+                  resizeMode="cover"
+                />
+                {isVideo && !isFileCompressing && (
+                  <Image
+                    source={require('../../assets/play.png')}
+                    style={styles.playIcon}
+                  />
+                )}
+                {isVideo && isFileCompressing && (
+                  <CircularProgress
+                    progress={compressionProgress}
+                    colors={colors}
+                  />
+                )}
+              </View>
+            ) : (
+              <View style={styles.filePreview}>
+                <Text numberOfLines={2} style={styles.fileName}>
+                  {file.fileName}
+                </Text>
+                <View style={styles.formatContainer}>
+                  <Image
+                    source={
+                      isDark
+                        ? require('./../../assets/document_dark.png')
+                        : require('./../../assets/document.png')
+                    }
+                    style={styles.formatIcon}
+                  />
+                  <Text style={styles.fileFormat}>
+                    {file.format.toUpperCase()}
+                  </Text>
+                </View>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+      );
+    };
+  
+    const styles = getStyles(colors);
+  
+    return (
+      <ScrollView
+        horizontal
+        ref={scrollViewRef}
+        contentContainerStyle={{
+          ...styles.containerStyle,
+          ...(mode === DisplayMode.Display && {
+            paddingHorizontal: 0,
+            width: files.length > 2 ? undefined : '100%',
+            justifyContent: 'flex-end',
+          }),
+        }}
+        showsHorizontalScrollIndicator={false}
+        keyboardShouldPersistTaps="always"
+        style={{
+          ...styles.scrollView,
+          ...(mode === DisplayMode.Display && {
+            marginLeft: 0,
+            paddingTop: 4,
+          }),
+        }}>
+        {files.map((file, fileIndex) => renderFileItem(file, fileIndex))}
+  
+        {mode === DisplayMode.Edit && (
+          <TouchableOpacity key="add-button" style={styles.addButton}>
+            <CustomAddFileComponent onFileSelected={onFileUpdated!} mode="list" />
+          </TouchableOpacity>
+        )}
+        <ImageView
+          images={imageUrls}
+          imageIndex={index}
+          visible={visible}
+          onRequestClose={() => setIsVisible(false)}
+        />
+      </ScrollView>
+    );
+  };
+  
+  const getStyles = (colors: ColorScheme) =>
+    StyleSheet.create({
+      scrollView: {
+        paddingVertical: 8,
+        backgroundColor: colors.fileListBackground,
+      },
+      containerStyle: {
+        paddingHorizontal: 12,
+      },
+      fileItem: {
+        width: 72,
+        height: 72,
+        marginRight: 8,
+        borderRadius: 8,
+        overflow: 'hidden',
+        position: 'relative',
+      },
+      deleteTouchable: {
+        position: 'absolute',
+        right: 0,
+        top: 0,
+        zIndex: 1,
+        width: 24,
+        height: 24,
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      deleteLayout: {
+        width: 20,
+        height: 20,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      deleteText: {
+        color: '#fff',
+        fontSize: 16,
+        marginTop: -1.5,
+        marginRight: -0.5,
+        fontWeight: 'normal',
+      },
+      thumbnailContainer: {
+        position: 'relative',
+        width: '100%',
+        height: '100%',
+      },
+      thumbnail: {
+        width: '100%',
+        height: '100%',
+      },
+      playIcon: {
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        marginTop: -16,
+        marginLeft: -16,
+        width: 32,
+        height: 32,
+      },
+      filePreview: {
+        width: '100%',
+        height: '100%',
+        backgroundColor: colors.card,
+        borderWidth: 1,
+        borderColor: colors.fileItemBorder,
+        borderRadius: 8,
+        alignItems: 'flex-start',
+        justifyContent: 'space-between',
+        padding: 8,
+      },
+      formatContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+      },
+      formatIcon: {
+        width: 16,
+        height: 16,
+        marginRight: 4,
+      },
+      fileName: {
+        fontSize: 12,
+        color: colors.text,
+        paddingRight: 12,
+      },
+      fileFormat: {
+        fontSize: 12,
+        color: colors.textSecondary,
+        marginTop: 2,
+      },
+      addButton: {
+        width: 72,
+        height: 72,
+        backgroundColor: colors.addButtonBackground,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      progressContainer: {
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        marginTop: -16,
+        marginLeft: -16,
+        width: 32,
+        height: 32,
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+    });
+  
+  </file>
+  </tool>
+</message>
+
+# Tools:
+
+# Response:
+
+ChatResponse { aiMessage = AiMessage { text = "I'll analyze these files for debugging-related content, looking for error messages, exceptions, TODO/FIXME comments, and potential failing tests.
+
+## Error Handling and Exceptions Found
+
+### react-native/src/api/open-api.ts
+
+**Error Handling and Messages:**
+- `console.log('Error reading stream:', readError);` - Stream reading error logging
+- `console.log(error);` - General error logging in catch blocks
+- Error response parsing: `let errorMessage = '**Error:** ' + (parsedData.error?.message ?? '');`
+- API upgrade error: `Error: Please upgrade your [server API](${GITHUB_LINK}?tab=readme-ov-file#upgrade-api), API` + parsedData.detail
+- Request error handling: `const errorInfo = 'Request error: ' + errorMsg;`
+- Stream parsing error fallback: `return { error: chunk };`
+- Timeout handling with 60-second timeout: `setTimeout(() => controller.abort(), 60000);`
+
+**Key Error Scenarios:**
+1. Stream reading failures
+2. JSON parsing errors in `parseStreamData`
+3. API response errors with detailed error messages
+4. Network request failures
+5. Timeout errors after 60 seconds
+
+### react-native/src/api/ollama-api.ts
+
+**Error Handling:**
+- `console.log('Error reading stream:', readError);` - Stream reading error
+- `console.log(error);` - General error logging
+- `console.log(\`HTTP error! status: ${response.status}\`);` - HTTP status errors
+- `console.log('Error fetching models:', error);` - Model fetching errors
+- Request error handling: `const errorInfo = 'Request error: ' + errorMsg;`
+- Stream parsing error: `return { error: error + chunk };`
+
+**Key Error Scenarios:**
+1. Stream reading failures
+2. HTTP request failures with status codes
+3. Model fetching failures
+4. JSON parsing errors in stream data
+5. Network timeouts (5 seconds for model requests, 60 seconds for chat)
+
+### react-native/ios/Services/AudioManager.swift
+
+**Error Enum and Handling:**
+```swift
+enum AudioError: Error {
+    case recordingFailed(String)
+    case playbackFailed(String)
+    case audioSessionFailed(String)
+    case microphoneAccessDenied(String)
+}
+```
+
+**Error Scenarios:**
+- `print("Failed to setup audio session: \(error)")` - Audio session setup failures
+- `print("Failed to enable voice processing: \(error)")` - Voice processing setup failures
+- `throw AudioError.recordingFailed("Failed to prepare recorder")` - Recording preparation failures
+- `throw AudioError.microphoneAccessDenied("Microphone access denied")` - Permission issues
+- `print("Failed to create format converter")` - Audio format conversion failures
+- `print("Conversion error: \(error?.localizedDescription ?? "unknown error")")` - Audio conversion errors
+- `print("Failed to start audio engine or install tap: \(error)")` - Audio engine startup failures
+
+### react-native/src/chat/component/CustomFileListComponent.tsx
+
+**Error Handling:**
+- Video compression errors: `catch (error) { showInfo('Video process failed'); }`
+- File sharing errors: `console.log('Error opening file:', error);`
+- Video size validation: `showInfo(\`Video too large: ${currentSize.toFixed(1)}MB (max ${MAX_VIDEO_SIZE}MB)\`);`
+
+**Key Issues:**
+1. Video compression failures with user feedback
+2. File sharing/opening failures
+3. Video size limit enforcement (8MB max)
+4. File processing and metadata extraction errors
+
+## Critical Debugging Indicators
+
+**Most Critical Issues:**
+1. **Stream Processing Errors** - Multiple console.log statements for stream reading failures across OpenAI and Ollama APIs
+2. **Audio Engine Failures** - Comprehensive error handling in AudioManager.swift for recording, playback, and microphone access
+3. **Network Timeout Issues** - 60-second timeouts that could cause user experience issues
+4. **Video Compression Failures** - Complex video processing with multiple failure points
+
+**Error Recovery Patterns:**
+- Fallback to "..." message when no content received
+- Audio queue clearing on barge-in detection
+- File removal on processing failures
+- Timeout handling with controller.abort()
+
+All files show production-ready error handling but lack TODO/FIXME comments, suggesting these are mature components with established error handling patterns." reasoningContent = null toolExecutionRequests = [] }, metadata = OpenAiChatResponseMetadata{id='chatcmpl-762ebab2-875a-459a-988c-9dc63100aa6e', modelName='claude-sonnet-4-20250514', tokenUsage=OpenAiTokenUsage { inputTokenCount = 13903, inputTokensDetails = OpenAiTokenUsage.InputTokensDetails { cachedTokens = 0 }, outputTokenCount = 1063, outputTokensDetails = OpenAiTokenUsage.OutputTokensDetails { reasoningTokens = 0 }, totalTokenCount = 14966 }, finishReason=STOP, created=1756791279, serviceTier='null', systemFingerprint='null'} }

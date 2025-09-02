@@ -41,6 +41,8 @@ export const invokeOpenAIWithCallBack = async (
     stream_options: {
       include_usage: true,
     },
+    // Kirim botId ke server untuk proxy requests
+    ...(prompt?.id ? { botId: prompt.id } : {}),
   };
 
   const options = {
@@ -271,6 +273,8 @@ function getOpenAIMessages(
   messages: BedrockMessage[],
   prompt: SystemPrompt | null
 ): OpenAIMessage[] {
+  // Untuk OpenAI, kita tetap menggunakan prompt yang ada karena system prompts
+  // akan ditangani oleh server melalui proxy (/api/openai)
   return [
     ...(prompt ? [{ role: 'system', content: prompt.prompt }] : []),
     ...messages.map(message => {

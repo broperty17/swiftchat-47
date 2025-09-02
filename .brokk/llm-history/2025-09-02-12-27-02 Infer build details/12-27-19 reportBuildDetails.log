@@ -1,0 +1,181 @@
+# Request to gemini-2.5-pro:
+
+<message type=system>
+  You are an agent tasked with finding build information for the *development* environment of a software project.
+  Your goal is to identify key build commands (clean, compile/build, test all, test specific) and how to invoke those commands correctly.
+  Focus *only* on details relevant to local development builds/profiles, explicitly ignoring production-specific
+  configurations unless they are the only ones available.
+  
+  Use the tools to examine build files (like `pom.xml`, `build.gradle`, etc.), configuration files, and linting files,
+  as necessary, to determine the information needed by `reportBuildDetails`.
+  
+  When selecting build or test commands, prefer flags or sub-commands that minimise console output (for example, Maven -q, Gradle --quiet, npm test --silent, sbt -error).
+  Avoid verbose flags such as --info, --debug, or -X unless they are strictly required for correct operation.
+  
+  The lists are DecoratedCollection instances, so you get first/last/index/value fields.
+  Examples:
+  
+  | Build tool        | One-liner a user could write
+  | ----------------- | ------------------------------------------------------------------------
+  | **SBT**           | `sbt -error "testOnly{{#fqclasses}} {{value}}{{/fqclasses}}"`
+  | **Maven**         | `mvn --quiet test -Dtest={{#classes}}{{value}}{{^-last}},{{/-last}}{{/classes}}`
+  | **Gradle**        | `gradle --quiet test{{#classes}} --tests {{value}}{{/classes}}`
+  | **Go**            | `go test -run '{{#classes}}{{value}}{{^-last}} | {{/-last}}{{/classes}}`
+  | **.NET CLI**      | `dotnet test --filter "{{#classes}}FullyQualifiedName\~{{value}}{{^-last}} | {{/-last}}{{/classes}}"`
+  | **pytest**        | `pytest {{#files}}{{value}}{{^-last}} {{/-last}}{{/files}}`
+  | **Jest**          | `jest {{#files}}{{value}}{{^-last}} {{/-last}}{{/files}}`
+  
+  Prefer the repository-local *wrapper script* when it exists in the project root (e.g. `./gradlew`, `./mvnw`).
+  Only fall back to the bare command (`gradle`, `mvn` …) when no wrapper script is present.
+  
+  
+  A baseline set of excluded directories has been established from build conventions and .gitignore.
+  When you use `reportBuildDetails`, the `excludedDirectories` parameter should contain *additional* directories
+  you identify that should be excluded from code intelligence, beyond this baseline.
+  
+  Remember to request the `reportBuildDetails` tool to finalize the process ONLY once all information is collected.
+  The reportBuildDetails tool expects exactly four parameters: buildLintCommand, testAllCommand, testSomeCommand, and excludedDirectories.
+</message>
+
+<message type=user>
+  Here are the contents of the project root directory:
+  ```
+  Files in .: CODE_OF_CONDUCT.md, CONTRIBUTING.md, LICENSE, README.md, README_CN.md, my-release-key.keystore, package-lock.json
+  ```
+</message>
+
+<message type=ai>
+  Thank you.
+</message>
+
+<message type=ai>
+  
+  Tool calls:
+  searchFilenames({"reasoning": "The presence of `package-lock.json` suggests an `npm` project. I'm looking for `package.json` to find the build and test scripts.", "patterns": ["package.json"]})
+</message>
+
+<message type=tool_execution_result>
+  searchFilenames -> Matching filenames: react-native/package.json
+</message>
+
+<message type=ai>
+  
+  Tool calls:
+  getFileContents({"filenames": ["react-native/package.json"]})
+</message>
+
+<message type=tool_execution_result>
+  getFileContents -> <file name="react-native/package.json">
+  {
+    "name": "BropertyAi",
+    "description": "Sample Bedrock Cross-platform App - BropertyAi",
+    "version": "2.4.0",
+    "private": true,
+    "scripts": {
+      "android": "react-native run-android",
+      "ios": "react-native run-ios",
+      "build:ios": "cd ios && xcodebuild -workspace BropertyAi.xcworkspace -scheme BropertyAi -sdk iphonesimulator -configuration Release -destination generic/platform=iOS CODE_SIGN_IDENTITY=\"\" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO clean archive | xcpretty",
+      "format": "npx prettier --check '*.{js,ts}'",
+      "lint": "npx eslint .",
+      "start": "react-native start",
+      "test": "jest"
+    },
+    "dependencies": {
+      "@bwjohns4/react-native-draggable-flatlist": "^4.0.1-patch",
+      "@react-native-clipboard/clipboard": "^1.14.1",
+      "@react-navigation/drawer": "^7.1.1",
+      "@react-navigation/native": "^7.0.14",
+      "@react-navigation/native-stack": "^7.2.0",
+      "mathjax-full": "^3.2.2",
+      "react": "18.2.0",
+      "react-native": "0.74.1",
+      "react-native-code-highlighter": "^1.2.2",
+      "react-native-compressor": "^1.10.1",
+      "react-native-dialog": "^9.3.0",
+      "react-native-document-picker": "^9.3.1",
+      "react-native-element-dropdown": "^2.12.1",
+      "react-native-fetch-api": "^3.0.0",
+      "react-native-file-viewer": "^2.1.5",
+      "react-native-fs": "^2.20.0",
+      "react-native-gesture-handler": "^2.16.2",
+      "react-native-get-random-values": "^1.11.0",
+      "react-native-gifted-chat": "^2.4.0",
+      "react-native-haptic-feedback": "^2.2.0",
+      "react-native-image-picker": "^7.2.3",
+      "react-native-image-viewing": "^0.2.2",
+      "react-native-keyboard-controller": "^1.18.2",
+      "react-native-maps": "^1.7.1",
+      "react-native-marked": "^6.0.7",
+      "react-native-math-view": "^3.9.5",
+      "react-native-mmkv": "^2.12.2",
+      "react-native-polyfill-globals": "^3.1.0",
+      "react-native-progress": "^5.0.1",
+      "react-native-reanimated": "^3.10.1",
+      "react-native-safe-area-context": "^4.10.8",
+      "react-native-screens": "^4.4.0",
+      "react-native-share": "^10.2.1",
+      "react-native-svg": "^15.4.0",
+      "react-native-toast-message": "^2.2.1",
+      "react-native-uuid": "^2.0.3",
+      "react-native-webview": "^13.16.0",
+      "react-syntax-highlighter": "^15.5.0",
+      "readable-stream": "^4.7.0",
+      "text-decoder": "^1.2.3",
+      "text-encoding": "^0.7.0",
+      "uuid": "^11.1.0",
+      "web-streams-polyfill": "^3.2.1"
+    },
+    "devDependencies": {
+      "@babel/core": "^7.26.10",
+      "@babel/preset-env": "^7.26.9",
+      "@babel/runtime": "^7.26.10",
+      "@react-native/babel-preset": "0.74.85",
+      "@react-native/eslint-config": "0.74.85",
+      "@react-native/metro-config": "0.74.85",
+      "@react-native/typescript-config": "0.74.85",
+      "@types/marked": "5.0.0",
+      "@types/react": "^18.2.6",
+      "@types/react-native-table-component": "^1.2.8",
+      "@types/react-syntax-highlighter": "^15.5.13",
+      "@types/react-test-renderer": "^18.0.0",
+      "@types/uuid": "^3.4.13",
+      "babel-jest": "^29.6.3",
+      "core-js": "^3.37.1",
+      "eslint": "^8.57.0",
+      "eslint-config-prettier": "8.8.0",
+      "jest": "^29.6.3",
+      "patch-package": "^8.0.0",
+      "prettier": "2.8.8",
+      "react-test-renderer": "18.2.0",
+      "typescript": "5.0.4"
+    },
+    "overrides": {
+      "@react-native-clipboard/clipboard": {
+        "react-native": "~0.74.1",
+        "react-native-windows": "~0.74.1"
+      }
+    },
+    "engines": {
+      "node": ">=18"
+    },
+    "license": "Apache-2.0",
+    "types": "module"
+  }
+  
+  </file>
+</message>
+
+<message type=user>
+  Gather the development build details based on the project files and previous findings. Use the available tools to explore and collect the information, then report it using 'reportBuildDetails'.
+</message>
+
+# Tools:
+
+listFiles
+searchFilenames
+searchSubstrings
+getFileContents
+reportBuildDetails
+abortBuildDetails# Response:
+
+ChatResponse { aiMessage = AiMessage { text = null reasoningContent = null toolExecutionRequests = [ToolExecutionRequest { id = "call_2a2848f1aed64867a899ea6dd8d5", name = "reportBuildDetails", arguments = "{"testAllCommand": "jest --silent", "testSomeCommand": "jest --silent {{#files}}{{value}}{{^-last}} {{/-last}}{{/files}}", "excludedDirectories": ["android", "ios"], "buildLintCommand": "npx eslint ."}" }] }, metadata = OpenAiChatResponseMetadata{id='MoC2aKfpGNKT-8YP7Y7egA4', modelName='gemini-2.5-pro', tokenUsage=OpenAiTokenUsage { inputTokenCount = 3103, inputTokensDetails = OpenAiTokenUsage.InputTokensDetails { cachedTokens = null }, outputTokenCount = 426, outputTokensDetails = OpenAiTokenUsage.OutputTokensDetails { reasoningTokens = 365 }, totalTokenCount = 3529 }, finishReason=STOP, created=1756790835, serviceTier='null', systemFingerprint='null'} }

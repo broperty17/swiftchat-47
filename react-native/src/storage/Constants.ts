@@ -154,6 +154,18 @@ const DefaultSystemPrompts = [
     prompt: 'Anda memberikan info properti lainnya. Semua pertanyaan prompt bisa dijawab disini',
     includeHistory: false,
   },
+  {
+    id: -8,
+    name: 'SEARCH WEB',
+    prompt: 'Buka browser web untuk mencari informasi properti di internet',
+    includeHistory: false,
+  },
+  {
+    id: -9,
+    name: 'MAPS',
+    prompt: 'Buka peta untuk melihat lokasi properti dan navigasi',
+    includeHistory: false,
+  },
   ...DefaultVoiceSystemPrompts,
 ];
 export const DefaultVoicePrompt =

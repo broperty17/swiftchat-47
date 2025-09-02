@@ -36,6 +36,7 @@
     "react-native-image-picker": "^7.2.3",
     "react-native-image-viewing": "^0.2.2",
     "react-native-keyboard-controller": "^1.18.2",
+    "react-native-maps": "^1.7.1",
     "react-native-marked": "^6.0.7",
     "react-native-math-view": "^3.9.5",
     "react-native-mmkv": "^2.12.2",
@@ -47,13 +48,16 @@
     "react-native-share": "^10.2.1",
     "react-native-svg": "^15.4.0",
     "react-native-toast-message": "^2.2.1",
+    "react-native-url-polyfill": "^2.0.0",
     "react-native-uuid": "^2.0.3",
+    "react-native-webview": "^13.16.0",
     "react-syntax-highlighter": "^15.5.0",
     "readable-stream": "^4.7.0",
     "text-decoder": "^1.2.3",
     "text-encoding": "^0.7.0",
     "uuid": "^11.1.0",
-    "web-streams-polyfill": "^3.2.1"
+    "web-streams-polyfill": "^3.2.1",
+    "whatwg-url-without-unicode": "^8.0.0-3"
   },
   "devDependencies": {
     "@babel/core": "^7.26.10",

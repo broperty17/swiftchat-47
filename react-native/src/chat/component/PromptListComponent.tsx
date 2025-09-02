@@ -136,6 +136,20 @@ export const PromptListComponent: React.FC<PromptListProps> = ({
     } catch (error) {
     console.error('Navigation error:', error);
     }
+  } else if (prompt.name === 'SEARCH WEB') {
+  console.log('Navigating to WebView');
+    try {
+    navigation.navigate('WebView', {});
+    } catch (error) {
+    console.error('Navigation error:', error);
+    }
+  } else if (prompt.name === 'MAPS') {
+  console.log('Navigating to Maps');
+    try {
+    navigation.navigate('Maps', {});
+    } catch (error) {
+    console.error('Navigation error:', error);
+    }
   } else {
     console.log('Default case – selecting prompt normally');
     const newPrompt = selectedPrompt?.id === prompt.id ? null : prompt;

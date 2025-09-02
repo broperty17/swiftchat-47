@@ -15,6 +15,8 @@ import TokenUsageScreen from './settings/TokenUsageScreen.tsx';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import PromptScreen from './prompt/PromptScreen.tsx';
 import PresetPromptList from './prompt/PresetPromptList.tsx';
+import WebViewScreen from './webview/WebViewScreen.tsx';
+import MapsScreen from './maps/MapsScreen.tsx';
 import { isAndroid, isMacCatalyst } from './utils/PlatformUtils';
 import { ThemeProvider, useTheme } from './theme';
 
@@ -109,6 +111,34 @@ const AppNavigator = () => {
          headerStyle: { backgroundColor: colors.background },
          headerTintColor: colors.text,
        }}
+      />
+      <Stack.Screen
+        name="WebView"
+        component={WebViewScreen}
+        options={{
+          title: 'Web Browser',
+          contentStyle: {
+            height: isMac ? 66 : undefined,
+            backgroundColor: colors.background,
+          },
+          headerTitleAlign: 'center',
+          headerStyle: { backgroundColor: colors.background },
+          headerTintColor: colors.text,
+        }}
+      />
+      <Stack.Screen
+        name="Maps"
+        component={MapsScreen}
+        options={{
+          title: 'Peta Properti',
+          contentStyle: {
+            height: isMac ? 66 : undefined,
+            backgroundColor: colors.background,
+          },
+          headerTitleAlign: 'center',
+          headerStyle: { backgroundColor: colors.background },
+          headerTintColor: colors.text,
+        }}
       />
     </Stack.Navigator>
   );

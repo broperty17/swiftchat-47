@@ -1,0 +1,2209 @@
+# Request to claude-4-sonnet:
+
+<message type=system>
+  You are a code expert extracting ALL information relevant to the given goal
+  from the provided tool call result.
+  
+  Your output will be given to the agent running the search, and replaces the raw result.
+  Thus, you must include every relevant class/method name and any
+  relevant code snippets that may be needed later. DO NOT speculate; only use the provided content.
+</message>
+
+<message type=user>
+  <goal>
+  Find any crash logs, stack traces, or error handling code that might indicate known issues
+  </goal>
+  <reasoning>
+  
+  </reasoning>
+  <tool name="getFileContents">
+  <file name="react-native/ios/Services/AudioManager.swift">
+  import Foundation
+  import AVFoundation
+  
+  enum AudioError: Error {
+      case recordingFailed(String)
+      case playbackFailed(String)
+      case audioSessionFailed(String)
+      case microphoneAccessDenied(String)
+  }
+  
+  class AudioManager: NSObject {
+      // Basic components
+      private var audioSession = AVAudioSession.sharedInstance()
+      private var audioRecorder: AVAudioRecorder?
+      
+      // Audio engine components
+      private var audioEngine = AVAudioEngine()
+      private var playerNode = AVAudioPlayerNode()
+      
+      // Microphone capture related
+      private var isCapturing = false
+    
+      private var isAudioContentEnd = true
+      private var isPlaying = false
+      private var isActive = false
+  
+      // Barge-in related
+      private var bargeIn = false
+    
+      private var allowInterruption = true
+      
+      // Standard format for audio processing (48kHz is widely supported)
+      private var iOSAudioFormat: AVAudioFormat = AVAudioFormat(standardFormatWithSampleRate: 48000, channels: 1)!
+      
+      // Input format for Nova Sonic (16kHz)
+      private var inputFormat: AVAudioFormat = AVAudioFormat(
+          commonFormat: .pcmFormatInt16,
+          sampleRate: 16000,
+          channels: 1,
+          interleaved: false
+      )!
+    
+      private var outputFormat: AVAudioFormat = AVAudioFormat(
+          commonFormat: .pcmFormatInt16,
+          sampleRate: 24000,
+          channels: 1,
+          interleaved: false
+      )!
+      
+      // Pre-created converter for better performance
+      private var converter: AVAudioConverter?
+      
+      // Audio processing queue
+      private let audioQueue = DispatchQueue(label: "com.swiftchat.audio", qos: .userInteractive)
+      
+      // Simple audio data queue
+      private var audioDataQueue = [Data]()
+      private var isProcessingQueue = false
+      
+      // Recording settings
+      private let recordSettings: [String: Any] = [
+          AVFormatIDKey: Int(kAudioFormatLinearPCM),
+          AVSampleRateKey: 16000.0,
+          AVNumberOfChannelsKey: 1,
+          AVLinearPCMBitDepthKey: 16,
+          AVLinearPCMIsFloatKey: false,
+          AVLinearPCMIsBigEndianKey: false
+      ]
+      
+      // Callbacks
+      var onError: ((Error) -> Void)?
+      var onAudioCaptured: ((Data) -> Void)?  // New callback for captured audio data
+      var onAudioLevelChanged: ((String, Int) -> Void)? // Callback for audio level changes (source, level 1-10)
+      
+      // Audio level tracking
+      private var lastInputLevel: Int = 0
+      private var lastOutputLevel: Int = 0
+      
+      override init() {
+          super.init()
+      }
+      
+      deinit {
+          audioEngine.stop()
+      }
+  
+      func setAllowInterruption(_ allowInterruption: Bool) {
+          self.allowInterruption = allowInterruption
+      }
+  
+      func setIsActive(_ isActive: Bool) {
+          if !isActive {
+              isAudioContentEnd = true
+              onAudioEnd()
+          }
+          self.isActive = isActive
+      }
+  
+      // MARK: - Audio Setup
+      private func setupAudio() {
+          // Setup audio session with speaker output
+          do {
+              // Changed to voiceChat mode - better for VoIP applications
+              try audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetooth, .duckOthers])
+              try audioSession.setActive(true)
+              if audioSession.isInputGainSettable {
+                  try audioSession.setInputGain(1.0)
+              }
+          } catch {
+              print("Failed to setup audio session: \(error)")
+          }
+          // Setup audio engine with explicit format
+          audioEngine.attach(playerNode)
+          audioEngine.connect(playerNode, to: audioEngine.mainMixerNode, format: iOSAudioFormat)
+          audioEngine.connect(audioEngine.mainMixerNode, to: audioEngine.outputNode, format: nil)
+          // Enable voice processing (echo cancellation)
+          do {
+              try audioEngine.inputNode.setVoiceProcessingEnabled(true)
+              print("Voice processing enabled successfully")
+          } catch {
+              print("Failed to enable voice processing: \(error)")
+          }
+          
+          // Set player node volume higher (for playback volume)
+          playerNode.volume = 2.0
+          // Pre-create converter for better performance
+          converter = AVAudioConverter(from: outputFormat, to: iOSAudioFormat)
+      }
+      
+      // MARK: - Recording
+      
+      func startRecording() throws -> URL {
+          print("start Recording")
+          let tempDir = FileManager.default.temporaryDirectory
+          let fileName = UUID().uuidString + ".wav"
+          let fileURL = tempDir.appendingPathComponent(fileName)
+          
+          do {
+              audioRecorder = try AVAudioRecorder(url: fileURL, settings: recordSettings)
+              audioRecorder?.delegate = self
+              
+              guard let recorder = audioRecorder, recorder.prepareToRecord() else {
+                  throw AudioError.recordingFailed("Failed to prepare recorder")
+              }
+              
+              if recorder.record() {
+                  return fileURL
+              } else {
+                  throw AudioError.recordingFailed("Failed to start recording")
+              }
+          } catch {
+              if let audioError = error as? AudioError {
+                  throw audioError
+              } else {
+                  throw AudioError.recordingFailed("Recording error: \(error)")
+              }
+          }
+      }
+      
+      func stopRecording() -> URL? {
+          guard let recorder = audioRecorder, recorder.isRecording else {
+              return nil
+          }
+          
+          let fileURL = recorder.url
+          recorder.stop()
+          audioRecorder = nil
+          return fileURL
+      }
+      
+      // MARK: - Barge-in handling
+      
+      func setBargeIn(_ value: Bool) {
+          audioQueue.async { [weak self] in
+              guard let self = self else { return }
+              self.bargeIn = value
+              
+              // If set to interrupt state, process queue immediately
+              if value {
+                  self.processQueue()
+              }
+          }
+      }
+      
+      // MARK: - Playback
+      // Helper method to convert nova sonic output format(24kHz) audio data to a buffer with iOS Format(48kHz)
+      private func convertOutputAudioToBuffer(data: Data) -> AVAudioPCMBuffer? {
+          // Create input buffer with 24kHz format (data.count / 2 because each sample is 2 bytes)
+          let frameCapacity = AVAudioFrameCount(data.count / 2)
+          
+          guard let inputBuffer = AVAudioPCMBuffer(pcmFormat: outputFormat, frameCapacity: frameCapacity) else {
+              return nil
+          }
+          inputBuffer.frameLength = inputBuffer.frameCapacity
+          
+          // Fill input buffer with audio data
+          data.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
+              if let baseAddress = bytes.baseAddress {
+                  memcpy(inputBuffer.int16ChannelData![0], baseAddress, data.count)
+              }
+          }
+          
+          // Use pre-created converter
+          guard let converter = self.converter else {
+              return nil
+          }
+          
+          // Calculate output buffer size based on sample rate conversion ratio
+          let ratio = iOSAudioFormat.sampleRate / outputFormat.sampleRate
+          let outputFrames = AVAudioFrameCount(Double(inputBuffer.frameLength) * ratio)
+          
+          // Create output buffer with 48kHz format
+          guard let outputBuffer = AVAudioPCMBuffer(pcmFormat: iOSAudioFormat, frameCapacity: outputFrames) else {
+              return nil
+          }
+          
+          // Perform conversion
+          var error: NSError?
+          let status = converter.convert(to: outputBuffer, error: &error) { inNumPackets, outStatus in
+              outStatus.pointee = .haveData
+              return inputBuffer
+          }
+          
+          if status == .error || error != nil {
+              return nil
+          }
+          
+          return outputBuffer
+      }
+      
+      func playAudio(data: Data) throws {
+          // Ensure engine is running
+          isPlaying = true
+          isAudioContentEnd = false
+  
+          // Process audio on dedicated queue
+          audioQueue.async { [weak self] in
+              guard let self = self else { return }
+              
+              // Add to queue
+              self.audioDataQueue.append(data)
+              
+              // If not already processing, start processing
+              if !self.isProcessingQueue {
+                  self.processQueue()
+              }
+          }
+      }
+      
+      private func processQueue() {
+          // Check if interruption is needed
+          if bargeIn {
+              print("Barge-in detected. Clearing audio queue.")
+              audioDataQueue.removeAll()
+              bargeIn = false
+              isProcessingQueue = false
+              
+              if playerNode.isPlaying {
+                  playerNode.stop()
+              }
+              
+              return
+          }
+        
+          guard !audioDataQueue.isEmpty else {
+              isProcessingQueue = false
+              if isPlaying, isAudioContentEnd {
+                  self.onAudioEnd()
+              }
+              return
+          }
+          
+          isProcessingQueue = true
+          
+          // Process up to 20 audio data blocks at once
+          let batchSize = min(20, audioDataQueue.count)
+          var combinedData = Data()
+          // Combine multiple audio data blocks
+          for _ in 0..<batchSize {
+              let audioData = audioDataQueue.removeFirst()
+              combinedData.append(audioData)
+          }
+          
+          // Convert combined audio data to buffer with sample rate conversion
+          if let buffer = convertOutputAudioToBuffer(data: combinedData) {
+              // Calculate audio level from output buffer
+              let level = calculateAudioLevel(buffer: buffer)
+              let normalizedLevel = normalizeToScale(level: level)
+              
+              // Only send callback if level changed
+              if normalizedLevel != lastOutputLevel {
+                  lastOutputLevel = normalizedLevel
+                  onAudioLevelChanged?("speaker", normalizedLevel)
+              }
+              
+              // Schedule buffer for playback
+              playerNode.scheduleBuffer(buffer, at: nil, options: [], completionHandler: { [weak self] in
+                  guard let self = self else { return }
+                  self.processQueue() // Process next batch
+              })
+              
+              // Start playback if not already playing
+              if !playerNode.isPlaying && audioEngine.isRunning {
+                  playerNode.play()
+              }
+          } else {
+              // If conversion failed, try next batch
+              processQueue()
+          }
+      }
+    
+      func readAudioChunk(from url: URL, chunkSize: Int = 1024) -> Data? {
+          do {
+              let data = try Data(contentsOf: url)
+              return data
+          } catch {
+              onError?(AudioError.playbackFailed("Failed to read audio file: \(error)"))
+              return nil
+          }
+      }
+      
+      // MARK: - Microphone Capturing
+      
+      func startCapturing() throws {
+          if audioEngine.isRunning {
+              audioEngine.inputNode.removeTap(onBus: 0)
+              audioEngine.stop()
+          }
+          setupAudio()
+          // Check microphone permission
+          switch audioSession.recordPermission {
+              case .denied:
+                  throw AudioError.microphoneAccessDenied("Microphone access denied")
+              case .undetermined:
+                  // Request permission
+                  var permissionGranted = false
+                  let semaphore = DispatchSemaphore(value: 0)
+                  
+                  audioSession.requestRecordPermission { granted in
+                      permissionGranted = granted
+                      semaphore.signal()
+                  }
+                  
+                  _ = semaphore.wait(timeout: .now() + 5.0)
+                  
+                  if !permissionGranted {
+                      throw AudioError.microphoneAccessDenied("Microphone access denied")
+                  }
+              case .granted:
+                  break
+              @unknown default:
+                  throw AudioError.microphoneAccessDenied("Unknown microphone permission status")
+          }
+          
+          // Ensure audio session is active
+          if !audioSession.isInputAvailable {
+              throw AudioError.recordingFailed("Audio input is not available")
+          }
+          do {
+              // Get input node
+              let inputNode = audioEngine.inputNode
+              let singleChannelFormat = AVAudioFormat(
+                  standardFormatWithSampleRate: inputNode.outputFormat(forBus: 0).sampleRate,
+                  channels: 1
+              )
+              let bufferSize: AVAudioFrameCount = 1024
+              print("Start Listening...")
+              inputNode.installTap(onBus: 0, bufferSize: bufferSize, format: singleChannelFormat) { [weak self] (buffer, time) in
+                  guard let self = self, self.isCapturing else { return }
+                  if isPlaying, !allowInterruption {
+                      if self.lastInputLevel != 1 {
+                          self.onAudioLevelChanged?("microphone", 1)
+                      }
+                      return
+                  }
+                  // Calculate audio level from input buffer
+                  var level = self.calculateAudioLevel(buffer: buffer)
+                  level = min(1, level * 1.5)
+                  let normalizedLevel = self.normalizeToScale(level: level)
+                  
+                  // Only send callback if level changed
+                  if normalizedLevel != self.lastInputLevel {
+                      self.lastInputLevel = normalizedLevel
+                      self.onAudioLevelChanged?("microphone", normalizedLevel)
+                  }
+                  // Convert buffer to target format (16kHz, 16-bit PCM)
+                  if let convertedBuffer = self.convertInputBufferToNovaSonicFormat(buffer, sourceFormat: buffer.format) {
+                      // Convert the converted buffer to Data
+                      if let data = self.bufferToData(convertedBuffer) {
+                          // Send data through callback in background thread
+                          self.onAudioCaptured?(data)
+                      }
+                  }
+              }
+              try audioEngine.start()
+              isCapturing = true
+              print("Audio engine started successfully")
+          } catch {
+              print("Failed to start audio engine or install tap: \(error)")
+              onError?(AudioError.recordingFailed("Recording error: \(error)"))
+          }
+      }
+      
+      // Convert device input buffer format(48kHz) to nova sonic target format (16kHz)
+      private func convertInputBufferToNovaSonicFormat(_ buffer: AVAudioPCMBuffer, sourceFormat: AVAudioFormat) -> AVAudioPCMBuffer? {
+          // Create a converter from source format to target format
+          guard let converter = AVAudioConverter(from: sourceFormat, to: inputFormat) else {
+              print("Failed to create format converter")
+              return nil
+          }
+          
+          // Calculate output buffer size based on sample rate conversion ratio
+          let ratio = Double(inputFormat.sampleRate) / Double(sourceFormat.sampleRate)
+          let outputFrames = AVAudioFrameCount(Double(buffer.frameLength) * ratio)
+          
+          // Create output buffer with target format
+          guard let outputBuffer = AVAudioPCMBuffer(pcmFormat: inputFormat, frameCapacity: outputFrames) else {
+              print("Failed to create output buffer")
+              return nil
+          }
+          
+          // Perform conversion
+          var error: NSError?
+          let status = converter.convert(to: outputBuffer, error: &error) { inNumPackets, outStatus in
+              outStatus.pointee = .haveData
+              return buffer
+          }
+          
+          if status == .error || error != nil {
+              print("Conversion error: \(error?.localizedDescription ?? "unknown error")")
+              return nil
+          }
+          
+          return outputBuffer
+      }
+      
+      // MARK: - Handle End Conversation
+      func stopCapturing() {
+          guard isCapturing else { return }
+          
+          // Remove tap
+          audioEngine.inputNode.removeTap(onBus: 0)
+          isCapturing = false
+          audioEngine.stop()
+          print("Microphone capturing stopped")
+      }
+      
+      func onAudioEnd() {
+          isPlaying = false
+          lastOutputLevel = 1
+          onAudioLevelChanged?("speaker", 1)
+      }
+  
+      func onContentEnd() {
+          self.isAudioContentEnd = true
+      }
+      
+      func stopPlayback() {
+        // Clear queue
+        audioQueue.async { [weak self] in
+            guard let self = self else { return }
+            
+            // Clear queue
+            self.audioDataQueue.removeAll()
+            self.isProcessingQueue = false
+            
+            if self.playerNode.isPlaying {
+                self.playerNode.stop()
+            }
+            print("Audio playback stopped")
+        }
+      }
+      
+      func deactivateAudioSession() throws {
+          do {
+              try audioSession.setActive(false, options: .notifyOthersOnDeactivation)
+          } catch {
+              throw AudioError.audioSessionFailed("Failed to deactivate audio session: \(error)")
+          }
+      }
+      
+      // Calculate audio level from buffer (0.0-1.0 range)
+      private func calculateAudioLevel(buffer: AVAudioPCMBuffer) -> Float {
+          guard let channelData = buffer.floatChannelData?[0] else { return 0.0 }
+          
+          let channelDataLength = Int(buffer.frameLength)
+          var sum: Float = 0.0
+          
+          // Calculate RMS (Root Mean Square) of audio samples
+          for i in 0..<channelDataLength {
+              let sample = channelData[i]
+              sum += sample * sample
+          }
+          
+          // Avoid division by zero
+          if channelDataLength > 0 {
+              let rms = sqrt(sum / Float(channelDataLength))
+              // Convert RMS to 0-1 range with logarithmic scaling
+              return min(1.0, max(0.0, 20 * log10(rms) + 60) / 60)
+          }
+          
+          return 0.0
+      }
+      
+      // Normalize level to target scale (e.g., 1-10)
+      private func normalizeToScale(level: Float, min: Float = 0.0, max: Float = 1.0, targetMin: Int = 1, targetMax: Int = 10) -> Int {
+          let normalizedValue = (level - min) / (max - min)
+          let scaledValue = normalizedValue * Float(targetMax - targetMin) + Float(targetMin)
+          return Int(round(scaledValue))
+      }
+      
+      // Convert PCM buffer to Data
+      private func bufferToData(_ buffer: AVAudioPCMBuffer) -> Data? {
+          guard let int16ChannelData = buffer.int16ChannelData else { return nil }
+          
+          let frameLength = Int(buffer.frameLength)
+          let channelCount = Int(buffer.format.channelCount)
+          let bytesPerSample = 2 // 16-bit = 2 bytes
+          let dataSize = frameLength * bytesPerSample * channelCount
+          
+          var data = Data(capacity: dataSize)
+          
+          // Copy int16 data to Data
+          for frame in 0..<frameLength {
+              let sample = int16ChannelData[0][frame]
+              var byteOrderedSample = sample.littleEndian // Ensure little-endian byte order
+              withUnsafePointer(to: &byteOrderedSample) { pointer in
+                   data.append(UnsafeBufferPointer(start: pointer, count: 1))
+               }
+          }
+          
+          return data
+      }
+  }
+  
+  // MARK: - AVAudioRecorderDelegate
+  extension AudioManager: AVAudioRecorderDelegate {
+      func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {
+          if !flag {
+              onError?(AudioError.recordingFailed("Recording finished unsuccessfully"))
+          }
+      }
+      
+      func audioRecorderEncodeErrorDidOccur(_ recorder: AVAudioRecorder, error: Error?) {
+          if let error = error {
+              onError?(AudioError.recordingFailed("Recording error: \(error)"))
+          } else {
+              onError?(AudioError.recordingFailed("Unknown recording error occurred"))
+          }
+      }
+  }
+  
+  </file>
+  
+  <file name="react-native/src/chat/ChatScreen.tsx">
+  import React, { useCallback, useEffect, useRef, useState } from 'react';
+  import { Composer, GiftedChat, InputToolbar } from 'react-native-gifted-chat';
+  import {
+    AppState,
+    Dimensions,
+    FlatList,
+    Keyboard,
+    LayoutChangeEvent,
+    NativeScrollEvent,
+    NativeSyntheticEvent,
+    Platform,
+    SafeAreaView,
+    StyleSheet,
+    TextInput,
+  } from 'react-native';
+  import { voiceChatService } from './service/VoiceChatService';
+  import AudioWaveformComponent, {
+    AudioWaveformRef,
+  } from './component/AudioWaveformComponent';
+  import { useTheme, ColorScheme } from '../theme';
+  import {
+    invokeBedrockWithCallBack as invokeBedrockWithCallBack,
+    requestToken,
+  } from '../api/bedrock-api';
+  import CustomMessageComponent from './component/CustomMessageComponent.tsx';
+  import { CustomScrollToBottomComponent } from './component/CustomScrollToBottomComponent.tsx';
+  import { EmptyChatComponent } from './component/EmptyChatComponent.tsx';
+  import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+  import { DrawerParamList } from '../types/RouteTypes.ts';
+  import {
+    getCurrentSystemPrompt,
+    getCurrentVoiceSystemPrompt,
+    getImageModel,
+    getMessagesBySessionId,
+    getSessionId,
+    getTextModel,
+    isTokenValid,
+    saveCurrentSystemPrompt,
+    saveCurrentVoiceSystemPrompt,
+    saveMessageList,
+    saveMessages,
+    updateTotalUsage,
+  } from '../storage/StorageUtils.ts';
+  import {
+    ChatMode,
+    ChatStatus,
+    FileInfo,
+    Metrics,
+    SwiftChatMessage,
+    SystemPrompt,
+    Usage,
+  } from '../types/Chat.ts';
+  import { useAppContext } from '../history/AppProvider.tsx';
+  import { CustomHeaderRightButton } from './component/CustomHeaderRightButton.tsx';
+  import CustomSendComponent from './component/CustomSendComponent.tsx';
+  import {
+    BedrockMessage,
+    getBedrockMessage,
+    getBedrockMessagesFromChatMessages,
+  } from './util/BedrockMessageConvertor.ts';
+  import { trigger } from './util/HapticUtils.ts';
+  import { HapticFeedbackTypes } from 'react-native-haptic-feedback/src/types.ts';
+  import { isMac } from '../App.tsx';
+  import { CustomChatFooter } from './component/CustomChatFooter.tsx';
+  import {
+    checkFileNumberLimit,
+    getFileTypeSummary,
+    isAllFileReady,
+  } from './util/FileUtils.ts';
+  import HeaderTitle from './component/HeaderTitle.tsx';
+  import { showInfo } from './util/ToastUtils.ts';
+  import { HeaderOptions } from '@react-navigation/elements';
+  import { v4 as uuidv4 } from 'uuid';
+  import { PRESET_PROMPTS } from '../prompt/PresetPrompts.ts';
+  const generateId = () => uuidv4();
+  
+  const BOT_ID = 2;
+  
+  const createBotMessage = (mode: string, currentSystemPrompt?: SystemPrompt | null) => {
+    // Generate AI name based on system prompt
+  const getAIName = () => {
+   if (mode !== ChatMode.Text) {
+  return getImageModel().modelName;
+  }
+   
+  if (currentSystemPrompt?.name) {
+  switch (currentSystemPrompt.name) {
+  case 'Notaris Ai':
+     return 'Notaris Ai';
+  case 'Pengacara Ai':
+     return 'Pengacara Ai';
+  case 'Aparatur Pemerintah Ai':
+      return 'Aparatur Pemerintah Ai';
+   case 'Sertifikasi Elektronik Ai':
+      return 'Sertifikasi Elektronik Ai';
+   case 'Agensi Properti Ai':
+      return 'Agensi Properti Ai';
+   case 'KPR Bank Ai':
+      return 'KPR Bank Ai';
+  default:
+     return 'Broperty Ai';
+    }
+   }
+   
+   return 'Broperty Ai';
+  };
+  
+    // Generate avatar based on system prompt
+   const getAIAvatar = () => {
+   if (currentSystemPrompt?.avatar) {
+   return currentSystemPrompt.avatar;
+   }
+   return undefined; // Default avatar will be handled by the UI
+   };
+  
+    return {
+      _id: generateId(),
+      text: mode === ChatMode.Text ? textPlaceholder : imagePlaceholder,
+      createdAt: new Date(),
+      user: {
+        _id: BOT_ID,
+        name: getAIName(),
+        avatar: getAIAvatar(),
+        modelTag: mode === ChatMode.Text ? getTextModel().modelTag : undefined,
+      },
+    };
+  };
+  const imagePlaceholder = '![](bedrock://imgProgress)';
+  const textPlaceholder = '...';
+  type ChatScreenRouteProp = RouteProp<DrawerParamList, 'Bedrock'>;
+  let currentMode = ChatMode.Text;
+  
+  function ChatScreen(): React.JSX.Element {
+    const { colors, isDark } = useTheme();
+    const navigation = useNavigation();
+    const route = useRoute<ChatScreenRouteProp>();
+    const initialSessionId = route.params?.sessionId;
+    const tapIndex = route.params?.tapIndex;
+    const mode = route.params?.mode ?? currentMode;
+    const modeRef = useRef(mode);
+    const isNovaSonic =
+      getTextModel()?.modelId?.includes('nova-sonic') &&
+      modeRef.current === ChatMode.Text;
+  
+    // Seed initial messages with Broperty Ai welcome if no session/preset provided
+    const initialBropertyPreset =
+      !initialSessionId && !route.params?.presetPrompt
+        ? PRESET_PROMPTS.find(p => p.name === 'Broperty Ai')
+        : undefined;
+    const seededInitialMessages: SwiftChatMessage[] = initialBropertyPreset
+      ? [
+          {
+            _id: generateId(),
+            text: initialBropertyPreset.prompt,
+            createdAt: new Date(),
+            user: {
+              _id: 2,
+              name: initialBropertyPreset.name,
+              avatar: initialBropertyPreset.avatar,
+              modelTag: getTextModel().modelTag,
+            },
+          },
+        ]
+      : [];
+    const [messages, setMessages] = useState<SwiftChatMessage[]>(
+      seededInitialMessages
+    );
+    const [isLoadingMessages, setIsLoadingMessages] = useState<boolean>(false);
+    const [systemPrompt, setSystemPrompt] = useState<SystemPrompt | null>(
+      isNovaSonic ? getCurrentVoiceSystemPrompt : getCurrentSystemPrompt
+    );
+    const [showSystemPrompt, setShowSystemPrompt] = useState<boolean>(true);
+    const [screenDimensions, setScreenDimensions] = useState(
+      Dimensions.get('window')
+    );
+    const [chatStatus, setChatStatus] = useState<ChatStatus>(ChatStatus.Init);
+    const [usage, setUsage] = useState<Usage>();
+    const [userScrolled, setUserScrolled] = useState(false);
+    const chatStatusRef = useRef(chatStatus);
+    const messagesRef = useRef(messages);
+    const bedrockMessages = useRef<BedrockMessage[]>([]);
+    const flatListRef = useRef<FlatList<SwiftChatMessage>>(null);
+    const textInputRef = useRef<TextInput>(null);
+    const sessionIdRef = useRef(initialSessionId || getSessionId() + 1);
+    const isCanceled = useRef(false);
+    const { sendEvent, event, drawerType } = useAppContext();
+    const sendEventRef = useRef(sendEvent);
+    const inputTexRef = useRef('');
+    const controllerRef = useRef<AbortController | null>(null);
+    const [selectedFiles, setSelectedFiles] = useState<FileInfo[]>([]);
+    const selectedFilesRef = useRef(selectedFiles);
+    const usageRef = useRef(usage);
+    const systemPromptRef = useRef(systemPrompt);
+    const drawerTypeRef = useRef(drawerType);
+    const isVoiceLoading = useRef(false);
+    const contentHeightRef = useRef(0);
+    const containerHeightRef = useRef(0);
+    const [isShowVoiceLoading, setIsShowVoiceLoading] = useState(false);
+    const audioWaveformRef = useRef<AudioWaveformRef>(null);
+  
+    const endVoiceConversationRef = useRef<(() => Promise<boolean>) | null>(null);
+  
+    const endVoiceConversation = useCallback(async () => {
+      audioWaveformRef.current?.resetAudioLevels();
+      if (isVoiceLoading.current) {
+        return Promise.resolve(false);
+      }
+      isVoiceLoading.current = true;
+      setIsShowVoiceLoading(true);
+      await voiceChatService.endConversation();
+      setChatStatus(ChatStatus.Init);
+      isVoiceLoading.current = false;
+      setIsShowVoiceLoading(false);
+      return true;
+    }, []);
+  
+    useEffect(() => {
+      endVoiceConversationRef.current = endVoiceConversation;
+    }, [endVoiceConversation]);
+  
+    // update refs value with state
+    useEffect(() => {
+      messagesRef.current = messages;
+      chatStatusRef.current = chatStatus;
+      usageRef.current = usage;
+      systemPromptRef.current = systemPrompt;
+    }, [chatStatus, messages, usage, systemPrompt]);
+  
+    useEffect(() => {
+      drawerTypeRef.current = drawerType;
+    }, [drawerType]);
+  
+    useEffect(() => {
+      selectedFilesRef.current = selectedFiles;
+      if (selectedFiles.length > 0) {
+        setShowSystemPrompt(false);
+      }
+    }, [selectedFiles]);
+  
+    // Initialize voice chat service
+    useEffect(() => {
+      // Set up voice chat service callbacks
+      voiceChatService.setCallbacks(
+        // Handle transcript received
+        (role, text) => {
+          handleVoiceChatTranscript(role, text);
+        },
+        // Handle error
+        message => {
+          if (getTextModel().modelId.includes('nova-sonic')) {
+            handleVoiceChatTranscript('ASSISTANT', message);
+            endVoiceConversationRef.current?.();
+            saveCurrentMessages();
+            console.log('Voice chat error:', message);
+          }
+        }
+      );
+  
+      // Clean up on unmount
+      return () => {
+        voiceChatService.cleanup();
+      };
+    }, []);
+  
+    // start new chat
+    const startNewChat = useRef(
+      useCallback(() => {
+        trigger(HapticFeedbackTypes.impactMedium);
+        sessionIdRef.current = getSessionId() + 1;
+        sendEventRef.current('updateHistorySelectedId', {
+          id: sessionIdRef.current,
+        });
+  
+        setMessages([]);
+        bedrockMessages.current = [];
+        setShowSystemPrompt(true);
+        showKeyboard();
+      }, [])
+    );
+  
+    // header text and right button click
+    React.useLayoutEffect(() => {
+      currentMode = mode;
+      systemPromptRef.current = systemPrompt;
+      const headerOptions: HeaderOptions = {
+        // eslint-disable-next-line react/no-unstable-nested-components
+        headerTitle: () => (
+          <HeaderTitle
+            title={
+              mode === ChatMode.Text
+                ? systemPrompt
+                  ? systemPrompt.name
+                  : ''
+                : ''
+            }
+            usage={usage}
+            onDoubleTap={scrollToTop}
+            onShowSystemPrompt={() => setShowSystemPrompt(true)}
+            isShowSystemPrompt={showSystemPrompt}
+          />
+        ),
+        // eslint-disable-next-line react/no-unstable-nested-components
+        headerRight: () => (
+          <CustomHeaderRightButton  
+            onPress={() => {
+    // Define Broperty AI prompt directly
+    const bropertyPrompt = {
+      id: 1,
+      name: 'Broperty Ai',
+      prompt: `Saya adalah **Broperty Ai**, bot utama yang **HANYA merespon komunikasi terkait properti real estate**. Jika pertanyaan tidak sesuai dengan topik properti real estate, saya akan secara halus menolaknya.
+  
+  **PERAN UTAMA SAYA:**
+  1. **GERBANG UTAMA** - Selalu berkomunikasi dengan user dan internal Broperty, serta menghubungkan kedua pihak tersebut
+  2. **IDENTIFIKASI KEBUTUHAN USER** - Berusaha untuk selalu mengetahui & memenuhi kebutuhan spesifik user terkait properti
+  3. **MENYAMBUNGKAN KE BERBAGAI FITUR YANG ADA** - Menghubungkan user ke sub-bot profesional, web view, atau Google Maps
+  
+  **FITUR AKTIF YANG TERSEDIA:**
+  - **Sub Bot Profesional Ecosystem:**
+    1. 🏠 Agensi Properti Ai - Konsultasi jual beli properti
+    2. 📜 Notaris Ai - Pengurusan sertifikat dan dokumen legal
+    3. ⚖️ Pengacara Ai - Konsultasi hukum properti dan kontrak
+    4. 🏛 Aparatur Pemerintah Ai - Perangkat pemerintah untuk pengurusan properti
+    5. 💻 Sertifikasi Elektronik Ai - Bantuan sertifikat elektronik
+    6. 🏦 KPR Bank Ai - Informasi KPR berbagai bank
+  
+  - **Web View Integration** - Akses konten properti terkini
+  - **Google Maps Integration** - Lokasi dan navigasi properti
+  
+  Silakan ajukan pertanyaan terkait properti real estate, saya akan menyambungkan Anda ke fitur yang tepat!`,
+      description: 'Ai Utama sebagai **Gerbang Komunikasi** & **Konektor Fitur Properti**',
+      avatar: '🏠',
+      includeHistory: true,
+      category: 'Utama'
+    };
+    
+    //  Clear input content and selected files
+      textInputRef?.current?.clear();
+      setUsage(undefined);
+      setSelectedFiles([]);
+      
+    // Start new chat and load Broperty AI prompt
+    startNewChat.current();
+    
+    // Send event to load Broperty AI prompt
+    sendEvent('navigateToBedrockWithPrompt', {
+      sessionId: Date.now(),
+      presetPrompt: bropertyPrompt,
+    });
+  }}
+            imageSource={
+              isDark
+                ? require('../assets/home_dark.png')
+                : require('../assets/home.png')
+            }
+          />
+        ),
+      };
+      navigation.setOptions(headerOptions);
+    }, [usage, navigation, mode, systemPrompt, showSystemPrompt, isDark]);
+    
+    // Auto show Broperty Ai welcome when app/screen starts with no specific session or preset
+    useEffect(() => {
+      if (!initialSessionId && !route.params?.presetPrompt) {
+        const bropertyPrompt = PRESET_PROMPTS.find(p => p.name === 'Broperty Ai');
+        if (bropertyPrompt) {
+          // Clear input and selection, start new chat, then navigate with preset
+          textInputRef?.current?.clear();
+          setUsage(undefined);
+          setSelectedFiles([]);
+          startNewChat.current();
+          sendEvent('navigateToBedrockWithPrompt', {
+            sessionId: Date.now(),
+            presetPrompt: bropertyPrompt,
+          });
+        }
+      }
+      // run once on mount
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+  
+    // sessionId changes (start new chat or click another session)
+    useEffect(() => {
+      if (tapIndex && initialSessionId) {
+        if (sessionIdRef.current === initialSessionId) {
+          return;
+        }
+        if (chatStatusRef.current === ChatStatus.Running) {
+          // there are still a request sending, abort the request and save current messages
+          controllerRef.current?.abort();
+          chatStatusRef.current = ChatStatus.Init;
+          if (modeRef.current === ChatMode.Image) {
+            if (messagesRef.current[0].text === imagePlaceholder) {
+              messagesRef.current[0].text = 'Request interrupted';
+            }
+          }
+          saveCurrentMessages();
+        }
+        modeRef.current = mode;
+        setChatStatus(ChatStatus.Init);
+        sendEventRef.current('');
+        setUsage(undefined);
+        if (initialSessionId === 0 || initialSessionId === -1) {
+          startNewChat.current();
+          return;
+        }
+        // click from history
+        setMessages([]);
+        endVoiceConversationRef.current?.();
+        setIsLoadingMessages(true);
+        const msg = getMessagesBySessionId(initialSessionId);
+        sessionIdRef.current = initialSessionId;
+        setUsage((msg[0] as SwiftChatMessage).usage);
+        // Restore sub-bot (assistant) info from saved messages for header title and future replies
+        const aiMessage = msg.find(
+        m => m.user && m.user._id === BOT_ID
+        ) as SwiftChatMessage | undefined;
+        if (aiMessage && aiMessage.user && typeof aiMessage.user.name === 'string') {
+          const restoredPrompt: SystemPrompt = {
+            id: -1,
+            name: aiMessage.user.name,
+            prompt: '',
+            includeHistory: true,
+            avatar:
+              typeof (aiMessage.user as any).avatar === 'string'
+                ? ((aiMessage.user as any).avatar as string)
+                : undefined,
+          };
+          setSystemPrompt(restoredPrompt);
+          if (isNovaSonic) {
+            saveCurrentVoiceSystemPrompt(restoredPrompt);
+          } else {
+            saveCurrentSystemPrompt(restoredPrompt);
+          }
+        } else {
+          setSystemPrompt(null);
+          saveCurrentSystemPrompt(null);
+          saveCurrentVoiceSystemPrompt(null);
+       }
+        getBedrockMessagesFromChatMessages(msg).then(currentMessage => {
+          bedrockMessages.current = currentMessage;
+        });
+        if (isMac) {
+          setMessages(msg);
+          setIsLoadingMessages(false);
+          scrollToBottom();
+        } else {
+          setTimeout(() => {
+            setMessages(msg);
+            setIsLoadingMessages(false);
+            scrollToBottom();
+          }, 200);
+        }
+      }
+    }, [initialSessionId, mode, tapIndex]);
+  
+    // deleteChat listener
+    useEffect(() => {
+      if (event?.event === 'deleteChat' && event.params) {
+        const { id } = event.params;
+        if (sessionIdRef.current === id) {
+          sessionIdRef.current = getSessionId() + 1;
+          sendEventRef.current('updateHistorySelectedId', {
+            id: sessionIdRef.current,
+          });
+          setUsage(undefined);
+          bedrockMessages.current = [];
+          setMessages([]);
+        }
+      }
+    }, [event]);
+    
+    
+    
+    // navigateToBedrockWithPrompt listener
+    useEffect(() => {
+      if (event?.event === 'navigateToBedrockWithPrompt' && event.params) {
+        const { sessionId, presetPrompt } = event.params;
+        if (presetPrompt && sessionId) {
+          // Convert PresetPrompt to SystemPrompt
+          const systemPromptFromPreset: SystemPrompt = {
+            id: presetPrompt.id,
+            name: presetPrompt.name,
+            prompt: presetPrompt.prompt,
+            includeHistory: presetPrompt.includeHistory,
+            allowInterruption: presetPrompt.allowInterruption,
+            promptType: presetPrompt.promptType,
+            avatar: presetPrompt.avatar,
+          };
+         
+          setSystemPrompt(systemPromptFromPreset);
+          
+          // Save as current system prompt
+          if (isNovaSonic) {
+            saveCurrentVoiceSystemPrompt(systemPromptFromPreset);
+          } else {
+            saveCurrentSystemPrompt(systemPromptFromPreset);
+          }
+          
+          // Start new session with preset prompt
+          sessionIdRef.current = sessionId;
+          sendEventRef.current('updateHistorySelectedId', {
+            id: sessionIdRef.current,
+          });
+          setUsage(undefined);
+          bedrockMessages.current = [];
+          setMessages([]);
+          
+          // Send initial message from AI assistant
+          const welcomeMessage: SwiftChatMessage = {
+            _id: generateId(),
+            text: presetPrompt.prompt,
+            createdAt: new Date(),
+            user: {
+              _id: 2,
+              name: presetPrompt.name,
+              avatar: presetPrompt.avatar,
+              modelTag: getTextModel().modelTag,
+            },
+          };
+          
+          setMessages([welcomeMessage]);
+          bedrockMessages.current = [
+            {
+              role: 'assistant',
+              content: [{ text: presetPrompt.prompt }],
+            },
+          ];
+          
+          // Save the initial message
+          setTimeout(() => {
+            saveCurrentMessages();
+          }, 100);
+        }
+      }
+    }, [event, isNovaSonic]);
+    
+    // Handle preset prompt selection
+    useEffect(() => {
+    const presetPrompt = route.params?.presetPrompt;
+    if (presetPrompt) {
+          // Convert PresetPrompt to SystemPrompt
+          const systemPromptFromPreset: SystemPrompt = {
+          id: presetPrompt.id,
+          name: presetPrompt.name,
+          prompt: presetPrompt.prompt,
+          includeHistory: presetPrompt.includeHistory,
+          allowInterruption: presetPrompt.allowInterruption,
+          promptType: presetPrompt.promptType,
+          avatar: presetPrompt.avatar,
+        };
+       
+        setSystemPrompt(systemPromptFromPreset);
+        
+       // Save as current system prompt
+       if (isNovaSonic) {
+          saveCurrentVoiceSystemPrompt(systemPromptFromPreset);
+       } else {
+          saveCurrentSystemPrompt(systemPromptFromPreset);
+       }
+       
+       // Start new session with preset prompt
+       sessionIdRef.current = Date.now();
+       sendEventRef.current('updateHistorySelectedId', {
+       id: sessionIdRef.current,
+       });
+       setUsage(undefined);
+       bedrockMessages.current = [];
+       setMessages([]);
+       
+       // Send initial message from AI assistant
+       const welcomeMessage: SwiftChatMessage = {
+          _id: generateId(),
+          text: presetPrompt.prompt,
+          createdAt: new Date(),
+          user: {
+          _id: 2,
+          name: presetPrompt.name,
+          avatar: presetPrompt.avatar,
+          modelTag: getTextModel().modelTag,
+         },
+       };
+       
+        setMessages([welcomeMessage]);
+        bedrockMessages.current = [
+         {
+            role: 'assistant',
+            content: [{ text: presetPrompt.prompt }],
+          },
+       ];
+        
+        // Save the initial message
+        setTimeout(() => {
+          saveCurrentMessages();
+        }, 100);
+      }
+    }, [route.params?.presetPrompt, isNovaSonic]);
+  
+  
+    // keyboard show listener for scroll to bottom
+    useEffect(() => {
+      const keyboardDidShowListener = Platform.select({
+        ios: Keyboard.addListener('keyboardWillShow', scrollToBottom),
+        android: Keyboard.addListener('keyboardDidShow', scrollToBottom),
+      });
+  
+      return () => {
+        keyboardDidShowListener && keyboardDidShowListener.remove();
+      };
+    }, []);
+  
+    // show keyboard for open the app
+    useEffect(() => {
+      showKeyboard();
+    }, []);
+  
+    const showKeyboard = () => {
+      setTimeout(() => {
+        if (textInputRef.current) {
+          textInputRef.current.focus();
+        }
+      }, 100);
+    };
+  
+    // update screenWith and height when screen rotate
+    useEffect(() => {
+      const updateDimensions = () => {
+        setScreenDimensions(Dimensions.get('window'));
+      };
+  
+      const subscription = Dimensions.addEventListener(
+        'change',
+        updateDimensions
+      );
+  
+      return () => {
+        subscription?.remove();
+      };
+    }, []);
+  
+    // handle message complete update bedrockMessage and saveMessage
+    useEffect(() => {
+      if (chatStatus === ChatStatus.Complete) {
+        if (messagesRef.current.length <= 1) {
+          return;
+        }
+        saveCurrentMessages();
+        getBedrockMessage(messagesRef.current[0]).then(currentMsg => {
+          bedrockMessages.current.push(currentMsg);
+        });
+        if (drawerTypeRef.current === 'permanent') {
+          sendEventRef.current('updateHistory');
+        }
+        setChatStatus(ChatStatus.Init);
+      }
+    }, [chatStatus]);
+  
+    // app goes to background and save running messages.
+    useEffect(() => {
+      const handleAppStateChange = (nextAppState: string) => {
+        if (nextAppState === 'background' || nextAppState === 'inactive') {
+          if (chatStatusRef.current === ChatStatus.Running) {
+            saveCurrentMessages();
+          }
+        }
+        if (nextAppState === 'active') {
+          if (!isTokenValid()) {
+            requestToken().then();
+          }
+        }
+      };
+      const subscription = AppState.addEventListener(
+        'change',
+        handleAppStateChange
+      );
+      return () => {
+        subscription.remove();
+      };
+    }, []);
+  
+    // save current message
+    const saveCurrentMessages = () => {
+      if (messagesRef.current.length === 0) {
+        return;
+      }
+      const currentSessionId = getSessionId();
+      saveMessages(sessionIdRef.current, messagesRef.current, usageRef.current!);
+      if (sessionIdRef.current > currentSessionId) {
+        saveMessageList(
+          sessionIdRef.current,
+          messagesRef.current,
+          modeRef.current
+        );
+      }
+    };
+  
+    const { width: screenWidth, height: screenHeight } = screenDimensions;
+  
+    const chatScreenWidth =
+      isMac && drawerType === 'permanent' ? screenWidth - 300 : screenWidth;
+  
+    const scrollStyle = StyleSheet.create({
+      scrollToBottomContainerStyle: {
+        width: 30,
+        height: 30,
+        left:
+          Platform.OS === 'ios' &&
+          screenHeight < screenWidth &&
+          screenHeight < 500
+            ? screenWidth / 2 - 75 // iphone landscape
+            : chatScreenWidth / 2 - 15,
+        bottom: screenHeight > screenWidth ? '1.5%' : '2%',
+      },
+    });
+  
+    const scrollToTop = () => {
+      setUserScrolled(true);
+      if (flatListRef.current) {
+        if (messagesRef.current.length > 0) {
+          flatListRef.current.scrollToIndex({
+            index: messagesRef.current.length - 1,
+            animated: true,
+          });
+        }
+      }
+    };
+    const scrollToBottom = () => {
+      if (flatListRef.current) {
+        flatListRef.current.scrollToOffset({ offset: 0, animated: true });
+      }
+    };
+  
+    const handleUserScroll = (_: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (chatStatusRef.current === ChatStatus.Running) {
+        setUserScrolled(true);
+      }
+    };
+  
+    const handleMomentumScrollEnd = (
+      endEvent: NativeSyntheticEvent<NativeScrollEvent>
+    ) => {
+      if (chatStatusRef.current === ChatStatus.Running && userScrolled) {
+        const { contentOffset } = endEvent.nativeEvent;
+        if (contentOffset.y > 0 && contentOffset.y < 100) {
+          scrollToBottom();
+        }
+      }
+    };
+  
+    // invoke bedrock api
+    useEffect(() => {
+      const lastMessage = messages[0];
+      if (
+        lastMessage &&
+        lastMessage.user &&
+        lastMessage.user._id === BOT_ID &&
+        lastMessage.text ===
+          (modeRef.current === ChatMode.Text
+            ? textPlaceholder
+            : imagePlaceholder) &&
+        chatStatusRef.current === ChatStatus.Running
+      ) {
+        if (modeRef.current === ChatMode.Image) {
+          sendEventRef.current('onImageStart');
+        }
+        controllerRef.current = new AbortController();
+        isCanceled.current = false;
+        const startRequestTime = new Date().getTime();
+        let latencyMs = 0;
+        let metrics: Metrics | undefined;
+        invokeBedrockWithCallBack(
+          bedrockMessages.current,
+          modeRef.current,
+          systemPromptRef.current,
+          () => isCanceled.current,
+          controllerRef.current,
+          (
+            msg: string,
+            complete: boolean,
+            needStop: boolean,
+            usageInfo?: Usage,
+            reasoning?: string
+          ) => {
+            if (chatStatusRef.current !== ChatStatus.Running) {
+              return;
+            }
+            if (latencyMs === 0) {
+              latencyMs = new Date().getTime() - startRequestTime;
+            }
+            const updateMessage = () => {
+              if (usageInfo) {
+                setUsage(prevUsage => ({
+                  modelName: usageInfo.modelName,
+                  inputTokens:
+                    (prevUsage?.inputTokens || 0) + usageInfo.inputTokens,
+                  outputTokens:
+                    (prevUsage?.outputTokens || 0) + usageInfo.outputTokens,
+                  totalTokens:
+                    (prevUsage?.totalTokens || 0) + usageInfo.totalTokens,
+                }));
+                updateTotalUsage(usageInfo);
+                const renderSec =
+                  (new Date().getTime() - startRequestTime - latencyMs) / 1000;
+                const speed = usageInfo.outputTokens / renderSec;
+                if (!metrics && modeRef.current === ChatMode.Text) {
+                  metrics = {
+                    latencyMs: (latencyMs / 1000).toFixed(2),
+                    speed: speed.toFixed(speed > 100 ? 1 : 2),
+                  };
+                }
+              }
+              const previousMessage = messagesRef.current[0];
+              if (
+                previousMessage.text !== msg ||
+                previousMessage.reasoning !== reasoning ||
+                (!previousMessage.metrics && metrics)
+              ) {
+                setMessages(prevMessages => {
+                  const newMessages = [...prevMessages];
+                  newMessages[0] = {
+                    ...prevMessages[0],
+                    text:
+                      isCanceled.current &&
+                      (previousMessage.text === textPlaceholder ||
+                        previousMessage.text === '')
+                        ? 'Canceled...'
+                        : msg,
+                    reasoning: reasoning,
+                    metrics: metrics,
+                  };
+                  return newMessages;
+                });
+              }
+            };
+    const setComplete = () => {
+    trigger(HapticFeedbackTypes.notificationSuccess);
+    setChatStatus(ChatStatus.Complete);
+    setShowSystemPrompt(true); // Show MENU button after chat completes
+  };
+            
+            if (modeRef.current === ChatMode.Text) {
+              trigger(HapticFeedbackTypes.selection);
+              updateMessage();
+              if (complete) {
+                setComplete();
+              }
+            } else {
+              if (needStop) {
+                sendEventRef.current('onImageStop');
+              } else {
+                sendEventRef.current('onImageComplete');
+              }
+              setTimeout(() => {
+                updateMessage();
+                setComplete();
+              }, 1000);
+            }
+            if (needStop) {
+              isCanceled.current = true;
+            }
+          }
+        ).then();
+      }
+    }, [messages]);
+  
+    // handle onSend
+    const onSend = useCallback((message: SwiftChatMessage[] = []) => {
+      // Reset user scroll state when sending a new message
+      setUserScrolled(false);
+      setShowSystemPrompt(false);
+      const files = selectedFilesRef.current;
+      if (!isAllFileReady(files)) {
+        showInfo('please wait for all videos to be ready');
+        return;
+      }
+      if (message[0]?.text || files.length > 0) {
+        if (!message[0]?.text) {
+          message[0].text = getFileTypeSummary(files);
+        }
+        if (selectedFilesRef.current.length > 0) {
+          message[0].image = JSON.stringify(selectedFilesRef.current);
+          setSelectedFiles([]);
+        }
+        trigger(HapticFeedbackTypes.impactMedium);
+        scrollToBottom();
+        getBedrockMessage(message[0]).then(currentMsg => {
+          bedrockMessages.current.push(currentMsg);
+          setChatStatus(ChatStatus.Running);
+          setMessages(previousMessages => [
+            createBotMessage(modeRef.current, systemPromptRef.current),
+            ...GiftedChat.append(previousMessages, message),
+          ]);
+        });
+      }
+    }, []);
+  
+    const handleNewFileSelected = (files: FileInfo[]) => {
+      setSelectedFiles(prevFiles => {
+        return checkFileNumberLimit(prevFiles, files);
+      });
+    };
+  
+    const handleVoiceChatTranscript = (role: string, text: string) => {
+      const userId = role === 'USER' ? 1 : BOT_ID;
+      if (
+        messagesRef.current.length > 0 &&
+        messagesRef.current[0].user._id === userId
+      ) {
+        if (userId === 1) {
+          text = ' ' + text;
+        }
+        setMessages(previousMessages => {
+          const newMessages = [...previousMessages];
+          if (!newMessages[0].text.includes(text)) {
+            newMessages[0] = {
+              ...newMessages[0],
+              text: newMessages[0].text + text,
+            };
+          }
+          return newMessages;
+        });
+      } else {
+        const newMessage: SwiftChatMessage = {
+          _id: generateId(),
+          text: text,
+          createdAt: new Date(),
+          user: {
+            _id: userId,
+            name: role === 'USER' ? 'You' : getTextModel().modelName,
+            modelTag: role === 'USER' ? undefined : getTextModel().modelTag,
+          },
+        };
+  
+        setMessages(previousMessages => [newMessage, ...previousMessages]);
+      }
+    };
+  
+    const styles = createStyles(colors);
+  
+    return (
+      <SafeAreaView style={styles.container}>
+        <GiftedChat
+          messageContainerRef={flatListRef}
+          textInputRef={textInputRef}
+          keyboardShouldPersistTaps="never"
+          placeholder="Ketik pesan....."
+          bottomOffset={
+            Platform.OS === 'android'
+              ? 0
+              : screenHeight > screenWidth && screenWidth < 500
+              ? 32 // iphone in portrait
+              : 20
+          }
+          messages={messages}
+          onSend={onSend}
+          user={{
+            _id: 1,
+          }}
+          alignTop={false}
+          inverted={true}
+          renderChatEmpty={() => (
+            <EmptyChatComponent
+              chatMode={modeRef.current}
+              isLoadingMessages={isLoadingMessages}
+            />
+          )}
+          alwaysShowSend={
+            chatStatus !== ChatStatus.Init || selectedFiles.length > 0
+          }
+          renderComposer={props => {
+            if (isNovaSonic && mode === ChatMode.Text) {
+                       return <AudioWaveformComponent ref={AudioWaveformRef} />;
+                     }
+                       
+                       //Default input box
+                       return
+               <Composer {...props} textInputStyle={styles.composerTextInput} placeholder="Ketik pesan....." />
+             ;
+          }}
+          renderSend={props => (
+            <CustomSendComponent
+              {...props}
+              chatStatus={chatStatus}
+              chatMode={mode}
+              selectedFiles={selectedFiles}
+              isShowLoading={isShowVoiceLoading}
+              onStopPress={() => {
+                trigger(HapticFeedbackTypes.notificationWarning);
+                if (isNovaSonic) {
+                  // End voice chat conversation
+                  endVoiceConversation().then(success => {
+                    if (success) {
+                      trigger(HapticFeedbackTypes.impactMedium);
+                    }
+                  });
+                  saveCurrentMessages();
+                } else {
+                  isCanceled.current = true;
+                  controllerRef.current?.abort();
+                }
+              }}
+              onFileSelected={files => {
+                handleNewFileSelected(files);
+              }}
+              onVoiceChatToggle={() => {
+                if (isVoiceLoading.current) {
+                  return;
+                }
+                isVoiceLoading.current = true;
+                setIsShowVoiceLoading(true);
+                voiceChatService.startConversation().then(success => {
+                  if (!success) {
+                    setChatStatus(ChatStatus.Init);
+                  } else {
+                    setChatStatus(ChatStatus.Running);
+                  }
+                  isVoiceLoading.current = false;
+                  setIsShowVoiceLoading(false);
+                  trigger(HapticFeedbackTypes.impactMedium);
+                });
+              }}
+            />
+          )}
+          renderChatFooter={() => (
+            <CustomChatFooter
+              files={selectedFiles}
+              onFileUpdated={(files, isUpdate) => {
+                if (isUpdate) {
+                  setSelectedFiles(files);
+                } else {
+                  handleNewFileSelected(files);
+                }
+              }}
+              onSystemPromptUpdated={prompt => {
+                setSystemPrompt(prompt);
+                if (isNovaSonic) {
+                  saveCurrentVoiceSystemPrompt(prompt);
+                  if (chatStatus === ChatStatus.Running) {
+                    endVoiceConversationRef.current?.();
+                  }
+                } else {
+                  saveCurrentSystemPrompt(prompt);
+                }
+              }}
+              onSwitchedToTextModel={() => {
+                endVoiceConversationRef.current?.();
+              }}
+              chatMode={modeRef.current}
+              isShowSystemPrompt={showSystemPrompt}
+            />
+          )}
+          renderMessage={props => {
+            // Find the index of the current message in the messages array
+            const messageIndex = messages.findIndex(
+              msg => msg._id === props.currentMessage?._id
+            );
+  
+            return (
+              <CustomMessageComponent
+                {...props}
+                chatStatus={chatStatus}
+                isLastAIMessage={
+                  props.currentMessage?._id === messages[0]?._id &&
+                  props.currentMessage?.user._id !== 1
+                }
+                onRegenerate={() => {
+                  setUserScrolled(false);
+                  trigger(HapticFeedbackTypes.impactMedium);
+                  const userMessageIndex = messageIndex + 1;
+                  if (userMessageIndex < messages.length) {
+                    // Reset bedrockMessages to only include the user's message
+                    getBedrockMessage(messages[userMessageIndex]).then(
+                      userMsg => {
+                        bedrockMessages.current = [userMsg];
+                        setChatStatus(ChatStatus.Running);
+                        setMessages(previousMessages => [
+                          createBotMessage(modeRef.current, systemPromptRef.current),
+                          ...previousMessages.slice(userMessageIndex),
+                        ]);
+                      }
+                    );
+                  }
+                }}
+              />
+            );
+          }}
+          listViewProps={{
+            contentContainerStyle: styles.contentContainer,
+            contentInset: { top: 2 },
+            onLayout: (layoutEvent: LayoutChangeEvent) => {
+              containerHeightRef.current = layoutEvent.nativeEvent.layout.height;
+            },
+            onContentSizeChange: (_width: number, height: number) => {
+              contentHeightRef.current = height;
+            },
+            onScrollBeginDrag: handleUserScroll,
+            onMomentumScrollEnd: handleMomentumScrollEnd,
+            ...(userScrolled &&
+            chatStatus === ChatStatus.Running &&
+            contentHeightRef.current > containerHeightRef.current
+              ? {
+                  maintainVisibleContentPosition: {
+                    minIndexForVisible: 0,
+                    autoscrollToTopThreshold: 0,
+                  },
+                }
+              : {}),
+          }}
+          scrollToBottom={true}
+          scrollToBottomComponent={CustomScrollToBottomComponent}
+          scrollToBottomStyle={scrollStyle.scrollToBottomContainerStyle}
+          renderInputToolbar={props => (
+            <InputToolbar
+              {...props}
+              containerStyle={{
+                backgroundColor: colors.background,
+                borderTopColor: colors.chatScreenSplit,
+              }}
+            />
+          )}
+          textInputProps={{
+            ...styles.textInputStyle,
+            ...{
+              fontWeight: isMac ? '300' : 'normal',
+              color: colors.text,
+            },
+          }}
+          maxComposerHeight={isMac ? 360 : 200}
+          onInputTextChanged={text => {
+            if (
+              isMac &&
+              inputTexRef.current.length > 0 &&
+              text[text.length - 1] === '\n' &&
+              text[text.length - 2] !== ' ' &&
+              text.length - inputTexRef.current.length === 1 &&
+              chatStatusRef.current !== ChatStatus.Running
+            ) {
+              setTimeout(() => {
+                if (textInputRef.current) {
+                  textInputRef.current.clear();
+                }
+              }, 1);
+              const msg: SwiftChatMessage = {
+                text: inputTexRef.current,
+                user: { _id: 1 },
+                createdAt: new Date(),
+                _id: generateId(),
+              };
+              onSend([msg]);
+            }
+            inputTexRef.current = text;
+          }}
+        />
+      </SafeAreaView>
+    );
+  }
+  
+  const createStyles = (colors: ColorScheme) =>
+    StyleSheet.create({
+      container: {
+        flex: 1,
+        backgroundColor: colors.background,
+      },
+      contentContainer: {
+        paddingTop: 15,
+        paddingBottom: 15,
+        flexGrow: 1,
+        justifyContent: 'flex-end',
+      },
+      textInputStyle: {
+        marginLeft: 14,
+        lineHeight: 22,
+      },
+      composerTextInput: {
+        backgroundColor: colors.background,
+        color: colors.text,
+      },
+    });
+  
+  export default ChatScreen;
+  
+  </file>
+  
+  <file name="react-native/src/api/ollama-api.ts">
+  import {
+    Model,
+    ModelTag,
+    OllamaModel,
+    SystemPrompt,
+    Usage,
+  } from '../types/Chat.ts';
+  import { getOllamaApiUrl, getTextModel } from '../storage/StorageUtils.ts';
+  import {
+    BedrockMessage,
+    ImageContent,
+    OpenAIMessage,
+    TextContent,
+  } from '../chat/util/BedrockMessageConvertor.ts';
+  
+  type CallbackFunction = (
+    result: string,
+    complete: boolean,
+    needStop: boolean,
+    usage?: Usage
+  ) => void;
+  export const invokeOllamaWithCallBack = async (
+    messages: BedrockMessage[],
+    prompt: SystemPrompt | null,
+    shouldStop: () => boolean,
+    controller: AbortController,
+    callback: CallbackFunction
+  ) => {
+    const bodyObject = {
+      model: getTextModel().modelId,
+      messages: getOllamaMessages(messages, prompt),
+    };
+    const options = {
+      method: 'POST',
+      headers: {
+        accept: '*/*',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(bodyObject),
+      signal: controller.signal,
+      reactNative: { textStreaming: true },
+    };
+    const url = getOllamaApiUrl() + '/api/chat';
+    let completeMessage = '';
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
+    fetch(url!, options)
+      .then(response => {
+        return response.body;
+      })
+      .then(async body => {
+        clearTimeout(timeoutId);
+        if (!body) {
+          return;
+        }
+        const reader = body.getReader();
+        const decoder = new TextDecoder();
+        let lastChunk = '';
+        while (true) {
+          if (shouldStop()) {
+            await reader.cancel();
+            if (completeMessage === '') {
+              completeMessage = '...';
+            }
+            callback(completeMessage, true, true);
+            return;
+          }
+  
+          try {
+            const { done, value } = await reader.read();
+            const chunk = decoder.decode(value, { stream: true });
+            if (!chunk) {
+              return;
+            }
+            const parsed = parseStreamData(chunk, lastChunk);
+            if (parsed.error) {
+              callback(parsed.error, true, true);
+              return;
+            }
+            completeMessage += parsed.content;
+            if (parsed.dataChunk) {
+              lastChunk = parsed.dataChunk;
+            } else {
+              lastChunk = '';
+            }
+            if (parsed.usage && parsed.usage.inputTokens) {
+              callback(completeMessage, true, false, parsed.usage);
+              return;
+            } else {
+              callback(completeMessage, done, false);
+            }
+            if (done) {
+              return;
+            }
+          } catch (readError) {
+            console.log('Error reading stream:', readError);
+            if (completeMessage === '') {
+              completeMessage = '...';
+            }
+            callback(completeMessage, true, true);
+            return;
+          }
+        }
+      })
+      .catch(error => {
+        console.log(error);
+        clearTimeout(timeoutId);
+        if (shouldStop()) {
+          if (completeMessage === '') {
+            completeMessage = '...';
+          }
+          callback(completeMessage, true, true);
+        } else {
+          const errorMsg = String(error);
+          const errorInfo = 'Request error: ' + errorMsg;
+          callback(completeMessage + '\n\n' + errorInfo, true, true);
+        }
+      });
+  };
+  
+  const parseStreamData = (chunk: string, lastChunk: string = '') => {
+    let content = '';
+    let usage: Usage | undefined;
+    const dataChunks = (lastChunk + chunk).split('\n');
+    for (let dataChunk of dataChunks) {
+      if (!dataChunk.trim()) {
+        continue;
+      }
+      if (dataChunk[0] === '\n') {
+        dataChunk = dataChunk.slice(1);
+      }
+      try {
+        const parsedData: OllamaResponse = JSON.parse(dataChunk);
+  
+        if (parsedData.message?.content) {
+          content += parsedData.message?.content;
+        }
+  
+        if (parsedData.done) {
+          usage = {
+            modelName: getTextModel().modelName,
+            inputTokens: parsedData.prompt_eval_count,
+            outputTokens: parsedData.eval_count,
+            totalTokens: parsedData.prompt_eval_count + parsedData.eval_count,
+          };
+        }
+      } catch (error) {
+        if (lastChunk.length > 0) {
+          return { error: error + chunk };
+        }
+        if (content.length > 0) {
+          return { content, dataChunk, usage };
+        }
+      }
+    }
+    return { content, usage };
+  };
+  
+  type OllamaResponse = {
+    model: string;
+    created_at: string;
+    message?: {
+      role: string;
+      content: string;
+    };
+    done: boolean;
+    prompt_eval_count: number;
+    eval_count: number;
+  };
+  
+  function getOllamaMessages(
+    messages: BedrockMessage[],
+    prompt: SystemPrompt | null
+  ): OpenAIMessage[] {
+    return [
+      ...(prompt ? [{ role: 'system', content: prompt.prompt }] : []),
+      ...messages.map(message => {
+        const images = message.content
+          .filter(content => (content as ImageContent).image)
+          .map(content => (content as ImageContent).image.source.bytes);
+  
+        return {
+          role: message.role,
+          content: message.content
+            .map(content => {
+              if ((content as TextContent).text) {
+                return (content as TextContent).text;
+              }
+              return '';
+            })
+            .join('\n'),
+          images: images.length > 0 ? images : undefined,
+        };
+      }),
+    ];
+  }
+  
+  export const requestAllOllamaModels = async (): Promise<Model[]> => {
+    const controller = new AbortController();
+    const modelsUrl = getOllamaApiUrl() + '/api/tags';
+    const options = {
+      method: 'GET',
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json',
+      },
+      signal: controller.signal,
+      reactNative: { textStreaming: true },
+    };
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    try {
+      const response = await fetch(modelsUrl, options);
+      clearTimeout(timeoutId);
+      if (!response.ok) {
+        console.log(`HTTP error! status: ${response.status}`);
+        return [];
+      }
+      const data = await response.json();
+      return data.models.map((item: OllamaModel) => ({
+        modelId: item.name,
+        modelName: item.name,
+        modelTag: ModelTag.Ollama,
+      }));
+    } catch (error) {
+      clearTimeout(timeoutId);
+      console.log('Error fetching models:', error);
+      return [];
+    }
+  };
+  
+  </file>
+  </tool>
+</message>
+
+# Tools:
+
+# Response:
+
+ChatResponse { aiMessage = AiMessage { text = "Based on the provided code, I've found several crash logs, stack traces, and error handling patterns that indicate known issues:
+
+## AudioManager.swift Error Handling
+
+The AudioManager class defines several custom error types and has extensive error handling:
+
+### Custom Error Types
+```swift
+enum AudioError: Error {
+    case recordingFailed(String)
+    case playbackFailed(String)
+    case audioSessionFailed(String)
+    case microphoneAccessDenied(String)
+}
+```
+
+### Known Audio Issues & Error Handling
+
+**1. Audio Session Setup Failures**
+```swift
+do {
+    try audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetooth, .duckOthers])
+    try audioSession.setActive(true)
+    if audioSession.isInputGainSettable {
+        try audioSession.setInputGain(1.0)
+    }
+} catch {
+    print("Failed to setup audio session: \(error)")
+}
+```
+
+**2. Voice Processing Failures**
+```swift
+do {
+    try audioEngine.inputNode.setVoiceProcessingEnabled(true)
+    print("Voice processing enabled successfully")
+} catch {
+    print("Failed to enable voice processing: \(error)")
+}
+```
+
+**3. Recording Preparation Issues**
+```swift
+guard let recorder = audioRecorder, recorder.prepareToRecord() else {
+    throw AudioError.recordingFailed("Failed to prepare recorder")
+}
+
+if recorder.record() {
+    return fileURL
+} else {
+    throw AudioError.recordingFailed("Failed to start recording")
+}
+```
+
+**4. Microphone Permission Handling**
+```swift
+case .denied:
+    throw AudioError.microphoneAccessDenied("Microphone access denied")
+case .undetermined:
+    // Request permission with timeout
+    let semaphore = DispatchSemaphore(value: 0)
+    _ = semaphore.wait(timeout: .now() + 5.0)
+    if !permissionGranted {
+        throw AudioError.microphoneAccessDenied("Microphone access denied")
+    }
+```
+
+**5. Audio Input Availability Issues**
+```swift
+if !audioSession.isInputAvailable {
+    throw AudioError.recordingFailed("Audio input is not available")
+}
+```
+
+**6. Audio Engine Start Failures**
+```swift
+do {
+    try audioEngine.start()
+    isCapturing = true
+    print("Audio engine started successfully")
+} catch {
+    print("Failed to start audio engine or install tap: \(error)")
+    onError?(AudioError.recordingFailed("Recording error: \(error)"))
+}
+```
+
+**7. Format Conversion Errors**
+```swift
+guard let converter = AVAudioConverter(from: sourceFormat, to: inputFormat) else {
+    print("Failed to create format converter")
+    return nil
+}
+
+let status = converter.convert(to: outputBuffer, error: &error) { ... }
+if status == .error || error != nil {
+    print("Conversion error: \(error?.localizedDescription ?? "unknown error")")
+    return nil
+}
+```
+
+### Recording Delegate Error Handling
+```swift
+func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {
+    if !flag {
+        onError?(AudioError.recordingFailed("Recording finished unsuccessfully"))
+    }
+}
+
+func audioRecorderEncodeErrorDidOccur(_ recorder: AVAudioRecorder, error: Error?) {
+    if let error = error {
+        onError?(AudioError.recordingFailed("Recording error: \(error)"))
+    } else {
+        onError?(AudioError.recordingFailed("Unknown recording error occurred"))
+    }
+}
+```
+
+## ChatScreen.tsx Error Patterns
+
+**1. Voice Chat Service Error Handling**
+```typescript
+voiceChatService.setCallbacks(
+    (role, text) => {
+        handleVoiceChatTranscript(role, text);
+    },
+    message => {
+        if (getTextModel().modelId.includes('nova-sonic')) {
+            handleVoiceChatTranscript('ASSISTANT', message);
+            endVoiceConversationRef.current?.();
+            saveCurrentMessages();
+            console.log('Voice chat error:', message);
+        }
+    }
+);
+```
+
+**2. Request Cancellation Handling**
+```typescript
+if (chatStatusRef.current === ChatStatus.Running) {
+    controllerRef.current?.abort();
+    chatStatusRef.current = ChatStatus.Init;
+    if (modeRef.current === ChatMode.Image) {
+        if (messagesRef.current[0].text === imagePlaceholder) {
+            messagesRef.current[0].text = 'Request interrupted';
+        }
+    }
+    saveCurrentMessages();
+}
+```
+
+## ollama-api.ts Error Handling
+
+**1. Network Request Timeouts**
+```typescript
+const timeoutId = setTimeout(() => controller.abort(), 60000);
+```
+
+**2. Stream Reading Errors**
+```typescript
+try {
+    const { done, value } = await reader.read();
+    // ... processing
+} catch (readError) {
+    console.log('Error reading stream:', readError);
+    if (completeMessage === '') {
+        completeMessage = '...';
+    }
+    callback(completeMessage, true, true);
+    return;
+}
+```
+
+**3. Network Fetch Errors**
+```typescript
+.catch(error => {
+    console.log(error);
+    clearTimeout(timeoutId);
+    if (shouldStop()) {
+        if (completeMessage === '') {
+            completeMessage = '...';
+        }
+        callback(completeMessage, true, true);
+    } else {
+        const errorMsg = String(error);
+        const errorInfo = 'Request error: ' + errorMsg;
+        callback(completeMessage + '\n\n' + errorInfo, true, true);
+    }
+});
+```
+
+**4. JSON Parsing Errors in Stream**
+```typescript
+try {
+    const parsedData: OllamaResponse = JSON.parse(dataChunk);
+    // ... processing
+} catch (error) {
+    if (lastChunk.length > 0) {
+        return { error: error + chunk };
+    }
+    if (content.length > 0) {
+        return { content, dataChunk, usage };
+    }
+}
+```
+
+**5. HTTP Status Errors**
+```typescript
+if (!response.ok) {
+    console.log(`HTTP error! status: ${response.status}`);
+    return [];
+}
+```
+
+These error handling patterns indicate known issues with audio permissions, network connectivity, audio format conversion, stream parsing, and request cancellation scenarios." reasoningContent = null toolExecutionRequests = [] }, metadata = OpenAiChatResponseMetadata{id='chatcmpl-469bc763-0bb2-471e-866d-be841faef3b2', modelName='claude-sonnet-4-20250514', tokenUsage=OpenAiTokenUsage { inputTokenCount = 18269, inputTokensDetails = OpenAiTokenUsage.InputTokensDetails { cachedTokens = 0 }, outputTokenCount = 1642, outputTokensDetails = OpenAiTokenUsage.OutputTokensDetails { reasoningTokens = 0 }, totalTokenCount = 19911 }, finishReason=STOP, created=1756791290, serviceTier='null', systemFingerprint='null'} }

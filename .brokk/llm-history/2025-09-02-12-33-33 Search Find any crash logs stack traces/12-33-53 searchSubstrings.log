@@ -1,0 +1,2852 @@
+# Request to claude-4-sonnet:
+
+<message type=system>
+  You are the Search Agent.
+  Your job:
+    - find and organize code relevant to the user's question or implementation goal,
+    - aggressively curate the Workspace so a Code Agent can implement next without confusion,
+    - never write code yourself.
+  
+  Critical rules:
+    1) At EVERY TURN, drop irrelevant fragments from the Workspace.
+       Prefer summaries over full files. Replace long fragments with concise summaries of content related to the goal first,
+       then drop the originals.
+    2) Use search and inspection tools to discover relevant code, including classes/methods/usages/call graphs.
+    3) The symbol-based tools only have visibility into the following file types: TYPESCRIPT
+       Use text-based tools if you need to search other file types.
+    4) Group related lookups into a single call when possible.
+    5) Make multiple tool calls at once when searching for different types of code.
+  
+  Output discipline:
+    - Think before calling tools.
+    - If you already know what to add, use Workspace tools directly; do not search redundantly.
+</message>
+
+<message type=user>
+  <workspace>
+  <workspace_readonly>
+  Here are the READ ONLY files and code fragments in your Workspace.
+  Do not edit this code! Images will be included separately if present.
+  
+  <summary targets="server/src/image_nl_processor.py, server/src/main.py" type="FILE_SKELETONS" fragmentid="5">
+  No summaries found for: server/src/image_nl_processor.py, server/src/main.py
+  </summary>
+  
+  
+  <summary targets="react-native.src.chat.component.EmptyChatComponentProps, react-native.src.api._module_.ChatResponse, react-native.src.chat.util.getBedrockMessagesFromChatMessages, react-native.src.storage.saveDeepSeekApiKey, react-native.src.chat.component._module_.styles, react-native.src.types.SystemPrompt, react-native.src.chat.component.markdown._module_.CopyButton, react-native.src.chat.component.CustomSendComponent, react-native.src.storage.deleteMessagesBySessionId, react-native.src.chat.component.markdown.Parser, react-native.src.storage.getCurrentSystemPrompt, react-native.src.settings.SettingsScreen, react-native.src.chat.util._module_.hapticFeedbackEnabled, react-native.src.chat.component.isModelSupportUploadImages, react-native.src.storage.saveCurrentVoiceSystemPrompt, react-native.src.storage.updateChatTitlesFromUserMessages, react-native.src.storage._module_.tokenInfoKey, react-native.src.chat.component.getFileType, react-native.src.chat.component._module_.NavigationProp, react-native.src.api.requestUpgradeInfo, react-native.src.api.getOllamaMessages, react-native.src.chat.component.ImageSpinnerProps, react-native.src.storage.getDefaultImageModels, react-native.src.chat.component.CustomSendComponentProps, react-native.src.storage.saveRegion, react-native.src.prompt._module_.PromptScreenRouteProp, react-native.src.api.invokeOpenAIWithCallBack, react-native.src.chat.component.CustomComposerProps, react-native.src.chat.component.createStyles, react-native.src.storage.getDefaultTextModels, react-native.src.settings.addBedrockPrefixToDeepseekModels, react-native.src.storage._module_.GPTModels, react-native.src.storage.getMessagesBySessionId, react-native.src.api.extractChunkContent, react-native.src.chat.component.ModelSelectionModal, react-native.src.chat.ChatScreen, react-native.src.storage.getOllamaApiUrl, react-native.src.chat.util._module_.MAX_IMAGES, react-native.src.storage.saveAllSystemPrompts, react-native.src.chat._module_.textPlaceholder, react-native.src.storage.saveOpenAICompatModels, react-native.src.chat.component.markdown._module_.CustomCodeHighlighter, react-native.src.storage.updateMessageList, react-native.src.storage._module_.apiKeyTag, react-native.src.chat.component._module_.EXTRA_DOCUMENT_FORMATS, react-native.src.settings.getImagePrice, react-native.src.storage._module_.DefaultTextModel, react-native.src.settings.CustomDropdown, react-native.src.storage._module_.DefaultImageModel, react-native.src.settings.createStyles, react-native.src.theme.ThemeProviderProps, react-native.src.chat.component.ModelIconButton, react-native.src.api.requestAllModels, react-native.src.storage._module_.thinkingEnabledKey, react-native.src.chat.util.ImageContent, react-native.src.chat.component.ModelIconButtonProps, react-native.src.storage.saveImageModel, react-native.src.storage.saveApiKey, react-native.src.settings.TabButton, react-native.src.storage._module_.sessionIdPrefix, react-native.src.history.groupMessagesByDate, react-native.src.utils._module_.isAndroid, react-native.src.storage.getSystemPrompts, react-native.src.chat.createStyles, react-native.src.storage._module_.messageListKey, react-native.src.api.isEnableThinking, react-native.src.api.genImage, react-native.src.chat.component.HeaderTitleProps, react-native.src.storage.getApiUrl, react-native.src.storage.saveThinkingEnabled, react-native.src.types.Metrics, react-native.src.storage._module_.openAICompatModelsKey, react-native.src.storage._module_.systemPromptsKey, react-native.src.chat.component.ModelSelectionModalProps, react-native.src.chat.component.markdown._module_.ALLOWED_STYLE_PROPERTIES, react-native.src.api.parseStreamData, react-native.src.storage.saveKeys, react-native.src.chat.component.markdown.getTableWidthArr, react-native.src.storage.getCurrentVoiceSystemPrompt, react-native.src.storage.saveOllamaApiURL, react-native.src.history.AppProviderProps, react-native.src.chat.util.getFileTypeSummary, react-native.src.chat.service._module_.voiceChatEmitter, react-native.src.api.getApiKey, react-native.src.types._module_.Usage, react-native.src.prompt.PresetPromptListProps, react-native.src.api.invokeBedrockWithCallBack, react-native.src.chat.component.markdown.useMarkdownHookOptions, react-native.src.types._module_.OllamaModel, react-native.src.theme.ThemeProvider, react-native.src.chat.component.CustomAddFileComponent, react-native.src.history._module_.AppContext, react-native.src.storage.getMessageList, react-native.src.api.requestAllOllamaModels, react-native.src.storage.getThinkingEnabled, react-native.src.storage._module_.ollamaApiUrlKey, react-native.src.utils._module_.isMacCatalyst, react-native.src.settings.getUsagePrice, react-native.src.chat.component.markdown._module_.MemoizedCodeHighlighter, react-native.src.storage.saveOpenAIApiKey, react-native.src.storage._module_.DefaultVoiceSystemPrompts, react-native.src.chat.component._module_.CustomHeaderRightButton, react-native.src.storage.saveVoiceId, react-native.src.storage._module_.textModelKey, react-native.src.chat.util.saveImageToLocal, react-native.src.types._module_.UsagePrice, react-native.src.settings._module_.ModelPrice, react-native.src.chat.component._module_.AnimatedCircle, react-native.src.chat.component.markdown.CustomMarkdownRenderer, react-native.src.chat.component.markdown._module_.ChatMarkdownProps, react-native.src.chat.component.markdown._module_.HighlighterStyleSheet, react-native.src.api.requestToken, react-native.src.chat.component.CustomScrollToBottomComponent, react-native.src.settings.getTotalInputPrice, react-native.src.storage.getImageModel, react-native.src.utils.getModelTag, react-native.src.storage.saveOpenAICompatApiKey, react-native.src.chat._module_.imagePlaceholder, react-native.src.chat.component.CircularProgress, react-native.src.chat.component.ListIcon, react-native.src.chat.util.setHapticFeedbackEnabled, react-native.src.chat.component.CustomMessageProps, react-native.src.types._module_.TokenResponse, react-native.src.history.useAppContext, react-native.src.storage.saveModelOrder, react-native.src.storage.getOpenAICompatApiKey, react-native.src.storage._module_.hapticEnabledKey, react-native.src.chat.service._module_.voiceChatService, react-native.src.storage._module_.DefaultRegion, react-native.src.storage.getAllImageSize, react-native.src.api.getApiPrefix, react-native.src.history._module_.DrawerType, react-native.src.prompt._module_.styles, react-native.src.chat.component.markdown.getRNStylesFromHljsStyle, react-native.src.utils.getModelIcon, react-native.src.chat.component.markdown.Markdown, react-native.src.storage.getDeepSeekApiKey, react-native.src.chat.component.isVideoFormat, react-native.src.storage.getOpenAIApiKey, react-native.src.settings._module_.GITHUB_LINK, react-native.src.storage.saveSystemPrompts, react-native.src.chat.component.HeaderRightButtonProps, react-native.src.storage._module_.VoiceIDList, react-native.src.history.getTodayTimestamp, react-native.src.chat.util._module_.OpenAIMessage, react-native.src.prompt._module_.RootStackParamList, react-native.src.types._module_.RouteParamList, react-native.src.storage.getRegion, react-native.src.chat.component.markdown.CodeHighlighterProps, react-native.src.storage.updateTextModelUsageOrder, react-native.src.storage.getAllRegions, react-native.src.chat.component.CustomFileProps, react-native.src.chat.util._module_.MessageContent, react-native.src.prompt.PresetPrompt, react-native.src.prompt._module_.MAX_NAME_LENGTH, react-native.src.chat.service.VoiceChatService, react-native.src.types._module_.DrawerParamList, react-native.src.chat.util.getFullFileUrl, react-native.src.chat.util._module_.MAX_NOVA_VIDEOS, react-native.src.chat.component.ImageProgressBar, react-native.src.history.getFirstDayOfMonthTimestamp, react-native.src.types.FileType, react-native.src.chat.component.markdown.CustomTokenizer, react-native.src.api.isOpenRouterRequest, react-native.src.storage._module_.RegionList, react-native.src.storage.getTextModel, react-native.src.chat.component.isDocumentFormat, react-native.src.types.PressMode, react-native.src.chat.component.PromptListProps, react-native.src.chat.component._module_.minWidth, react-native.src.chat.util.trigger, react-native.src.storage.getMessageListStr, react-native.src.api.invokeOllamaWithCallBack, react-native.src.storage.saveAllModels, react-native.src.storage._module_.currentSystemPromptKey, react-native.src.settings.getTotalOutputTokens, react-native.src.storage._module_.voiceIdKey, react-native.src.storage.getDefaultApiKeyModels, react-native.src.history.CustomDrawerContent, react-native.src.chat.component.markdown._module_.MemoizedText, react-native.src.chat.component._module_.AnimatedImage, react-native.src.storage.getTokenInfo, react-native.src.types._module_.UpgradeInfo, react-native.src.storage._module_.openAICompatApiURLKey, react-native.src.chat.component.isImageFormat, react-native.src.chat.component.ImageSpinner, react-native.src.history.AppContextType, react-native.src.storage.getModelUsage, react-native.src.types.SwiftChatMessage, react-native.src.api._module_.isDev, react-native.src.storage._module_.modelUsageKey, react-native.src.chat.util._module_.BedrockMessage, react-native.src.chat.component._module_.VIDEO_FORMATS, react-native.src.chat.util.DocumentContent, react-native.src.prompt.createStyles, react-native.src.theme.ThemeContextType, react-native.src.chat._module_.ChatScreenRouteProp, react-native.src.chat.component.CustomFileListComponent, react-native.src.chat.component.AudioWaveformRef, react-native.src.chat.util.TextContent, react-native.src.chat.component._module_.MODAL_HEIGHT, react-native.src.api._module_.OllamaResponse, react-native.src.api._module_.CallbackFunction, react-native.src.prompt._module_.PresetPromptListNavigationProp, react-native.src.theme._module_.lightColors, react-native.src.history.createStyles, react-native.src.types._module_.AllModel, react-native.src.settings.TabButtonProps, react-native.src.settings.CustomTextInput, react-native.src.settings._module_.ImageModelPrices, react-native.src.history.formatTimestampToYearMonth, react-native.src.storage._module_.currentVoiceSystemPromptKey, react-native.src.storage._module_.imageSizeKey, react-native.src.chat.util.normalizeFilename, react-native.src.settings.getTotalImageCount, react-native.src.storage._module_.allModelKey, react-native.src.prompt._module_.PROMPT_CATEGORIES, react-native.src.storage._module_.currentSessionIdKey, react-native.src.types.ModelTag, react-native.src.settings.ModelPriceType, react-native.src.prompt.PromptScreen, react-native.src.storage.saveMessages, react-native.src.chat.generateId, react-native.src.utils.getModelTagByUserName, react-native.src.storage.initializeStorage, react-native.src.theme.useTheme, react-native.src.prompt._module_.PRESET_PROMPTS, react-native.src.chat.util.VideoContent, react-native.src.storage._module_.HARDCODED_DEEPSEEK_API_KEY, react-native.src.types.ReasoningContent, react-native.src.chat.util.getBedrockMessage, react-native.src.settings._module_.NavigationProp, react-native.src.theme.ColorScheme, react-native.src.chat.component.markdown._module_.ReactStyle, react-native.src.chat.component.markdown.useMarkdown, react-native.src.storage.saveTextModel, react-native.src.api.isConfigured, react-native.src.theme._module_.ThemeContext, react-native.src.api.isThinkingModel, react-native.src.storage.getMergedModelOrder, react-native.src.storage.saveOpenAIProxyEnabled, react-native.src.prompt.PresetPromptList, react-native.src.settings.getTotalOutputPrice, react-native.src.chat.component.CustomRenderActionsProps, react-native.src.chat.component.HeaderTitle, react-native.src.storage.getAllModels, react-native.src.chat.util._module_.MAX_NOVA_FILES, react-native.src.chat.util.ImageInfo, react-native.src.storage.updateTotalUsage, react-native.src.storage.getImageSize, react-native.src.chat.component.markdown.CustomCodeHighlighter, react-native.src.chat.component.getFileNameWithoutExtension, react-native.src.settings._module_.initUpgradeInfo, react-native.src.storage.saveMessageList, react-native.src.storage.saveTokenInfo, react-native.src.storage.saveApiUrl, react-native.src.prompt.HeaderLeftView, react-native.src.api._module_.OpenRouterTag, react-native.src.types.EventData, react-native.src.api.getApiURL, react-native.src.types._module_.Chat, react-native.src.prompt._module_.NavigationProp, react-native.src.chat.util.isAllFileReady, react-native.src.storage._module_.openAIProxyEnabledKey, react-native.src.storage.getPromptId, react-native.src.api.getOpenAIMessages, react-native.src.settings.getTotalInputTokens, react-native.src.storage._module_.BedrockVoiceModels, react-native.src.chat.util.getUniqueFileName, react-native.src.types.SwiftChatUser, react-native.src.chat.component._module_.customMarkedStyles, react-native.src.storage.saveCurrentSystemPrompt, react-native.src.chat.component.openInFileViewer, react-native.src.chat.util.getFileBytes, react-native.src.storage.saveOpenAICompatApiURL, react-native.src.storage.getSessionId, react-native.src.chat.util.isNova, react-native.src.settings.getTotalImagePrice, react-native.src.storage._module_.encryptStorage, react-native.src.storage._module_.keyPrefix, react-native.src.chat.util.isValidFilename, react-native.src.chat.component.markdown.getMathKey, react-native.src.chat.component.getFiles, react-native.src.chat.util._module_.hapticOptions, react-native.src.chat.createBotMessage, react-native.src.storage._module_.imageModelKey, react-native.src.storage._module_.DefaultSystemPrompts, react-native.src.chat.component.DefaultIcon, react-native.src.storage.getApiKey, react-native.src.storage.getOpenAIProxyEnabled, react-native.src.settings.DropdownItem, react-native.src.chat.component.markdown._module_.mathViewIndex, react-native.src.theme._module_.darkColors, react-native.src.storage.isNovaCanvas, react-native.src.storage.getDefaultSystemPrompts, react-native.src.storage._module_.BedrockThinkingModels, react-native.src.chat.component._module_.isAndroid, react-native.src.settings.CustomDropdownProps, react-native.src.settings.CustomTextInputProps, react-native.src.chat.component.markdown.createCustomStyles, react-native.src.chat.util.saveFile, react-native.src.chat.component._module_.IMAGE_FORMATS, react-native.src.storage._module_.apiUrlKey, react-native.src.storage._module_.modelOrderKey, react-native.src.chat.component.ProgressCircle, react-native.src.chat.component.getStyles, react-native.src.settings.getTotalCost, react-native.src.chat.component.EmptyChatComponent, react-native.src.types.Delta, react-native.src.types._module_.FileInfo, react-native.src.storage.getModelOrder, react-native.src.types.BedrockChunk, react-native.src.storage.isTokenValid, react-native.src.api.parseChunk, react-native.src.storage._module_.regionKey, react-native.src.chat.component.markdown._module_.styles, react-native.src.chat.util.checkFileNumberLimit, react-native.src.storage.getOpenAICompatModels, react-native.src.storage._module_.DefaultVoicePrompt, react-native.src.storage._module_.deepSeekApiKeyTag, react-native.src.chat.component._module_.MAX_FILE_SIZE, react-native.src.storage._module_.DeepSeekModels, react-native.src.chat.component.DisplayMode, react-native.src.chat.component._module_.AudioWaveformComponent, react-native.src.storage._module_.currentPromptIdKey, react-native.src.chat.component.CustomMessageComponent, react-native.src.chat.component.CustomChatFooter, react-native.src.storage._module_.openAIApiKeyTag, react-native.src.chat.component._module_.isPad, react-native.src.settings.TokenUsageScreen, react-native.src.types._module_.Model, react-native.src.chat.component._module_.SCREEN_WIDTH, react-native.src.storage.saveImageSize, react-native.src.chat.util.showInfo, react-native.src.storage.isNewStabilityImageModel, react-native.src.chat.component.markdown.cleanStyle, react-native.src.storage.getVoiceId, react-native.src.chat.component._module_.MAX_VIDEO_SIZE, react-native.src.chat.component.isVideoSupported, react-native.src.chat.component.markdown.CopyButtonProps, react-native.src.prompt.calculateTextLength, react-native.src.chat.util._module_.MAX_DOCUMENTS, react-native.src.storage.savePromptId, react-native.src.storage.getOpenAICompatApiURL, react-native.src.types.DropdownItem, react-native.src.storage.getHapticEnabled, react-native.src.history.AppProvider, react-native.src.chat._module_.currentMode, react-native.src.storage._module_.storage, react-native.src.types._module_.ImageRes, react-native.src.storage.saveHapticEnabled, react-native.src.chat.component._module_.DOCUMENT_FORMATS, react-native.src.chat._module_.BOT_ID, react-native.src.chat.util.getFileTextContent, react-native.src.types.ChatMode, react-native.src.chat.component.PromptListComponent, react-native.src.storage._module_.openAICompatApiKeyTag, react-native.src.types.ChatStatus, react-native.src.api.getProxyRequestURL" type="CODEUNIT_SKELETON" fragmentid="1156">
+  package react-native.src.api;
+  
+  type ChatResponse = {
+    choices: Array<{
+      delta: {
+        content: string;
+        reasoning_content: string;
+        reasoning: string;
+      };
+    }>;
+    usage?: {
+      prompt_tokens: number;
+      completion_tokens: number;
+      total_tokens: number;
+      prompt_cache_hit_tokens: number;
+    };
+    error?: {
+      message?: string;
+      metadata?: {
+        raw?: string;
+      };
+    };
+    detail?: string;
+  };
+  
+  export const requestUpgradeInfo = async (
+    os: string,
+    version: string
+  ): Promise<UpgradeInfo> => { ... }
+  
+  function getOllamaMessages(
+    messages: BedrockMessage[],
+    prompt: SystemPrompt | null
+  ): OpenAIMessage[] { ... }
+  
+  export const invokeOpenAIWithCallBack = async (
+    messages: BedrockMessage[],
+    prompt: SystemPrompt | null,
+    shouldStop: () => boolean,
+    controller: AbortController,
+    callback: CallbackFunction
+  ) => { ... }
+  
+  function extractChunkContent(bedrockChunk: BedrockChunk, rawChunk: string) { ... }
+  
+  export const requestAllModels = async (): Promise<AllModel> => { ... }
+  
+  const isEnableThinking = (): boolean => { ... }
+  
+  export const genImage = async (
+    imagePrompt: string,
+    controller: AbortController,
+    image?: ImageInfo
+  ): Promise<ImageRes> => { ... }
+  
+  function getApiKey(): string { ... }
+  
+  export const invokeBedrockWithCallBack = async (
+    messages: BedrockMessage[],
+    chatMode: ChatMode,
+    prompt: SystemPrompt | null,
+    shouldStop: () => boolean,
+    controller: AbortController,
+    callback: CallbackFunction
+  ) => { ... }
+  
+  export const requestAllOllamaModels = async (): Promise<Model[]> => { ... }
+  
+  export const requestToken = async (): Promise<TokenResponse | null> => { ... }
+  
+  function getApiPrefix(): string { ... }
+  
+  function isOpenRouterRequest(): boolean { ... }
+  
+  export const invokeOllamaWithCallBack = async (
+    messages: BedrockMessage[],
+    prompt: SystemPrompt | null,
+    shouldStop: () => boolean,
+    controller: AbortController,
+    callback: CallbackFunction
+  ) => { ... }
+  
+  export const isDev = false
+  
+  type OllamaResponse = {
+    model: string;
+    created_at: string;
+    message?: {
+      role: string;
+      content: string;
+    };
+    done: boolean;
+    prompt_eval_count: number;
+    eval_count: number;
+  };
+  
+  function isConfigured(): boolean { ... }
+  
+  const isThinkingModel = (): boolean => { ... }
+  
+  const OpenRouterTag = ': OPENROUTER PROCESSING'
+  
+  function getApiURL(): string { ... }
+  
+  const parseStreamData = (chunk: string, lastChunk: string = '') => { ... }
+  
+  function getOpenAIMessages(
+    messages: BedrockMessage[],
+    prompt: SystemPrompt | null
+  ): OpenAIMessage[] { ... }
+  
+  type CallbackFunction = (
+    result: string,
+    complete: boolean,
+    needStop: boolean,
+    usage?: Usage,
+    reasoning?: string
+  ) => void;
+  
+  function parseChunk(rawChunk: string) { ... }
+  
+  function getProxyRequestURL(): string { ... }
+  
+  package react-native.src.chat;
+  
+  function ChatScreen(): React.JSX.Element { ... }
+  
+  const textPlaceholder = '...'
+  
+  const createStyles = (colors: ColorScheme) => { ... }
+  
+  const imagePlaceholder = '![](bedrock://imgProgress)'
+  
+  type ChatScreenRouteProp = RouteProp<DrawerParamList, 'Bedrock'>
+  
+  const generateId = () => { ... }
+  
+  const createBotMessage = (mode: string, currentSystemPrompt?: SystemPrompt | null) => { ... }
+  
+  let currentMode = ChatMode.Text
+  
+  const BOT_ID = 2
+  
+  package react-native.src.chat.component;
+  
+  interface EmptyChatComponentProps {
+    chatMode: ChatMode
+    isLoadingMessages?: boolean
+  }
+  
+  const CustomSendComponent: React.FC<CustomSendComponentProps> = ({
+    chatStatus,
+    chatMode,
+    selectedFiles,
+    isShowLoading: isShowLoading = false,
+    onStopPress,
+    onFileSelected,
+    onVoiceChatToggle,
+    ...props
+  }) => { ... }
+  
+  const isModelSupportUploadImages = (chatMode: ChatMode): boolean => { ... }
+  
+  export const getFileType = (format: string) => { ... }
+  
+  interface ImageSpinnerProps {
+    size?: number
+    source: ImageSourcePropType
+    visible: boolean
+    isRotate?: boolean
+  }
+  
+  interface CustomSendComponentProps extends SendProps<SwiftChatMessage> {
+    chatStatus: ChatStatus
+    chatMode: ChatMode
+    selectedFiles: FileInfo[]
+    isShowLoading?: boolean
+    onStopPress: () => void
+    onFileSelected: (files: FileInfo[]) => void
+    onVoiceChatToggle?: () => void
+  }
+  
+  interface CustomComposerProps {
+    files: FileInfo[]
+    onFileUpdated: (files: FileInfo[], isUpdate?: boolean) => void
+    onSystemPromptUpdated: (prompt: SystemPrompt | null) => void
+    onSwitchedToTextModel: () => void
+    chatMode: ChatMode
+    isShowSystemPrompt: boolean
+  }
+  
+  const createStyles = (colors: ColorScheme) => { ... }
+  
+  export const ModelSelectionModal: React.FC<ModelSelectionModalProps> = ({
+    visible,
+    onClose,
+    iconPosition = {
+      x: SCREEN_WIDTH - 50,
+      y: 70
+    }
+  }) => { ... }
+  
+  export const EXTRA_DOCUMENT_FORMATS = [
+    'json',
+    'py',
+    'ts',
+    'tsx',
+    'js',
+    'kt',
+    'java',
+    'swift',
+    'c',
+    'm',
+    'h',
+    'sh',
+    'cpp',
+    'rs',
+    'go',
+    'class',
+    'cs',
+    'php',
+    'rb',
+    'dart',
+    'sql',
+    'css',
+    'xml',
+    'yaml',
+  ]
+  
+  export const ModelIconButton: React.FC<ModelIconButtonProps> = ({
+    onPress
+  }) => { ... }
+  
+  interface ModelIconButtonProps {
+    onPress: () => void
+  }
+  
+  const styles = StyleSheet.create({
+    container: {
+      height: 90
+    },
+    promptContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1
+    }
+  })
+  
+  interface HeaderTitleProps {
+    title: string
+    usage?: Usage
+    onDoubleTap: () => void
+    onShowSystemPrompt: () => void
+    isShowSystemPrompt: boolean
+  }
+  
+  interface ModelSelectionModalProps {
+    visible: boolean
+    onClose: () => void
+    iconPosition?: { x: number; y: number }
+  }
+  
+  export const CustomAddFileComponent: React.FC<CustomRenderActionsProps> = ({
+    onFileSelected,
+    mode = 'default',
+    chatMode = ChatMode.Text
+  }) => { ... }
+  
+  export const CustomHeaderRightButton: React.FC<HeaderRightButtonProps> =
+    React.memo(({ onPress, imageSource }) => (
+      <TouchableOpacity onPress={onPress} style={styles.touchStyle}>
+        <Image source={imageSource} style={styles.editImage} />
+      </TouchableOpacity>
+    ))
+  
+  const AnimatedCircle = Animated.createAnimatedComponent(Circle)
+  
+  export const CustomScrollToBottomComponent = (): React.ReactNode => { ... }
+  
+  const CircularProgress = ({
+    progress,
+    colors
+  }: {
+    progress: number;
+    colors: ColorScheme;
+  }) => { ... }
+  
+  const ListIcon = ({ textColor }: { textColor: string }) => { ... }
+  
+  interface CustomMessageProps extends MessageProps<SwiftChatMessage> {
+    chatStatus: ChatStatus
+    isLastAIMessage?: boolean
+    onRegenerate?: () => void
+  }
+  
+  export const isVideoFormat = (format: string) => { ... }
+  
+  interface HeaderRightButtonProps {
+    onPress: (event: GestureResponderEvent) => void
+    imageSource: ImageSourcePropType
+  }
+  
+  interface CustomFileProps {
+    files: FileInfo[]
+    onFileUpdated?: (files: FileInfo[], isUpdate?: boolean) => void
+    mode?: DisplayMode
+  }
+  
+  const ImageProgressBar = () => { ... }
+  
+  export const isDocumentFormat = (format: string) => { ... }
+  
+  interface PromptListProps {
+    onSelectPrompt: (prompt: SystemPrompt | null) => void
+    onSwitchedToTextModel: () => void
+  }
+  
+  const minWidth = screenWidth > screenHeight ? screenHeight : screenWidth
+  
+  const AnimatedImage = Animated.createAnimatedComponent(Image)
+  
+  export const isImageFormat = (format: string) => { ... }
+  
+  const ImageSpinner = ({
+    size = 24,
+    source,
+    visible,
+    isRotate = false
+  }: ImageSpinnerProps) => { ... }
+  
+  export const VIDEO_FORMATS = ['mp4', 'mov', 'mkv', 'webm']
+  
+  export const CustomFileListComponent: React.FC<CustomFileProps> = ({
+    files,
+    onFileUpdated,
+    mode = DisplayMode.Edit
+  }) => { ... }
+  
+  export interface AudioWaveformRef {
+    resetAudioLevels: () => void
+  }
+  
+  const MODAL_HEIGHT = 360
+  
+  interface CustomRenderActionsProps {
+    onFileSelected: (files: FileInfo[]) => void
+    mode?: 'default' | 'list'
+    chatMode?: ChatMode
+  }
+  
+  const HeaderTitle: React.FC<HeaderTitleProps> = ({
+    title,
+    usage,
+    onDoubleTap,
+    onShowSystemPrompt,
+    isShowSystemPrompt
+  }) => { ... }
+  
+  type NavigationProp = DrawerNavigationProp<RouteParamList>
+  
+  const getFileNameWithoutExtension = (fileName: string) => { ... }
+  
+  const customMarkedStyles: MarkedStyles = {
+    table: { marginVertical: 4 },
+    li: { paddingVertical: 4 },
+    h1: { fontSize: 28 },
+    h2: { fontSize: 24 },
+    h3: { fontSize: 20 },
+    h4: { fontSize: 18 },
+    blockquote: { marginVertical: 8 },
+    paragraph: { paddingVertical: 6 }
+  }
+  
+  const openInFileViewer = (url: string) => { ... }
+  
+  const getFiles = async (res: ImagePickerResponse) => { ... }
+  
+  const DefaultIcon = () => { ... }
+  
+  const isAndroid = Platform.OS === 'android'
+  
+  export const IMAGE_FORMATS = ['png', 'jpg', 'jpeg', 'gif', 'webp']
+  
+  const ProgressCircle = ({
+    progressAnim,
+    isDark
+  }: {
+    progressAnim: Animated.Value;
+    isDark: boolean;
+  }) => { ... }
+  
+  const getStyles = (colors: ColorScheme) => { ... }
+  
+  export const EmptyChatComponent = ({
+    chatMode,
+    isLoadingMessages = false
+  }: EmptyChatComponentProps): React.ReactElement => { ... }
+  
+  const MAX_FILE_SIZE = 4.5 * 1024 * 1024
+  
+  export enum DisplayMode {
+    Edit = 'edit',
+    Display = 'display',
+    GenImage = 'genImage'
+  }
+  
+  const AudioWaveformComponent = React.forwardRef<AudioWaveformRef>(
+    (props, ref) => {
+      const { colors } = useTheme();
+      const [colorOffset, setColorOffset] = useState(0);
+      const barCountRef = useRef(isMac || isPad ? 48 : 32);
+      const barValues = Array(barCountRef.current)
+        .fill(0)
+        // eslint-disable-next-line react-hooks/rules-of-hooks
+        .map(() => useSharedValue(0.3));
+      const inputAudioLevelRef = useRef(1);
+      const outputAudioLevelRef = useRef(1);
+      const [audioVolume, setAudioVolume] = useState<number>(1); // Audio volume level (1-10)
+  
+      useEffect(() => {
+        // Set up voice chat service callbacks
+        voiceChatService.setOnAudioLevelCallbacks(
+          // Handle audio level changes
+          (source, level) => {
+            if (source === 'microphone') {
+              inputAudioLevelRef.current = level;
+            } else {
+              outputAudioLevelRef.current = level;
+            }
+            const maxLevel = Math.max(
+              inputAudioLevelRef.current,
+              outputAudioLevelRef.current
+            );
+            setAudioVolume(maxLevel);
+          }
+        );
+      }, []);
+  
+      // Add reset method for audio levels
+      const resetAudioLevels = useCallback(() => {
+        inputAudioLevelRef.current = 1;
+        outputAudioLevelRef.current = 1;
+      }, []);
+  
+      // Expose methods to parent component
+      useImperativeHandle(
+        ref,
+        () => ({
+          resetAudioLevels
+        }),
+        [resetAudioLevels]
+      );
+  
+      // Gradient colors from blue to green to purple
+      const gradientColors = [
+        '#4158D0',
+        '#4B5EE8',
+        '#5564FF',
+        '#5F6CFF',
+        '#6975FF',
+        '#737EFF',
+        '#7D87FF',
+        '#8790FF',
+        '#90A0FF',
+        '#8BAFFF',
+        '#86BEFF',
+        '#80CDFF',
+        '#7ADCFF',
+        '#74EBFF',
+        '#6EFAFF',
+        '#68FFFC',
+        '#60F5F0',
+        '#58F0E0',
+        '#50EBD0',
+        '#48E6C0',
+        '#40E1B0',
+        '#38DCA0',
+        '#30D790',
+        '#29D280',
+        '#21CD70',
+        '#41D46C',
+        '#61DB68',
+        '#81E264',
+        '#A1E960',
+        '#B0ED5C',
+        '#C0F158',
+        '#D0F554',
+        '#C8F050',
+        '#BEC24C',
+        '#B49448',
+        '#AA6644',
+        '#A03840',
+        '#963A60',
+        '#8C3C80',
+        '#823EA0',
+        '#7840C0',
+        '#7E4CD8',
+        '#8458F0',
+        '#8A64FF',
+        '#9070FF',
+        '#967CFF',
+        '#9C88FF',
+        '#4158D0',
+      ];
+  
+      // Color animation effect - updates every 500ms
+      useEffect(() => {
+        const colorAnimationInterval = setInterval(() => {
+          setColorOffset(prev => (prev + 1) % gradientColors.length);
+        }, 500);
+  
+        return () => clearInterval(colorAnimationInterval);
+      }, [gradientColors.length]);
+  
+      // Update waveform when volume changes
+      useEffect(() => {
+        // Special handling for volume=1 (silent or not recording)
+        if (audioVolume === 1) {
+          barValues.forEach(bar => {
+            // Fixed low height for all bars
+            const minHeight = 0.05;
+  
+            bar.value = withTiming(minHeight, {
+              duration: 300,
+              easing: Easing.bezier(0.25, 0.1, 0.25, 1)
+            });
+          });
+          return;
+        }
+  
+        // For volume > 1, animate based on volume level
+        const baseIntensity = audioVolume / 10;
+  
+        barValues.forEach((bar, index) => {
+          const centerEffect =
+            1 -
+            Math.abs(
+              (index - barCountRef.current / 2) / (barCountRef.current / 2)
+            ) *
+              0.5;
+          const randomHeight =
+            (Math.random() * 0.6 + 0.2) * baseIntensity * centerEffect;
+          const delay = index * 10;
+  
+          bar.value = withSequence(
+            withTiming(randomHeight, {
+              duration: 180 + delay,
+              easing: Easing.bezier(0.25, 0.1, 0.25, 1)
+            }),
+            withTiming(0.05 + Math.random() * 0.15 * baseIntensity, {
+              duration: 220 + delay,
+              easing: Easing.bezier(0.25, 0.1, 0.25, 1)
+            })
+          );
+        });
+      }, [barValues, audioVolume]);
+  
+      const animatedBarStyles = barValues.map(bar =>
+        // eslint-disable-next-line react-hooks/rules-of-hooks
+        useAnimatedStyle(() => ({
+          height: `${bar.value * 100}%`,
+          opacity: 0.7 + bar.value * 0.3
+        }))
+      );
+  
+      const styles = createStyles(colors);
+  
+      return (
+        <View style={styles.container}>
+          <View style={styles.waveformContainer}>
+            {barValues.map((_, index) => (
+              <Animated.View
+                key={index}
+                style={[
+                  styles.bar,
+                  animatedBarStyles[index],
+                  {
+                    backgroundColor:
+                      gradientColors[
+                        (index + colorOffset) % gradientColors.length
+                      ]
+                  },
+                ]}
+              />
+            ))}
+          </View>
+        </View>
+      );
+    }
+  )
+  
+  const CustomMessageComponent: React.FC<CustomMessageProps> = ({
+    currentMessage,
+    chatStatus,
+    isLastAIMessage,
+    onRegenerate
+  }) => { ... }
+  
+  export const CustomChatFooter: React.FC<CustomComposerProps> = ({
+    files,
+    onFileUpdated,
+    onSystemPromptUpdated,
+    onSwitchedToTextModel,
+    chatMode,
+    isShowSystemPrompt
+  }) => { ... }
+  
+  const isPad = minWidth > 434
+  
+  const SCREEN_WIDTH = Dimensions.get('window').width
+  
+  const MAX_VIDEO_SIZE = 8
+  
+  export const isVideoSupported = (): boolean => { ... }
+  
+  export const DOCUMENT_FORMATS = [
+    'pdf',
+    'csv',
+    'doc',
+    'docx',
+    'xls',
+    'xlsx',
+    'html',
+    'txt',
+    'md',
+    ...EXTRA_DOCUMENT_FORMATS,
+  ]
+  
+  export const PromptListComponent: React.FC<PromptListProps> = ({
+    onSelectPrompt,
+    onSwitchedToTextModel
+  }) => { ... }
+  
+  package react-native.src.chat.component.markdown;
+  
+  export const CopyButton: React.FC<CopyButtonProps> = React.memo(
+    ({ onCopy, colors, isDark }) => {
+      const [copied, setCopied] = useState(false);
+      const styles = createCustomStyles(colors);
+  
+      const handleCopy = useCallback(() => {
+        onCopy();
+        setCopied(true);
+      }, [onCopy]);
+  
+      // UseMemo to memoize the image source to prevent flickering
+      const imageSource = useMemo(() => {
+        return copied
+          ? isDark
+            ? require('../../../assets/done_dark.png')
+            : require('../../../assets/done.png')
+          : isDark
+          ? require('../../../assets/copy_grey.png')
+          : require('../../../assets/copy.png');
+      }, [copied, isDark]);
+  
+      useEffect(() => {
+        if (copied) {
+          const timer = setTimeout(() => {
+            setCopied(false);
+          }, 2000);
+  
+          return () => clearTimeout(timer);
+        }
+      }, [copied]);
+      return (
+        <TouchableOpacity style={styles.copyButtonLayout} onPress={handleCopy}>
+          <Image source={imageSource} style={styles.copyButton} />
+        </TouchableOpacity>
+      );
+    },
+    () => true
+  )
+  
+  class Parser {
+    private renderer: RendererInterface
+    private styles: MarkedStyles
+    private readonly headingStylesMap: Record<number, TextStyle | undefined>
+    private readonly baseUrl: string
+    constructor(options: ParserOptions) { ... }
+    parse(tokens: Token[]) { ... }
+    private _parse(tokens: Token[], styles?: ViewStyle | TextStyle | ImageStyle) { ... }
+    private _parseToken(
+        token: Token,
+        styles?: ViewStyle | TextStyle | ImageStyle
+      ): ReactNode { ... }
+    private getNormalizedSiblingNodesForBlockAndInlineTokens(
+        tokens: Token[],
+        textStyle?: TextStyle
+      ): ReactNode[] { ... }
+    private hasDuplicateTextChildToken(token: Token): boolean { ... }
+  }
+  
+  const CustomCodeHighlighter = lazy(() => import('./CustomCodeHighlighter'))
+  
+  const ALLOWED_STYLE_PROPERTIES: Record<string, boolean> = {
+    color: true,
+    background: true,
+    backgroundColor: true,
+    fontWeight: true,
+    fontStyle: true
+  }
+  
+  const getTableWidthArr = (
+    totalCols: number,
+    windowWidth: number,
+    windowHeight: number
+  ) => { ... }
+  
+  export interface useMarkdownHookOptions {
+    colorScheme?: ColorSchemeName
+    renderer?: RendererInterface
+    theme?: UserTheme
+    styles?: MarkedStyles
+    baseUrl?: string
+    tokenizer?: Tokenizer<CustomToken>
+    chatStatus?: ChatStatus
+  }
+  
+  const MemoizedCodeHighlighter = React.memo(
+    ({
+      text,
+      language,
+      colors,
+      isDark
+    }: {
+      text: string;
+      language?: string;
+      colors: ColorScheme;
+      isDark: boolean;
+    }) => {
+      const styles = createCustomStyles(colors);
+      const handleCopy = useCallback(() => {
+        Clipboard.setString(text);
+      }, [text]);
+  
+      const hljsStyle = isDark ? vs2015 : github;
+  
+      return (
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <Text style={styles.headerText}>
+              {language === '' ? 'code' : language}
+            </Text>
+            <CopyButton onCopy={handleCopy} colors={colors} isDark={isDark} />
+          </View>
+          <Suspense fallback={<Text style={styles.loading}>Loading...</Text>}>
+            <CustomCodeHighlighter
+              hljsStyle={hljsStyle}
+              scrollViewProps={{
+                contentContainerStyle: {
+                  padding: 12,
+                  minWidth: '100%',
+                  borderBottomLeftRadius: 8,
+                  borderBottomRightRadius: 8,
+                  backgroundColor: colors.codeBackground
+                },
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-expect-error
+                backgroundColor: colors.codeBackground
+              }}
+              textStyle={styles.text}
+              language={language ?? 'code'}>
+              {text}
+            </CustomCodeHighlighter>
+          </Suspense>
+        </View>
+      );
+    },
+    (prevProps, nextProps) =>
+      prevProps.text === nextProps.text &&
+      prevProps.language === nextProps.language &&
+      prevProps.colors === nextProps.colors &&
+      prevProps.isDark === nextProps.isDark
+  )
+  
+  export class CustomMarkdownRenderer
+    extends Renderer
+    implements RendererInterface {
+    private width = Dimensions.get('window').width
+    private height = Dimensions.get('window').height
+    private colors: ColorScheme
+    private styles: ReturnType<typeof createCustomStyles>
+    private isDark: boolean
+    constructor(
+        private onImagePress: (pressMode: PressMode, url: string) => void,
+        colors: ColorScheme,
+        isDark: boolean
+      ) { ... }
+    getTextView(children: string | ReactNode[], styles?: TextStyle): ReactNode { ... }
+    getNodeForTextArray(text: ReactNode[], styles?: TextStyle): ReactNode { ... }
+    codespan(text: string, styles?: TextStyle): ReactNode { ... }
+    text(text: string | ReactNode[], styles?: TextStyle): ReactNode { ... }
+    strong(children: string | ReactNode[], styles?: TextStyle): ReactNode { ... }
+    em(children: string | ReactNode[], styles?: TextStyle): ReactNode { ... }
+    br(): ReactNode { ... }
+    del(children: string | ReactNode[], styles?: TextStyle): ReactNode { ... }
+    heading(text: string | ReactNode[], styles?: TextStyle): ReactNode { ... }
+    escape(text: string, styles?: TextStyle): ReactNode { ... }
+    image(uri: string, alt?: string, style?: ImageStyle): ReactNode { ... }
+    code(
+        text: string,
+        language?: string,
+        _containerStyle?: ViewStyle,
+        _textStyle?: TextStyle
+      ): ReactNode { ... }
+    table(
+        header: ReactNode[][],
+        rows: ReactNode[][][],
+        tableStyle?: ViewStyle,
+        rowStyle?: ViewStyle,
+        cellStyle?: ViewStyle
+      ): React.ReactNode { ... }
+    list(
+        ordered: boolean,
+        li: ReactNode[],
+        listStyle?: ViewStyle,
+        textStyle?: TextStyle,
+        startIndex?: number
+      ): ReactNode { ... }
+    custom(
+        identifier: string,
+        _raw: string,
+        _children?: ReactNode[],
+        args?: Record<string, unknown>
+      ): ReactNode { ... }
+  }
+  
+  type ChatMarkdownProps = MarkdownProps & {
+    chatStatus: ChatStatus;
+  };
+  
+  type HighlighterStyleSheet = { [key: string]: TextStyle }
+  
+  const getRNStylesFromHljsStyle = (
+    hljsStyle: ReactStyle
+  ): HighlighterStyleSheet => { ... }
+  
+  const Markdown = ({
+    value,
+    flatListProps,
+    theme,
+    baseUrl,
+    renderer,
+    styles,
+    tokenizer,
+    chatStatus
+  }: ChatMarkdownProps) => { ... }
+  
+  export interface CodeHighlighterProps extends SyntaxHighlighterProps {
+    hljsStyle: ReactStyle
+    textStyle?: StyleProp<TextStyle>
+    scrollViewProps?: ScrollViewProps
+    containerStyle?: StyleProp<ViewStyle>
+  }
+  
+  export class CustomTokenizer extends MarkedTokenizer<CustomToken> {
+    list(this: MarkedTokenizer<CustomToken>, src: string) { ... }
+    processLatex(src: string): { token: CustomToken | null; raw: string } | null { ... }
+    paragraph(
+        src: string
+      ): ReturnType<MarkedTokenizer<CustomToken>['paragraph']> { ... }
+    private processDollarLatex(src: string): CustomToken | null { ... }
+    private processLatexInText(
+        src: string,
+        match: RegExpMatchArray,
+        isDisplayMode: boolean,
+        extractParts: (
+          src: string,
+          match: RegExpMatchArray
+        ) => {
+          beforeFormula: string;
+          formula: string;
+          formulaContent: string;
+          afterFormula: string;
+        }
+      ): ReturnType<MarkedTokenizer<CustomToken>['text']> { ... }
+    text(src: string): ReturnType<MarkedTokenizer<CustomToken>['text']> { ... }
+    escape(src: string): ReturnType<MarkedTokenizer<CustomToken>['escape']> { ... }
+  }
+  
+  const MemoizedText = memo(
+    ({
+      style,
+      children
+    }: {
+      style: StyleProp<TextStyle>;
+      children: ReactNode;
+    }) => <Text style={style}>{children}</Text>
+  )
+  
+  type ReactStyle = Record<string, CSSProperties>
+  
+  const useMarkdown = (
+    value: string,
+    options?: useMarkdownHookOptions
+  ): ReactNode[] => { ... }
+  
+  export const CustomCodeHighlighter: FunctionComponent<CodeHighlighterProps> = ({
+    children,
+    textStyle,
+    hljsStyle,
+    scrollViewProps,
+    containerStyle,
+    ...rest
+  }) => { ... }
+  
+  function getMathKey() { ... }
+  
+  let mathViewIndex = 0
+  
+  const createCustomStyles = (colors: ColorScheme) => { ... }
+  
+  const styles = StyleSheet.create({
+    inputText: {
+      lineHeight: 20,
+      marginTop: -5
+    }
+  })
+  
+  const cleanStyle = (style: CSSProperties) => { ... }
+  
+  interface CopyButtonProps {
+    onCopy: () => void
+    colors: ColorScheme
+    isDark: boolean
+  }
+  
+  package react-native.src.chat.service;
+  
+  const voiceChatEmitter = VoiceChatModule
+    ? new NativeEventEmitter(VoiceChatModule)
+    : null
+  
+  export const voiceChatService = new VoiceChatService()
+  
+  export class VoiceChatService {
+    private isInitialized = false
+    private subscriptions: EmitterSubscription[] = []
+    private onTranscriptReceivedCallback?: (role: string, text: string) => void
+    private onErrorCallback?: (message: string) => void
+    private onAudioLevelChangedCallback?: (source: string, level: number) => void
+    constructor() { ... }
+    public setCallbacks(
+        onTranscriptReceived?: (role: string, text: string) => void,
+        onError?: (message: string) => void
+      ) { ... }
+    public setOnAudioLevelCallbacks(
+        onAudioLevelChanged?: (source: string, level: number) => void
+      ) { ... }
+    private setupEventListeners() { ... }
+    private async getValidConfig(): Promise<object | null> { ... }
+    public async initialize(): Promise<boolean> { ... }
+    public async startConversation(): Promise<boolean> { ... }
+    public async endConversation(): Promise<boolean> { ... }
+    public cleanup() { ... }
+  }
+  
+  package react-native.src.chat.util;
+  
+  export async function getBedrockMessagesFromChatMessages(
+    messages: SwiftChatMessage[]
+  ): Promise<BedrockMessage[]> { ... }
+  
+  let hapticFeedbackEnabled = getHapticEnabled()
+  
+  const MAX_IMAGES = 20
+  
+  export interface ImageContent {
+    image: ImageInfo
+  }
+  
+  export const getFileTypeSummary = (files: FileInfo[]) => { ... }
+  
+  export const saveImageToLocal = async (
+    base64ImageData: string
+  ): Promise<string> => { ... }
+  
+  export function setHapticFeedbackEnabled(isEnabled: boolean) { ... }
+  
+  export type OpenAIMessage = {
+    role: string;
+    content:
+      | string
+      | Array<{
+          type: 'text' | 'image_url';
+          text?: string;
+          image_url?: {
+            url: string;
+          };
+        }>;
+  };
+  
+  export type MessageContent = | TextContent
+    | ImageContent
+    | VideoContent
+    | DocumentContent;
+  
+  export const getFullFileUrl = (url: string) => { ... }
+  
+  const MAX_NOVA_VIDEOS = 1
+  
+  export function trigger(method: HapticFeedbackTypes) { ... }
+  
+  export type BedrockMessage = {
+    role: string;
+    content: MessageContent[];
+  };
+  
+  export interface DocumentContent {
+    document: {
+        format: string;
+        name: string;
+        source: {
+          bytes: string;
+        };
+      }
+  }
+  
+  export interface TextContent {
+    text: string
+  }
+  
+  function normalizeFilename(filename: string): string { ... }
+  
+  export interface VideoContent {
+    video: {
+        format: string;
+        source: {
+          bytes: string;
+        };
+      }
+  }
+  
+  export async function getBedrockMessage(
+    message: SwiftChatMessage
+  ): Promise<BedrockMessage> { ... }
+  
+  const MAX_NOVA_FILES = 5
+  
+  export interface ImageInfo {
+    format: string
+    source: {
+        bytes: string;
+      }
+  }
+  
+  export const isAllFileReady = (files: FileInfo[]) => { ... }
+  
+  const getUniqueFileName = async (
+    basePath: string,
+    originalFileName: string
+  ): Promise<string> => { ... }
+  
+  export const getFileBytes = async (fileUrl: string) => { ... }
+  
+  const isNova = (): boolean => { ... }
+  
+  function isValidFilename(filename: string): boolean { ... }
+  
+  const hapticOptions = {
+    enableVibrateFallback: true,
+    ignoreAndroidSystemSettings: true
+  }
+  
+  export const saveFile = async (sourceUrl: string, fileName: string) => { ... }
+  
+  export const checkFileNumberLimit = (
+    prevFiles: FileInfo[],
+    newFiles: FileInfo[]
+  ) => { ... }
+  
+  export const showInfo = (msg: string) => { ... }
+  
+  const MAX_DOCUMENTS = 5
+  
+  export const getFileTextContent = async (fileUrl: string): Promise<string> => { ... }
+  
+  package react-native.src.history;
+  
+  export function groupMessagesByDate(messages: Chat[]) { ... }
+  
+  interface AppProviderProps {
+    children: ReactNode
+  }
+  
+  const AppContext = createContext<AppContextType | undefined>(undefined)
+  
+  export const useAppContext = () => { ... }
+  
+  export type DrawerType = 'permanent' | 'slide'
+  
+  function getTodayTimestamp(): number { ... }
+  
+  function getFirstDayOfMonthTimestamp(yearMonth: string): number { ... }
+  
+  const CustomDrawerContent: React.FC<DrawerContentComponentProps> = ({
+    navigation
+  }) => { ... }
+  
+  interface AppContextType {
+    sendEvent: (event: string, params?: EventData) => void
+    event: { event: string; params?: EventData } | null
+    drawerType: DrawerType
+    setDrawerType: (type: DrawerType) => void
+  }
+  
+  const createStyles = (colors: ColorScheme) => { ... }
+  
+  function formatTimestampToYearMonth(timestamp: number): string { ... }
+  
+  export const AppProvider: React.FC<AppProviderProps> = ({ children }) => { ... }
+  
+  package react-native.src.prompt;
+  
+  type PromptScreenRouteProp = RouteProp<RouteParamList, 'Prompt'>
+  
+  interface PresetPromptListProps {
+  }
+  
+  const styles = StyleSheet.create({
+    headerContainer: {
+      marginLeft: -10,
+      paddingRight: 16,
+      padding: 10
+    },
+    headerImage: { width: 20, height: 20 }
+  })
+  
+  type RootStackParamList = {
+    Drawer: undefined;
+    TokenUsage: undefined;
+    Prompt: { prompt?: any };
+    PresetPrompts: undefined;
+  };
+  
+  export interface PresetPrompt extends SystemPrompt {
+    avatar: string
+    description: string
+    category?: string
+  }
+  
+  const MAX_NAME_LENGTH = 20
+  
+  type PresetPromptListNavigationProp = NativeStackNavigationProp<RootStackParamList>
+  
+  const createStyles = (colors: ColorScheme) => { ... }
+  
+  export const PROMPT_CATEGORIES = [
+    'Profesional',
+    'Instansi', 
+    'Asisten',
+  ]
+  
+  function PromptScreen(): React.JSX.Element { ... }
+  
+  export const PRESET_PROMPTS: PresetPrompt[] = [
+    {
+      id: 1,
+      name: 'Broperty Ai',
+      prompt: `Saya adalah **Broperty Ai**, bot utama yang **HANYA merespon komunikasi terkait properti real estate**. Jika pertanyaan tidak sesuai dengan topik properti real estate, saya akan secara halus menolaknya.
+  
+  **PERAN UTAMA SAYA:**
+  1. **GERBANG UTAMA** - Selalu berkomunikasi dengan user dan internal Broperty, serta menghubungkan kedua pihak tersebut
+  2. **IDENTIFIKASI KEBUTUHAN USER** - Berusaha untuk selalu mengetahui & memenuhi kebutuhan spesifik user terkait properti
+  3. **MENYAMBUNGKAN KE BERBAGAI FITUR YANG ADA** - Menghubungkan user ke sub-bot profesional, web view, atau Google Maps
+  
+  **FITUR AKTIF YANG TERSEDIA:**
+  - **Sub Bot Profesional Ecosystem:**
+    1. 🏠 Agensi Properti Ai - Konsultasi jual beli properti
+    2. 📜 Notaris Ai - Pengurusan sertifikat dan dokumen legal
+    3. ⚖️ Pengacara Ai - Konsultasi hukum properti dan kontrak
+    4. 🏛 Aparatur Pemerintah Ai - Perangkat pemerintah untuk pengurusan properti
+    5. 💻 Sertifikasi Elektronik Ai - Bantuan sertifikat elektronik
+    6. 🏦 KPR Bank Ai - Informasi KPR berbagai bank
+  
+  - **Web View Integration** - Akses konten properti terkini
+  - **Google Maps Integration** - Lokasi dan navigasi properti (Fitur Baru!)
+  
+  Silakan ajukan pertanyaan terkait properti real estate, saya akan menyambungkan Anda ke fitur yang tepat!`,
+      description: 'Ai Utama sebagai **Gerbang Komunikasi** & **Konektor Fitur Properti**',
+      avatar: '🏠',
+      includeHistory: true,
+      category: 'Utama'
+    },
+    {
+      id: 926,
+      name: 'Agensi Properti Ai',
+      prompt: 'Aku adalah Agensi Properti Ai berpengalaman puluhan tahun dalam membantu pembelian dan penjualan properti klien kami. Saya tidak dapat menjawab pertanyaan apapun itu yg tdk berkaitan dengan proses jual beli properti',
+      description: 'Konsultasi dalam pembelian atau penjualan properti milik anda',
+      avatar: '👨‍💼',
+      includeHistory: true,
+      category: 'Asisten'
+    },
+    {
+      id: 900,
+      name: 'Notaris Ai',
+      prompt: 'Halo! Aku adalah Notaris Ai. Aku akan memberikan kamu berbagai info terkait apapun itu yang menjadi tugas Notaris. Saya tidak dapat menjawab pertanyaan apapun itu yg tdk berkaitan dengan tugas kenotariatan',
+      description: 'Membuat dokumen transaksi jual beli properti, legalisasi dopkumen serta membantu pengurusan surat ke BPN',
+      avatar: '📜',
+      includeHistory: true,
+      category: 'Profesional'
+    },
+    {
+      id: 901,
+      name: 'Pengacara Ai',
+      prompt: 'Halo! Aku adalah Pengacara Ai. Aku akan memberikan kamu berbagai info berita terkait tugas Pengacara yang berkaitan dengan properti. Saya tidak dapat menjawab pertanyaan apapun itu yg tdk berkaitan dengan tugas Pengacara properti',
+      description: 'Menangani sengketa, memeriksa dokumen transaksi jual beli & pendampingan hukum di pengadilan',
+      avatar: '⚖️',
+      includeHistory: true,
+      category: 'Profesional'
+    },
+    {
+      id: 911,
+      name: 'Aparatur Pemerintah Ai',
+      prompt: 'Halo! Aku adalah Aparatur Pemerintah Ai seperti kepala desa, Lurah, Camat, Bupati, Walikota dll yang membantu terkait segala sesuatu yang berhubungan dengan properti. Saya tidak dapat menjawab pertanyaan apapun itu yg tdk berkaitan dengan tugas Aparatur Pemerintah terkait properti',
+      description: 'Mengurus prosedur kepemilikan properti di pemerintahan',
+      avatar: '🏛',
+      includeHistory: true,
+      category: 'Instansi'
+    },
+    {
+      id: 920,
+      name: 'Sertifikasi Elektronik Ai',
+      prompt: 'Halo! Aku adalah asisten Program Sertifikasi Elektronik Ai yang akan membantu anda dalam pengurusan sertifikat elektronik di BPN. Saya tidak dapat menjawab pertanyaan apapun itu yg tdk berkaitan dengan Program Sertifikasi Elektronik',
+      description: 'Membantu dalam pembuatan Sertifikasi Elektronik',
+      avatar: '💻',
+      includeHistory: true,
+      category: 'Asisten'
+    },
+     {
+      id: 922,
+      name: 'KPR Bank Ai',
+      prompt: 'Halo! Aku adalah asisten pengajuan KPR Bank Ai yang bertugas memberikan info dan membantu anda terkait segala sesuatu mengenai KPR berbagai Bank di Indonesia. Saya tidak dapat menjawab pertanyaan apapun itu yg tdk berkaitan dengan KPR Bank',
+      description: 'Memberikan segala info terkait KPR di Indonesia',
+      avatar: '🏦',   
+      includeHistory: true,
+      category: 'Asisten'
+    },
+  ]
+  
+  const PresetPromptList: React.FC<PresetPromptListProps> = () => { ... }
+  
+  export const HeaderLeftView = (navigation: NavigationProp, isDark: boolean) => { ... }
+  
+  type NavigationProp = DrawerNavigationProp<RouteParamList>
+  
+  function calculateTextLength(str: string) { ... }
+  
+  package react-native.src.settings;
+  
+  function SettingsScreen(): React.JSX.Element { ... }
+  
+  export function addBedrockPrefixToDeepseekModels(models: Model[]): void { ... }
+  
+  function getImagePrice(
+    modelName: keyof ImageModelPrices,
+    size: 'small' | 'medium' | 'large'
+  ): number { ... }
+  
+  const CustomDropdown: React.FC<CustomDropdownProps> = ({
+    label,
+    data,
+    value,
+    onChange,
+    placeholder,
+    searchPlaceholder = 'Search...'
+  }) => { ... }
+  
+  function TabButton({
+    label,
+    isSelected,
+    onPress
+  }: TabButtonProps): React.JSX.Element { ... }
+  
+  export const getUsagePrice = (usage: Usage): UsagePrice => { ... }
+  
+  export const ModelPrice: ModelPriceType = {
+    textModelPrices: {
+      'Bedrock DeepSeek-R1': {
+        inputTokenPrice: 0.00135,
+        outputTokenPrice: 0.0054
+      },
+      'DeepSeek-V3': {
+        inputTokenPrice: 0.00027,
+        outputTokenPrice: 0.0011
+      },
+      'DeepSeek-R1': {
+        inputTokenPrice: 0.00055,
+        outputTokenPrice: 0.00219
+      },
+      'GPT-4.1': {
+        inputTokenPrice: 0.002,
+        outputTokenPrice: 0.008
+      },
+      'GPT-4.1-mini': {
+        inputTokenPrice: 0.0004,
+        outputTokenPrice: 0.0016
+      },
+      'GPT-4.1-nano': {
+        inputTokenPrice: 0.0001,
+        outputTokenPrice: 0.0004
+      },
+      'GPT-4o': {
+        inputTokenPrice: 0.0025,
+        outputTokenPrice: 0.01
+      },
+      'GPT-4o mini': {
+        inputTokenPrice: 0.00015,
+        outputTokenPrice: 0.0006
+      },
+      'Titan Text G1 - Lite': {
+        inputTokenPrice: 0.00015,
+        outputTokenPrice: 0.0002
+      },
+      'Titan Text G1 - Express': {
+        inputTokenPrice: 0.0002,
+        outputTokenPrice: 0.0006
+      },
+      'Titan Text G1 - Premier': {
+        inputTokenPrice: 0.0005,
+        outputTokenPrice: 0.0015
+      },
+      'Nova Pro': {
+        inputTokenPrice: 0.0008,
+        outputTokenPrice: 0.0032
+      },
+      'Nova Lite': {
+        inputTokenPrice: 0.00006,
+        outputTokenPrice: 0.00024
+      },
+      'Nova Micro': {
+        inputTokenPrice: 0.000035,
+        outputTokenPrice: 0.00014
+      },
+      'Claude 3.5 Sonnet v2': {
+        inputTokenPrice: 0.003,
+        outputTokenPrice: 0.015
+      },
+      'Claude 3.5 Haiku': {
+        inputTokenPrice: 0.0008,
+        outputTokenPrice: 0.004
+      },
+      'Claude Instant': {
+        inputTokenPrice: 0.0008,
+        outputTokenPrice: 0.0024
+      },
+      Claude: {
+        inputTokenPrice: 0.008,
+        outputTokenPrice: 0.024
+      },
+      'Claude 3 Sonnet': {
+        inputTokenPrice: 0.003,
+        outputTokenPrice: 0.015
+      },
+      'Claude 3 Haiku': {
+        inputTokenPrice: 0.00025,
+        outputTokenPrice: 0.00125
+      },
+      'Claude 3 Opus': {
+        inputTokenPrice: 0.015,
+        outputTokenPrice: 0.075
+      },
+      'Claude 3.5 Sonnet': {
+        inputTokenPrice: 0.003,
+        outputTokenPrice: 0.015
+      },
+      'Claude 3.7 Sonnet': {
+        inputTokenPrice: 0.003,
+        outputTokenPrice: 0.015
+      },
+      Command: {
+        inputTokenPrice: 0.0015,
+        outputTokenPrice: 0.002
+      },
+      'Command R': {
+        inputTokenPrice: 0.0005,
+        outputTokenPrice: 0.0015
+      },
+      'Command R+': {
+        inputTokenPrice: 0.003,
+        outputTokenPrice: 0.015
+      },
+      'Command Light': {
+        inputTokenPrice: 0.0003,
+        outputTokenPrice: 0.0006
+      },
+      'Llama 3 8B Instruct': {
+        inputTokenPrice: 0.0003,
+        outputTokenPrice: 0.0006
+      },
+      'Llama 3 70B Instruct': {
+        inputTokenPrice: 0.00265,
+        outputTokenPrice: 0.0035
+      },
+      'Llama 3.1 8B Instruct': {
+        inputTokenPrice: 0.00022,
+        outputTokenPrice: 0.00022
+      },
+      'Llama 3.1 70B Instruct': {
+        inputTokenPrice: 0.00072,
+        outputTokenPrice: 0.00072
+      },
+      'Llama 3.1 405B Instruct': {
+        inputTokenPrice: 0.0024,
+        outputTokenPrice: 0.0024
+      },
+      'Llama 3.2 1B Instruct': {
+        inputTokenPrice: 0.0001,
+        outputTokenPrice: 0.0001
+      },
+      'Llama 3.2 3B Instruct': {
+        inputTokenPrice: 0.00015,
+        outputTokenPrice: 0.00015
+      },
+      'Llama 3.2 11B Instruct': {
+        inputTokenPrice: 0.00016,
+        outputTokenPrice: 0.00016
+      },
+      'Llama 3.2 90B Instruct': {
+        inputTokenPrice: 0.00072,
+        outputTokenPrice: 0.00072
+      },
+      'Mistral 7B Instruct': {
+        inputTokenPrice: 0.00015,
+        outputTokenPrice: 0.0002
+      },
+      'Mixtral 8x7B Instruct': {
+        inputTokenPrice: 0.00045,
+        outputTokenPrice: 0.0007
+      },
+      'Mistral Small (24.02)': {
+        inputTokenPrice: 0.001,
+        outputTokenPrice: 0.003
+      },
+      'Mistral Large (24.02)': {
+        inputTokenPrice: 0.004,
+        outputTokenPrice: 0.012
+      },
+      'Mistral Large (24.07)': {
+        inputTokenPrice: 0.002,
+        outputTokenPrice: 0.006
+      },
+      'Jamba-Instruct': {
+        inputTokenPrice: 0.0005,
+        outputTokenPrice: 0.0007
+      },
+      'Jamba 1.5 Large': {
+        inputTokenPrice: 0.002,
+        outputTokenPrice: 0.008
+      },
+      'Jamba 1.5 Mini': {
+        inputTokenPrice: 0.0002,
+        outputTokenPrice: 0.0004
+      }
+    },
+    imageModelPrices: {
+      'Titan Image Generator G1': {
+        small: 0.008,
+        medium: 0.01
+      },
+      'Titan Image Generator G1 v2': {
+        small: 0.008,
+        medium: 0.01
+      },
+      'Nova Canvas': {
+        medium: 0.04,
+        large: 0.06
+      },
+      'SDXL 1.0': {
+        medium: 0.04
+      },
+      'SD3 Large 1.0': {
+        medium: 0.08
+      },
+      'Stable Diffusion 3.5 Large': {
+        medium: 0.08
+      },
+      'Stable Image Core 1.0': {
+        medium: 0.04
+      },
+      'Stable Image Ultra 1.0': {
+        medium: 0.14
+      }
+    }
+  }
+  
+  export function getTotalInputPrice(usage: Usage[]) { ... }
+  
+  export const GITHUB_LINK = 'https://github.com/aws-samples/swift-chat'
+  
+  const createStyles = (colors: ColorScheme) => { ... }
+  
+  export function getTotalOutputTokens(usage: Usage[]) { ... }
+  
+  interface TabButtonProps {
+    label: string
+    isSelected: boolean
+    onPress: () => void
+  }
+  
+  const CustomTextInput: React.FC<CustomTextInputProps> = ({
+    label,
+    value,
+    onChangeText,
+    placeholder,
+    secureTextEntry = false,
+    numberOfLines = 1
+  }) => { ... }
+  
+  type ImageModelPrices = {
+    'Titan Image Generator G1': {
+      small: number;
+      medium: number;
+    };
+    'Titan Image Generator G1 v2': {
+      small: number;
+      medium: number;
+    };
+    'Nova Canvas': {
+      medium: number;
+      large: number;
+    };
+    'SDXL 1.0': {
+      medium: number;
+    };
+    'SD3 Large 1.0': {
+      medium: number;
+    };
+    'Stable Diffusion 3.5 Large': {
+      medium: number;
+    };
+    'Stable Image Core 1.0': {
+      medium: number;
+    };
+    'Stable Image Ultra 1.0': {
+      medium: number;
+    };
+  };
+  
+  export function getTotalImageCount(usage: Usage[]) { ... }
+  
+  interface ModelPriceType {
+    textModelPrices: Record<
+        string,
+        { inputTokenPrice: number; outputTokenPrice: number }
+      >
+    imageModelPrices: ImageModelPrices
+  }
+  
+  type NavigationProp = DrawerNavigationProp<RouteParamList>
+  
+  export function getTotalOutputPrice(usage: Usage[]) { ... }
+  
+  const initUpgradeInfo: UpgradeInfo = {
+    needUpgrade: false,
+    version: '',
+    url: ''
+  }
+  
+  export function getTotalInputTokens(usage: Usage[]) { ... }
+  
+  export function getTotalImagePrice(usage: Usage[]) { ... }
+  
+  interface DropdownItem {
+    label: string
+    value: string
+  }
+  
+  interface CustomDropdownProps {
+    label: string
+    data: DropdownItem[]
+    value: string | null
+    onChange: (item: DropdownItem) => void
+    placeholder: string
+    searchPlaceholder?: string
+  }
+  
+  interface CustomTextInputProps {
+    label: string
+    value: string
+    onChangeText: (text: string) => void
+    placeholder: string
+    secureTextEntry?: boolean
+    numberOfLines?: number
+  }
+  
+  export function getTotalCost(usage: Usage[]) { ... }
+  
+  function TokenUsageScreen(): React.JSX.Element { ... }
+  
+  package react-native.src.storage;
+  
+  export function saveDeepSeekApiKey(apiKey: string) { ... }
+  
+  export function deleteMessagesBySessionId(sessionId: number) { ... }
+  
+  export function getCurrentSystemPrompt(): SystemPrompt | null { ... }
+  
+  export function saveCurrentVoiceSystemPrompt(prompts: SystemPrompt | null) { ... }
+  
+  export function updateChatTitlesFromUserMessages() { ... }
+  
+  const tokenInfoKey = keyPrefix + 'tokenInfo'
+  
+  export function getDefaultImageModels() { ... }
+  
+  export function saveRegion(region: string) { ... }
+  
+  export function getDefaultTextModels() { ... }
+  
+  export const GPTModels = [
+    { modelName: 'GPT-4.1', modelId: 'gpt-4.1', modelTag: ModelTag.OpenAI },
+    {
+      modelName: 'GPT-4.1-mini',
+      modelId: 'gpt-4.1-mini',
+      modelTag: ModelTag.OpenAI
+    },
+    {
+      modelName: 'GPT-4.1-nano',
+      modelId: 'gpt-4.1-nano',
+      modelTag: ModelTag.OpenAI
+    },
+    { modelName: 'GPT-4o', modelId: 'gpt-4o', modelTag: ModelTag.OpenAI },
+    {
+      modelName: 'GPT-4o mini',
+      modelId: 'gpt-4o-mini',
+      modelTag: ModelTag.OpenAI
+    },
+  ]
+  
+  export function getMessagesBySessionId(sessionId: number): SwiftChatMessage[] { ... }
+  
+  export function getOllamaApiUrl(): string { ... }
+  
+  export function saveAllSystemPrompts(prompts: SystemPrompt[]) { ... }
+  
+  export function saveOpenAICompatModels(models: string) { ... }
+  
+  export function updateMessageList(chatList: Chat[]) { ... }
+  
+  const apiKeyTag = keyPrefix + 'apiKeyTag'
+  
+  export const DefaultTextModel = [
+    {
+      modelName: 'DeepSeek-V3',
+      modelId: 'deepseek-chat',
+      modelTag: ModelTag.Broperty
+    },
+  ]
+  
+  const DefaultImageModel = {
+    modelName: 'Stable Diffusion 3.5 Large',
+    modelId: 'stability.sd3-5-large-v1:0',
+    modelTag: ModelTag.Bedrock
+  }
+  
+  const thinkingEnabledKey = keyPrefix + 'thinkingEnabledKey'
+  
+  export function saveImageModel(model: Model) { ... }
+  
+  export function saveApiKey(apiKey: string) { ... }
+  
+  const sessionIdPrefix = keyPrefix + 'sessionId/'
+  
+  export function getSystemPrompts(type?: string): SystemPrompt[] { ... }
+  
+  const messageListKey = keyPrefix + 'messageList'
+  
+  export function getApiUrl(): string { ... }
+  
+  export function saveThinkingEnabled(enabled: boolean) { ... }
+  
+  const openAICompatModelsKey = keyPrefix + 'openAICompatModelsKey'
+  
+  const systemPromptsKey = keyPrefix + 'systemPromptsKey'
+  
+  export function saveKeys(apiUrl: string, apiKey: string) { ... }
+  
+  export function getCurrentVoiceSystemPrompt(): SystemPrompt | null { ... }
+  
+  export function saveOllamaApiURL(apiUrl: string) { ... }
+  
+  export function getMessageList(): Chat[] { ... }
+  
+  export function getThinkingEnabled() { ... }
+  
+  const ollamaApiUrlKey = keyPrefix + 'ollamaApiUrlKey'
+  
+  export function saveOpenAIApiKey(apiKey: string) { ... }
+  
+  export const DefaultVoiceSystemPrompts = [
+    {
+      id: -4,
+      name: 'LearnWords',
+      prompt: `Please act as an English vocabulary coach. In each response, follow this exact format:
+  
+  1. If the user has spoken: Score their speaking from 1-10
+  2. If score < 7: Provide brief correction tips and ask them to repeat the same word
+  3. If score ≥ 7: ask user to read a new English word
+  
+  Keep all responses under 5 sentences. Begin by introducing yourself and providing the first practice word.
+  
+  Remember: ALWAYS start with a score after the user speaks`,
+      includeHistory: true,
+      promptType: 'voice',
+      allowInterruption: false
+    },
+    {
+      id: -5,
+      name: 'LearnSentences',
+      prompt: `Please act as an English pronunciation coach. In each response, follow this exact format:
+  
+  1. If the user has spoken: Score their pronunciation from 1-10
+  2. If score < 7: Provide brief correction tips and ask them to repeat the same sentence
+  3. If score ≥ 7: Introduce a new common English phrase for practice
+  
+  Keep all responses under 5 sentences. Begin by introducing yourself and providing the first practice sentence.
+  
+  Remember: ALWAYS start with a score after the user speaks`,
+      includeHistory: true,
+      promptType: 'voice',
+      allowInterruption: false
+    },
+    {
+      id: -6,
+      name: 'Story',
+      prompt:
+        'You are a storytelling expert. Please first ask the user what type of story they would like to hear, and then tell that story with emotion and expressiveness.',
+      includeHistory: true,
+      promptType: 'voice',
+      allowInterruption: true
+    },
+  ]
+  
+  export function saveVoiceId(voiceId: string) { ... }
+  
+  const textModelKey = keyPrefix + 'textModelKey'
+  
+  export function getImageModel(): Model { ... }
+  
+  export function saveOpenAICompatApiKey(apiKey: string) { ... }
+  
+  export function saveModelOrder(models: Model[]) { ... }
+  
+  export function getOpenAICompatApiKey(): string { ... }
+  
+  const hapticEnabledKey = keyPrefix + 'hapticEnabled'
+  
+  export const DefaultRegion = 'ap-southeast-1'
+  
+  export function getAllImageSize(imageModelId: string = '') { ... }
+  
+  export function getDeepSeekApiKey(): string { ... }
+  
+  export function getOpenAIApiKey(): string { ... }
+  
+  export function saveSystemPrompts(prompts: SystemPrompt[], type?: string) { ... }
+  
+  export const VoiceIDList = [
+    {
+      voiceName: 'Matthew (American English)',
+      voiceId: 'matthew'
+    },
+    {
+      voiceName: 'Tiffany (American English)',
+      voiceId: 'tiffany'
+    },
+    {
+      voiceName: 'Amy (British English)',
+      voiceId: 'amy'
+    },
+    {
+      voiceName: 'Lupe (Spanish)',
+      voiceId: 'lupe'
+    },
+    {
+      voiceName: 'Carlos (Spanish)',
+      voiceId: 'carlos'
+    },
+  ]
+  
+  export function getRegion() { ... }
+  
+  export function updateTextModelUsageOrder(model: Model) { ... }
+  
+  export function getAllRegions() { ... }
+  
+  const RegionList = [
+    'us-west-2',
+    'us-east-1',
+    'us-east-2',
+    'ap-south-1',
+    'ap-southeast-1',
+    'ap-southeast-2',
+    'ap-northeast-1',
+    'ap-northeast-2',
+    'ap-northeast-3',
+    'ca-central-1',
+    'eu-central-1',
+    'eu-west-1',
+    'eu-west-2',
+    'eu-west-3',
+    'eu-north-1',
+    'sa-east-1',
+  ]
+  
+  export function getTextModel(): Model { ... }
+  
+  function getMessageListStr() { ... }
+  
+  export function saveAllModels(allModels: AllModel) { ... }
+  
+  const currentSystemPromptKey = keyPrefix + 'currentSystemPromptKey'
+  
+  const voiceIdKey = keyPrefix + 'voiceIdKey'
+  
+  export function getDefaultApiKeyModels() { ... }
+  
+  export function getTokenInfo(): TokenResponse | null { ... }
+  
+  const openAICompatApiURLKey = keyPrefix + 'openAICompatApiURLKey'
+  
+  export function getModelUsage(): Usage[] { ... }
+  
+  const modelUsageKey = keyPrefix + 'modelUsageKey'
+  
+  const currentVoiceSystemPromptKey = keyPrefix + 'currentVoiceSystemPromptKey'
+  
+  const imageSizeKey = keyPrefix + 'imageSizeKey'
+  
+  const allModelKey = keyPrefix + 'allModelKey'
+  
+  const currentSessionIdKey = keyPrefix + 'currentSessionId'
+  
+  export function saveMessages(
+    sessionId: number,
+    messages: SwiftChatMessage[],
+    usage: Usage
+  ) { ... }
+  
+  const initializeStorage = () => { ... }
+  
+  export const HARDCODED_DEEPSEEK_API_KEY = 'sk-b9067f0295ac48d5bc7cfd4674fea812'
+  
+  export function saveTextModel(model: Model) { ... }
+  
+  export function getMergedModelOrder(): Model[] { ... }
+  
+  export function saveOpenAIProxyEnabled(enabled: boolean) { ... }
+  
+  export function getAllModels() { ... }
+  
+  export function updateTotalUsage(usage: Usage) { ... }
+  
+  export function getImageSize() { ... }
+  
+  export function saveMessageList(
+    sessionId: number,
+    messages: SwiftChatMessage[],
+    chatMode: ChatMode
+  ) { ... }
+  
+  export function saveTokenInfo(tokenInfo: TokenResponse) { ... }
+  
+  export function saveApiUrl(apiUrl: string) { ... }
+  
+  const openAIProxyEnabledKey = keyPrefix + 'openAIProxyEnabledKey'
+  
+  export function getPromptId() { ... }
+  
+  export const BedrockVoiceModels = ['Nova Sonic']
+  
+  export function saveCurrentSystemPrompt(prompts: SystemPrompt | null) { ... }
+  
+  export function saveOpenAICompatApiURL(apiUrl: string) { ... }
+  
+  export function getSessionId() { ... }
+  
+  export const encryptStorage = initializeStorage()
+  
+  const keyPrefix = 'bedrock/'
+  
+  const imageModelKey = keyPrefix + 'imageModelKey'
+  
+  const DefaultSystemPrompts = [
+    {
+      id: -7,
+      name: 'MENU',
+      prompt: 'Anda memberikan info properti lainnya. Semua pertanyaan prompt bisa dijawab disini',
+      includeHistory: false
+    },
+    {
+      id: -8,
+      name: 'SEARCH WEB',
+      prompt: 'Buka browser web untuk mencari informasi properti di internet',
+      includeHistory: false
+    },
+    {
+      id: -9,
+      name: 'MAPS',
+      prompt: 'Buka peta untuk melihat lokasi properti dan navigasi',
+      includeHistory: false
+    },
+    ...DefaultVoiceSystemPrompts,
+  ]
+  
+  export function getApiKey(): string { ... }
+  
+  export function getOpenAIProxyEnabled() { ... }
+  
+  export function isNovaCanvas(modelId: string) { ... }
+  
+  export function getDefaultSystemPrompts(): SystemPrompt[] { ... }
+  
+  export const BedrockThinkingModels = [
+    'Claude 3.7 Sonnet',
+    'Claude Sonnet 4',
+    'Claude Opus 4',
+  ]
+  
+  const apiUrlKey = keyPrefix + 'apiUrlKey'
+  
+  const modelOrderKey = keyPrefix + 'modelOrderKey'
+  
+  export function getModelOrder(): Model[] { ... }
+  
+  export function isTokenValid(): boolean { ... }
+  
+  const regionKey = keyPrefix + 'regionKey'
+  
+  export function getOpenAICompatModels(): string { ... }
+  
+  export const DefaultVoicePrompt =
+    'You are a friendly assistant. The user and you will engage in a spoken dialog exchanging the transcripts of a natural real-time conversation. Keep your responses short, generally within five sentences for chatty scenarios.'
+  
+  const deepSeekApiKeyTag = keyPrefix + 'deepSeekApiKeyTag'
+  
+  export const DeepSeekModels = [
+    {
+      modelName: 'DeepSeek-V3',
+      modelId: 'deepseek-chat',
+      modelTag: ModelTag.Broperty
+    },
+    {
+      modelName: 'DeepSeek-R1',
+      modelId: 'deepseek-reasoner',
+      modelTag: ModelTag.Broperty
+    },
+  ]
+  
+  const currentPromptIdKey = keyPrefix + 'currentPromptIdKey'
+  
+  const openAIApiKeyTag = keyPrefix + 'openAIApiKeyTag'
+  
+  export function saveImageSize(size: string) { ... }
+  
+  export function isNewStabilityImageModel(modelId: string) { ... }
+  
+  export function getVoiceId() { ... }
+  
+  export function savePromptId(promptId: number) { ... }
+  
+  export function getOpenAICompatApiURL(): string { ... }
+  
+  export function getHapticEnabled() { ... }
+  
+  export const storage = new MMKV()
+  
+  export function saveHapticEnabled(enabled: boolean) { ... }
+  
+  const openAICompatApiKeyTag = keyPrefix + 'openAICompatApiKeyTag'
+  
+  package react-native.src.theme;
+  
+  interface ThemeProviderProps {
+    children: ReactNode
+  }
+  
+  export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => { ... }
+  
+  interface ThemeContextType {
+    colors: ColorScheme
+    isDark: boolean
+    colorScheme: 'light' | 'dark'
+  }
+  
+  export const lightColors: ColorScheme = {
+    background: '#ffffff',
+    surface: '#f5f5f5',
+    surfaceSecondary: '#f9f9f9',
+    text: '#000000',
+    textSecondary: '#666666',
+    textTertiary: '#999999',
+    border: '#e0e0e0',
+    borderLight: '#eaeaea',
+    shadow: 'rgba(0,0,0,0.1)',
+    card: '#ffffff',
+    input: '#f8f8f8',
+    placeholder: '#999999',
+    error: '#ff4444',
+    success: '#00C851',
+    warning: '#ffbb33',
+    info: '#33b5e5',
+    primary: '#007AFF',
+    primaryLight: '#E3F2FD',
+    accent: '#FF6B6B',
+    overlay: 'rgba(0,0,0,0.5)',
+    codeBackground: '#F8F8F8',
+    selectedBackground: '#F5F5F5',
+    selectedBackgroundMac: '#ECECEC',
+    inputBackground: '#ffffff',
+    labelBackground: '#ffffff',
+    messageBackground: '#f2f2f2',
+    reasoningBackground: '#f3f3f3',
+    inputBorder: '#808080',
+    drawerBackground: 'transparent',
+    drawerBackgroundMac: '#F9F9F9',
+    promptButtonBackground: '#E8E8E8',
+    promptButtonBorder: '#E8E8E8',
+    promptText: '#333333',
+    promptSelectedBorder: '#000000',
+    promptAddButtonBackground: '#ffffff',
+    promptAddButtonBorder: '#666666',
+    promptAddText: '#666666',
+    promptDeleteBackground: '#666666',
+    promptDeleteText: '#ffffff',
+    promptScreenInputBorder: '#e0e0e0',
+    promptScreenSaveButton: '#007AFF',
+    promptScreenSaveButtonText: '#ffffff',
+    textDarkGray: '#333333',
+    inputToolbarBorder: '#000000',
+    fileListBackground: '#ffffff',
+    fileItemBorder: '#e0e0e0',
+    addButtonBackground: '#f0f0f0',
+    chatScreenSplit: '#c7c7c7'
+  }
+  
+  export const useTheme = (): ThemeContextType => { ... }
+  
+  export interface ColorScheme {
+    background: string
+    surface: string
+    surfaceSecondary: string
+    text: string
+    textSecondary: string
+    textTertiary: string
+    border: string
+    borderLight: string
+    shadow: string
+    card: string
+    input: string
+    placeholder: string
+    error: string
+    success: string
+    warning: string
+    info: string
+    primary: string
+    primaryLight: string
+    accent: string
+    overlay: string
+    codeBackground: string
+    selectedBackground: string
+    selectedBackgroundMac: string
+    inputBackground: string
+    labelBackground: string
+    messageBackground: string
+    reasoningBackground: string
+    inputBorder: string
+    drawerBackground: string
+    drawerBackgroundMac: string
+    promptButtonBackground: string
+    promptButtonBorder: string
+    promptText: string
+    promptSelectedBorder: string
+    promptAddButtonBackground: string
+    promptAddButtonBorder: string
+    promptAddText: string
+    promptDeleteBackground: string
+    promptDeleteText: string
+    promptScreenInputBorder: string
+    promptScreenSaveButton: string
+    promptScreenSaveButtonText: string
+    textDarkGray: string
+    inputToolbarBorder: string
+    fileListBackground: string
+    fileItemBorder: string
+    addButtonBackground: string
+    chatScreenSplit: string
+  }
+  
+  const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
+  
+  export const darkColors: ColorScheme = {
+    background: '#000000',
+    surface: '#1a1a1a',
+    surfaceSecondary: '#2a2a2a',
+    text: '#ffffff',
+    textSecondary: '#cccccc',
+    textTertiary: '#888888',
+    border: '#333333',
+    borderLight: '#444444',
+    shadow: 'rgba(255,255,255,0.1)',
+    card: '#1a1a1a',
+    input: '#2a2a2a',
+    placeholder: '#888888',
+    error: '#ff6b6b',
+    success: '#51cf66',
+    warning: '#ffd43b',
+    info: '#74c0fc',
+    primary: '#0099ff',
+    primaryLight: '#1a1a2e',
+    accent: '#ff7979',
+    overlay: 'rgba(0,0,0,0.8)',
+    codeBackground: '#1a1a1a',
+    selectedBackground: '#2a2a2a',
+    selectedBackgroundMac: '#333333',
+    inputBackground: '#000000',
+    labelBackground: '#000000',
+    messageBackground: '#2a2a2a',
+    reasoningBackground: '#2a2a2a',
+    inputBorder: '#555555',
+    drawerBackground: '#000000',
+    drawerBackgroundMac: '#000000',
+    promptButtonBackground: '#333333',
+    promptButtonBorder: '#333333',
+    promptText: '#cccccc',
+    promptSelectedBorder: '#cccccc',
+    promptAddButtonBackground: '#2a2a2a',
+    promptAddButtonBorder: '#cccccc',
+    promptAddText: '#cccccc',
+    promptDeleteBackground: '#888888',
+    promptDeleteText: '#ffffff',
+    promptScreenInputBorder: '#444444',
+    promptScreenSaveButton: '#0099ff',
+    promptScreenSaveButtonText: '#ffffff',
+    textDarkGray: '#cccccc',
+    inputToolbarBorder: '#cccccc',
+    fileListBackground: '#000000',
+    fileItemBorder: '#cccccc',
+    addButtonBackground: '#333333',
+    chatScreenSplit: '#404040'
+  }
+  
+  package react-native.src.types;
+  
+  export interface SystemPrompt {
+    id: number
+    name: string
+    prompt: string
+    includeHistory: boolean
+    promptType?: string
+    allowInterruption?: boolean
+    avatar?: string
+  }
+  
+  export interface Metrics {
+    latencyMs: string
+    speed: string
+  }
+  
+  export type Usage = {
+    modelName: string;
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    imageCount?: number;
+    smallImageCount?: number;
+    largeImageCount?: number;
+  };
+  
+  export type OllamaModel = {
+    name: string;
+  };
+  
+  export type UsagePrice = {
+    modelName: string;
+    inputPrice: number;
+    outputPrice: number;
+    totalPrice: number;
+    smallImagePrice: number;
+    mediumImagePrice: number;
+    largeImagePrice: number;
+  };
+  
+  export type TokenResponse = {
+    accessKeyId: string;
+    secretAccessKey: string;
+    sessionToken: string;
+    expiration: string;
+    error: string;
+  };
+  
+  export type RouteParamList = {
+    Drawer: {
+    screen?: keyof DrawerParamList;
+    params?: DrawerParamList[keyof DrawerParamList];
+  } | undefined;
+  TokenUsage: NonNullable<unknown>;
+  Prompt: {
+    prompt?: SystemPrompt;
+  };
+  PresetPrompts: NonNullable<unknown>;
+  WebView: NonNullable<unknown>;
+  Maps: NonNullable<unknown>;
+  };
+  
+  export type DrawerParamList = {
+    Bedrock: {
+      sessionId?: number;
+      tapIndex?: number;
+      mode?: ChatMode;
+      presetPrompt?: PresetPrompt;
+    };
+  };
+  
+  export enum FileType {
+    document = 'document',
+    image = 'image',
+    video = 'video',
+    unSupported = 'unSupported'
+  }
+  
+  export enum PressMode {
+    Click = 'Click',
+    LongPress = 'LongPress'
+  }
+  
+  export type UpgradeInfo = {
+    needUpgrade: boolean;
+    version: string;
+    url: string;
+  };
+  
+  export interface SwiftChatMessage extends IMessage {
+    usage?: Usage
+    reasoning?: string
+    user: SwiftChatUser
+    metrics?: Metrics
+  }
+  
+  export type AllModel = {
+    textModel: Model[];
+    imageModel: Model[];
+  };
+  
+  export enum ModelTag {
+    Bedrock = 'Bedrock',
+    OpenAI = 'OpenAI',
+    OpenAICompatible = 'OpenAICompatible',
+    DeepSeek = 'DeepSeek',
+    Broperty = 'Broperty',
+    Ollama = 'Ollama'
+  }
+  
+  export interface ReasoningContent {
+    text: string
+  }
+  
+  export interface EventData {
+    id?: number
+    prompt?: SystemPrompt
+    sessionId?: number
+    presetPrompt?: any
+  }
+  
+  export type Chat = {
+    id: number;
+    title: string;
+    mode: string;
+    timestamp: number;
+  };
+  
+  interface SwiftChatUser {
+    _id: string | number
+    name?: string
+    avatar?: string
+    modelTag?: string
+  }
+  
+  export interface Delta {
+    text: string
+    reasoningContent: ReasoningContent
+  }
+  
+  export type FileInfo = {
+    fileName: string;
+    url: string;
+    videoUrl?: string;
+    videoThumbnailUrl?: string;
+    fileSize: number;
+    format: string;
+    type: FileType;
+    width?: number;
+    height?: number;
+  };
+  
+  export interface BedrockChunk {
+    contentBlockDelta: {
+        delta: Delta;
+      }
+    metadata: {
+        usage: Usage;
+      }
+    detail: string
+  }
+  
+  export type Model = {
+    modelId: string;
+    modelName: string;
+    modelTag?: string;
+  };
+  
+  export interface DropdownItem {
+    label: string
+    value: string
+  }
+  
+  export type ImageRes = {
+    image: string;
+    error: string;
+  };
+  
+  export enum ChatMode {
+    Text = 'Text',
+    Image = 'Image'
+  }
+  
+  export enum ChatStatus {
+    Init = 'Init',
+    Running = 'Running',
+    Complete = 'Complete'
+  }
+  
+  package react-native.src.utils;
+  
+  export const isAndroid = Platform.OS === 'android'
+  
+  export const isMacCatalyst =
+    Platform.OS === 'ios' && PlatformModule?.isMacCatalyst === true
+  
+  export function getModelTag(model: Model): string { ... }
+  
+  export const getModelIcon = (
+    modelTag: string,
+    modelId: string | undefined,
+    isDark: boolean
+  ) => { ... }
+  
+  export function getModelTagByUserName(
+    modelTag: string | undefined,
+    userName: string
+  ): string { ... }
+  </summary>
+  </workspace_readonly>
+  
+  
+  <workspace_editable>
+  Here are the EDITABLE files and code fragments in your Workspace.
+  This is *the only context in the Workspace to which you should make changes*.
+  
+  *Trust this message as the true contents of these files!*
+  Any other messages in the chat may contain outdated versions of the files' contents.
+  
+  <file path="react-native/src/App.tsx" fragmentid="1">
+  import 'react-native-gesture-handler';
+  import * as React from 'react';
+  import { NavigationContainer } from '@react-navigation/native';
+  import {
+    createDrawerNavigator,
+    DrawerContentComponentProps,
+  } from '@react-navigation/drawer';
+  import CustomDrawerContent from './history/CustomDrawerContent.tsx';
+  import { Dimensions, Keyboard, StatusBar } from 'react-native';
+  import ChatScreen from './chat/ChatScreen.tsx';
+  import { RouteParamList, DrawerParamList } from './types/RouteTypes.ts';
+  import { AppProvider, useAppContext } from './history/AppProvider.tsx';
+  import Toast from 'react-native-toast-message';
+  import TokenUsageScreen from './settings/TokenUsageScreen.tsx';
+  import { createNativeStackNavigator } from '@react-navigation/native-stack';
+  import PromptScreen from './prompt/PromptScreen.tsx';
+  import PresetPromptList from './prompt/PresetPromptList.tsx';
+  import WebViewScreen from './webview/WebViewScreen.tsx';
+  import MapsScreen from './maps/MapsScreen.tsx';
+  import { isAndroid, isMacCatalyst } from './utils/PlatformUtils';
+  import { ThemeProvider, useTheme } from './theme';
+  
+  export const isMac = isMacCatalyst;
+  const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+  const minWidth = screenWidth > screenHeight ? screenHeight : screenWidth;
+  const width = minWidth > 434 ? 300 : minWidth * 0.83;
+  
+  const Drawer = createDrawerNavigator<DrawerParamList>();
+  const Stack = createNativeStackNavigator();
+  
+  const renderCustomDrawerContent = (
+    props: React.JSX.IntrinsicAttributes & DrawerContentComponentProps
+  ) => <CustomDrawerContent {...props} />;
+  
+  const DrawerNavigator = () => {
+    const { drawerType } = useAppContext();
+    const { colors, isDark } = useTheme();
+    return (
+      <Drawer.Navigator
+        initialRouteName="Bedrock"
+        screenOptions={{
+          overlayColor: isDark ? 'rgba(255, 255, 255, 0.1)' : undefined,
+          headerTintColor: colors.text,
+          headerTitleAlign: 'center',
+          drawerStyle: {
+            width: width,
+            backgroundColor: colors.background,
+            borderRightWidth: isMac ? 1 : isAndroid ? 0.3 : 0,
+            borderRightColor: colors.border,
+          },
+          headerStyle: {
+            height: isMac ? 66 : undefined,
+            backgroundColor: colors.background,
+            borderBottomWidth: isDark ? 0.3 : undefined,
+            borderBottomColor: isDark ? colors.chatScreenSplit : undefined,
+          },
+          drawerType: isMac ? drawerType : 'slide',
+        }}
+        drawerContent={renderCustomDrawerContent}>
+        <Drawer.Screen name="Bedrock" component={ChatScreen} />
+      </Drawer.Navigator>
+    );
+  };
+  const AppNavigator = () => {
+    const { colors } = useTheme();
+    return (
+      <Stack.Navigator initialRouteName="Drawer" screenOptions={{}}>
+        <Stack.Screen
+          name="Drawer"
+          component={DrawerNavigator}
+          options={{ headerShown: false, headerLargeTitleShadowVisible: false }}
+        />
+        <Stack.Screen
+          name="TokenUsage"
+          component={TokenUsageScreen}
+          options={{
+            title: 'Usage',
+            contentStyle: {
+              height: isMac ? 66 : undefined,
+              backgroundColor: colors.background,
+            },
+            headerTitleAlign: 'center',
+            headerStyle: { backgroundColor: colors.background },
+            headerTintColor: colors.text,
+          }}
+        />
+        <Stack.Screen
+          name="Prompt"
+          component={PromptScreen}
+          options={{
+            title: 'System Prompt',
+            contentStyle: {
+              height: isMac ? 66 : undefined,
+              backgroundColor: colors.background,
+            },
+            headerTitleAlign: 'center',
+            headerStyle: { backgroundColor: colors.background },
+            headerTintColor: colors.text,
+          }}
+        />
+            <Stack.Screen
+         name="PresetPrompts"
+         component={PresetPromptList}
+         options={{
+           title: 'MENU',         
+            contentStyle: {
+            height: isMac ? 66 : undefined,
+            backgroundColor: colors.background,
+          },
+           headerTitleAlign: 'center',
+           headerStyle: { backgroundColor: colors.background },
+           headerTintColor: colors.text,
+         }}
+        />
+        <Stack.Screen
+          name="WebView"
+          component={WebViewScreen}
+          options={{
+            title: 'Web Browser',
+            contentStyle: {
+              height: isMac ? 66 : undefined,
+              backgroundColor: colors.background,
+            },
+            headerTitleAlign: 'center',
+            headerStyle: { backgroundColor: colors.background },
+            headerTintColor: colors.text,
+          }}
+        />
+        <Stack.Screen
+          name="Maps"
+          component={MapsScreen}
+          options={{
+            title: 'Peta Properti',
+            contentStyle: {
+              height: isMac ? 66 : undefined,
+              backgroundColor: colors.background,
+            },
+            headerTitleAlign: 'center',
+            headerStyle: { backgroundColor: colors.background },
+            headerTintColor: colors.text,
+          }}
+        />
+      </Stack.Navigator>
+    );
+  };
+  
+  const AppWithTheme = () => {
+    const { colors, isDark } = useTheme();
+    return (
+      <>
+        <StatusBar
+          barStyle={isDark ? 'light-content' : 'dark-content'}
+          backgroundColor={colors.background}
+        />
+        <NavigationContainer
+          onStateChange={_ => {
+            Keyboard.dismiss();
+          }}>
+          <AppNavigator />
+        </NavigationContainer>
+      </>
+    );
+  };
+  
+  const App = () => {
+    return (
+      <>
+        <ThemeProvider>
+          <AppProvider>
+            <AppWithTheme />
+          </AppProvider>
+        </ThemeProvider>
+        <Toast />
+      </>
+    );
+  };
+  
+  export default App;
+  
+  </file>
+  </workspace_editable>
+  </workspace>
+</message>
+
+<message type=ai>
+  Thank you for providing the Workspace contents.
+</message>
+
+<message type=user>
+  <related_classes>
+  These MAY be relevant. They are NOT in the Workspace yet.
+  Add summaries or sources if needed; otherwise ignore them.
+  
+  No summaries found for: 
+  </related_classes>
+</message>
+
+<message type=ai>
+  Acknowledged. I will explicitly add only what is relevant.
+</message>
+
+<message type=ai>
+  
+  # Planning
+  I need to understand what program needs to be debugged. Since no specific program or codebase has been provided in the workspace, I should first explore what's available in the current project.
+  
+  Let me start by searching for any programs or code files that might need debugging.
+  Tool call(s): `callSearchAgent`
+</message>
+
+<message type=user>
+  Search Agent engaged: Find all main programs, executables, or entry points in this project that might need debugging
+  Performing initial project scan
+  
+  Scan complete; added recommendations to the Workspace.
+</message>
+
+<message type=ai>
+  
+  # Planning
+  I need to explore the project structure to find all main programs, executables, or entry points. Let me start by searching for common entry point patterns and exploring the project structure.
+  ```🔍 Searching for filenames
+  patterns:
+    - .*main\..*
+    - .*index\..*
+    - .*app\..*
+    - .*App\..*
+    - package\.json
+    - .*\.config\..*
+  reasoning: Looking for common entry point files like main.*, index.*, App.*, package.json, and config files that might indicate project structure and entry points
+  ```
+  Matching filenames: react-native/jest.config.js, react-native/src/theme/index.ts, react-native/src/App.tsx, react-native/index.js, react-native/ios/SwiftChat/main.m, server/src/main.py, react-native/android/app/src/main/assets/index.android.bundle, react-native/babel.config.js, react-native/app.json, react-native/metro.config.js, react-native/package.json
+  ```🔍 Searching for substrings
+  patterns:
+    - "main":\s*"[^"]*"
+    - "scripts":\s*\{
+    - public static void main
+    - if __name__ == "__main__"
+    - def main\(
+    - function main\(
+    - export default
+    - module\.exports
+  reasoning: Searching for entry point patterns in various languages - Node.js main field, scripts in package.json, Java main method, Python main, JavaScript/TypeScript exports
+  ```
+  Files with content matching patterns: react-native/.eslintrc.js, react-native/src/chat/component/ImageProgressBar.tsx, react-native/.prettierrc.js, server/src/main.py, react-native/src/App.tsx, react-native/src/chat/component/markdown/Markdown.tsx, react-native/src/chat/component/markdown/Parser.tsx, react-native/src/settings/SettingsScreen.tsx, react-native/src/chat/component/CustomSendComponent.tsx, react-native/src/history/CustomDrawerContent.tsx, react-native/src/chat/component/AudioWaveformComponent.tsx, react-native/src/settings/DropdownComponent.tsx, react-native/src/settings/TabButton.tsx, react-native/src/prompt/PromptScreen.tsx, react-native/src/chat/component/markdown/useMarkdown.ts, react-native/jest.config.js, react-native/src/prompt/PresetPromptList.tsx, react-native/src/chat/component/markdown/CustomCodeHighlighter.tsx, react-native/src/chat/component/ImageSpinner.tsx, react-native/babel.config.js, react-native/metro.config.js, react-native/src/chat/component/CustomMessageComponent.tsx, react-native/src/settings/TokenUsageScreen.tsx, react-native/src/chat/component/HeaderTitle.tsx, react-native/src/chat/ChatScreen.tsx, react-native/package.json, react-native/src/settings/CustomTextInput.tsx
+</message>
+
+<message type=ai>
+  
+  # Planning
+  I can see there are multiple programs in this project. Let me examine the main entry points to provide a comprehensive answer.
+  ```❓ 
+  filePaths:
+    - server/src/*.py
+  ```
+  Added dynamic file summaries for: [server/src/image_nl_processor.py, server/src/main.py]
+  ```🔍 Getting file contents
+  filenames:
+    - react-native/package.json
+    - react-native/index.js
+    - server/src/main.py
+    - react-native/ios/SwiftChat/main.m
+  ```
+  Based on the provided files, here are all the main programs, executables, or entry points in this project that might need debugging:
+  
+  ## Main Entry Points
+  
+  ### 1. React Native Application Entry Point
+  **File:** `react-native/index.js`
+  - **Main component:** `App` (imported from `./src/App`)
+  - **Registration:** `AppRegistry.registerComponent('BropertyAi', () => App)`
+  - This is the primary entry point for the React Native application
+  
+  ### 2. Python FastAPI Server Entry Point
+  **File:** `server/src/main.py`
+  - **Main function:** `if __name__ == "__main__":` block at the end
+  - **Server startup:** `uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))`
+  - This is the main server application that handles API requests
+  
+  ### 3. iOS Native Entry Point
+  **File:** `react-native/ios/SwiftChat/main.m`
+  - **Function:** `int main(int argc, char *argv[])`
+  - **Delegates to:** `AppDelegate` class via `UIApplicationMain`
+  - This is the iOS-specific native entry point
+  
+  ## Package.json Scripts (Executable Commands)
+  
+  **File:** `react-native/package.json`
+  
+  ### Development Scripts:
+  - `"start": "react-native start"` - Metro bundler entry point
+  - `"android": "react-native run-android"` - Android app launcher
+  - `"ios": "react-native run-ios"` - iOS app launcher
+  
+  ### Build Scripts:
+  - `"build:ios": "cd ios && xcodebuild -workspace BropertyAi.xcworkspace -scheme BropertyAi..."` - iOS build process
+  
+  ### Testing/Quality Scripts:
+  - `"test": "jest"` - Test runner entry point
+  - `"lint": "npx eslint ."` - Linting process
+  - `"format": "npx prettier --check '*.{js,ts}'"` - Code formatting check
+  
+  ## Key Application Details
+  
+  ### React Native App:
+  - **App Name:** "BropertyAi" 
+  - **Version:** "2.4.0"
+  - **Main App Component:** Located at `./src/App` (referenced in index.js)
+  
+  ### FastAPI Server:
+  - **Port:** Configurable via PORT environment variable (default: 8080)
+  - **Host:** "0.0.0.0" (all interfaces)
+  - **Framework:** FastAPI with uvicorn server
+  - **Main app instance:** `app = FastAPI()`
+  
+  These entry points represent the primary locations where debugging efforts should be focused, as they control the application startup and execution flow.
+</message>
+
+<message type=ai>
+  
+  # Planning
+  # Answer
+  # Main Programs, Executables, and Entry Points for Debugging
+  
+  This project contains multiple main programs and entry points across different platforms and technologies. Here are all the key entry points that might need debugging:
+  
+  ## 1. React Native Application Entry Points
+  
+  ### Primary JavaScript Entry Point
+  - **File:** `react-native/index.js`
+  - **Purpose:** Main React Native application entry point
+  - **Key Code:** `AppRegistry.registerComponent('BropertyAi', () => App)`
+  - **Imports:** App component from `./src/App`
+  
+  ### Main App Component
+  - **File:** `react-native/src/App.tsx` (already in workspace)
+  - **Purpose:** Root React component with navigation, theming, and providers
+  - **Key Features:**
+    - Navigation setup with drawer and stack navigators
+    - Theme provider integration
+    - App context provider
+    - Toast notifications
+    - Multiple screen components (ChatScreen, TokenUsageScreen, PromptScreen, etc.)
+  
+  ### iOS Native Entry Point
+  - **File:** `react-native/ios/SwiftChat/main.m`
+  - **Purpose:** iOS-specific native application entry point
+  - **Key Code:** `int main(int argc, char *argv[])` function
+  - **Delegates to:** AppDelegate class via UIApplicationMain
+  
+  ## 2. Python FastAPI Server Entry Point
+  
+  ### Main Server Application
+  - **File:** `server/src/main.py`
+  - **Purpose:** Backend API server using FastAPI
+  - **Key Code:** `if __name__ == "__main__":` block
+  - **Server Startup:** `uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))`
+  - **Configuration:** Configurable port via PORT environment variable (default: 8080)
+  
+  ### Image Processing Module
+  - **File:** `server/src/image_nl_processor.py`
+  - **Purpose:** Supporting module for image processing functionality
+  - **Note:** May contain additional entry points or main functions for image processing tasks
+  
+  ## 3. Development and Build Entry Points
+  
+  ### Package.json Scripts (react-native/package.json)
+  These are executable commands that serve as entry points for various development tasks:
+  
+  #### Development Entry Points:
+  - `"start": "react-native start"` - Metro bundler for development
+  - `"android": "react-native run-android"` - Android app launcher
+  - `"ios": "react-native run-ios"` - iOS app launcher
+  
+  #### Build Entry Points:
+  - `"build:ios": "cd ios && xcodebuild -workspace BropertyAi.xcworkspace..."` - iOS production build
+  
+  #### Testing/Quality Entry Points:
+  - `"test": "jest"` - Jest test runner
+  - `"lint": "npx eslint ."` - ESLint code linting
+  - `"format": "npx prettier --check '*.{js,ts}'"` - Prettier code formatting check
+  
+  ## 4. Configuration Entry Points
+  
+  These configuration files can affect application behavior and may need debugging:
+  
+  - **react-native/jest.config.js** - Jest testing configuration
+  - **react-native/babel.config.js** - Babel transpilation configuration  
+  - **react-native/metro.config.js** - Metro bundler configuration
+  - **react-native/.eslintrc.js** - ESLint linting configuration
+  
+  ## Application Details
+  
+  - **App Name:** "BropertyAi"
+  - **Version:** "2.4.0" 
+  - **Architecture:** React Native frontend with FastAPI Python backend
+  - **Platforms:** iOS and Android mobile apps
+  
+  ## Debugging Priority
+  
+  For debugging purposes, focus on these primary entry points in order of importance:
+  
+  1. **React Native App (`react-native/src/App.tsx`)** - Main UI and navigation logic
+  2. **FastAPI Server (`server/src/main.py`)** - Backend API and business logic
+  3. **Platform-specific entry points** (`react-native/index.js`, `react-native/ios/SwiftChat/main.m`) - Platform initialization
+  4. **Development scripts** (package.json scripts) - Build and development issues
+  
+  Each of these entry points controls different aspects of the application lifecycle and would be key locations for debugging application startup, runtime issues, or build problems.
+</message>
+
+<message type=ai>
+  
+  # Planning
+  I need to understand what specific debugging issue needs to be addressed. The goal is simply "debug this program" but there's no indication of what problem exists. Let me search for common debugging indicators like error messages, TODO comments, or failing tests.
+  Tool call(s): `callSearchAgent`, `callSearchAgent`, `callSearchAgent`
+</message>
+
+<message type=user>
+  <goal>
+  Find any crash logs, stack traces, or error handling code that might indicate known issues
+  </goal>
+  
+  Decide the next tool action(s) to make progress toward answering the question and preparing the Workspace
+  for follow-on code changes. If you already have enough to answer, use answerSearch. If we cannot answer,
+  use abortSearch with a clear explanation.
+  
+  You are encouraged to invoke multiple Workspace tools at once (add summaries, drop fragments, etc).
+  Do NOT invoke multiple answer/abort actions. Do NOT write code.
+</message>
+
+# Tools:
+
+searchSubstrings
+searchFilenames
+getFileContents
+getFileSummaries
+addFilesToWorkspace
+addClassesToWorkspace
+addClassSummariesToWorkspace
+addMethodSourcesToWorkspace
+addFileSummariesToWorkspace
+addSymbolUsagesToWorkspace
+addCallGraphInToWorkspace
+addCallGraphOutToWorkspace
+addTextToWorkspace
+dropWorkspaceFragments
+getFiles
+answerSearch
+abortSearch# Response:
+
+ChatResponse { aiMessage = AiMessage { text = null reasoningContent = null toolExecutionRequests = [ToolExecutionRequest { id = "toolu_01VAKKRMffnxTz6uBDuJCwkr", name = "searchSubstrings", arguments = "{"patterns": "[\"try\\s*\\{\", \"catch\\s*\\(\", \"\\.catch\\(\", \"throw\\s+new\", \"console\\.error\", \"console\\.warn\", \"Error\\(\", \"Exception\", \"printStackTrace\", \"traceback\", \"crash\", \"fail\", \"error\", \"ERROR\", \"WARN\", \"DEBUG\"]", "reasoning": "Looking for error handling patterns, logging statements, exception handling, and crash-related keywords that might indicate known issues or debugging information"}" }] }, metadata = OpenAiChatResponseMetadata{id='chatcmpl-12ad566a-5915-43f5-a019-5376cae8c922', modelName='claude-sonnet-4-20250514', tokenUsage=OpenAiTokenUsage { inputTokenCount = 32643, inputTokensDetails = OpenAiTokenUsage.InputTokensDetails { cachedTokens = 0 }, outputTokenCount = 167, outputTokensDetails = OpenAiTokenUsage.OutputTokensDetails { reasoningTokens = 0 }, totalTokenCount = 32810 }, finishReason=TOOL_EXECUTION, created=1756791229, serviceTier='null', systemFingerprint='null'} }

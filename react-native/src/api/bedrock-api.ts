@@ -94,13 +94,14 @@ export const invokeBedrockWithCallBack = async (
     callback('Please configure your API URL and API Key', true, true);
     return;
   }
-  if (chatMode === ChatMode.Text) {
+    if (chatMode === ChatMode.Text) {
     const bodyObject = {
       messages: messages,
       modelId: getTextModel().modelId,
       region: getRegion(),
       enableThinking: isEnableThinking(),
       system: prompt ? [{ text: prompt?.prompt }] : undefined,
+      botId: prompt?.id,  // Kirim ID bot ke server
     };
     if (prompt?.includeHistory === false) {
       bodyObject.messages = messages.slice(-1);

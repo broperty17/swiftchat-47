@@ -1,0 +1,31 @@
+{
+  "messages" : [ {
+    "text" : "You are an expert software engineer that generates concise summaries of code-related text.\n\nReply only with the summary, without any additional text, explanations, or line breaks.\n"
+  }, {
+    "name" : null,
+    "contents" : [ {
+      "text" : "Give a detailed but concise summary of this task.\nA third party should be able to understand what happened without reference to the original.\nFocus on information that would be useful for someone doing further work on the project described in the task.\n\nHere is the task to summarize. Do not include XML tags or other markup.\n<task sequence=1>\n  <message type=ai>\n    \n    # Planning\n    I need to understand what program needs to be debugged. Since no specific program or codebase has been provided in the workspace, I should first explore what's available in the current project.\n    \n    Let me start by searching for any programs or code files that might need debugging.\n    Tool call(s): `callSearchAgent`\n  </message>\n</task>\n\n"
+    } ]
+  } ],
+  "parameters" : {
+    "modelName" : null,
+    "temperature" : null,
+    "topP" : null,
+    "frequencyPenalty" : null,
+    "presencePenalty" : null,
+    "maxOutputTokens" : null,
+    "stopSequences" : [ ],
+    "toolSpecifications" : [ ],
+    "toolChoice" : null,
+    "responseFormat" : null,
+    "maxCompletionTokens" : null,
+    "logitBias" : { },
+    "parallelToolCalls" : null,
+    "seed" : null,
+    "user" : null,
+    "store" : null,
+    "metadata" : { },
+    "serviceTier" : null,
+    "reasoningEffort" : null
+  }
+}

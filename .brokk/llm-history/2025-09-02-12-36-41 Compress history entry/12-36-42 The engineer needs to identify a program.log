@@ -1,0 +1,32 @@
+# Request to gemini-2.0-flash:
+
+<message type=system>
+  You are an expert software engineer that generates concise summaries of code-related text.
+  
+  Reply only with the summary, without any additional text, explanations, or line breaks.
+</message>
+
+<message type=user>
+  Give a detailed but concise summary of this task.
+  A third party should be able to understand what happened without reference to the original.
+  Focus on information that would be useful for someone doing further work on the project described in the task.
+  
+  Here is the task to summarize. Do not include XML tags or other markup.
+  <task sequence=1>
+    <message type=ai>
+      
+      # Planning
+      I need to understand what program needs to be debugged. Since no specific program or codebase has been provided in the workspace, I should first explore what's available in the current project.
+      
+      Let me start by searching for any programs or code files that might need debugging.
+      Tool call(s): `callSearchAgent`
+    </message>
+  </task>
+</message>
+
+# Tools:
+
+# Response:
+
+ChatResponse { aiMessage = AiMessage { text = "The engineer needs to identify a program within the current project that requires debugging, as no specific program was initially provided. They will start by searching for relevant code files.
+" reasoningContent = null toolExecutionRequests = [] }, metadata = OpenAiChatResponseMetadata{id='aYK2aL6vMrK-2cAP0ODH4Qs', modelName='gemini-2.0-flash', tokenUsage=OpenAiTokenUsage { inputTokenCount = 204, inputTokensDetails = OpenAiTokenUsage.InputTokensDetails { cachedTokens = null }, outputTokenCount = 34, outputTokensDetails = OpenAiTokenUsage.OutputTokensDetails { reasoningTokens = 0 }, totalTokenCount = 238 }, finishReason=STOP, created=1756791402, serviceTier='null', systemFingerprint='null'} }

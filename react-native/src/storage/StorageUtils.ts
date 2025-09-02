@@ -496,30 +496,24 @@ export function getSystemPrompts(type?: string): SystemPrompt[] {
   const promptsString = storage.getString(systemPromptsKey) ?? '';
   if (promptsString.length > 0) {
     currentSystemPrompts = JSON.parse(promptsString) as SystemPrompt[];
-    if (
-      currentSystemPrompts.filter(p => p.promptType === 'voice').length === 0
-    ) {
-      currentSystemPrompts = currentSystemPrompts.concat(
-        DefaultVoiceSystemPrompts
-      );
-      saveAllSystemPrompts(currentSystemPrompts);
-    }
   } else {
     currentSystemPrompts = getDefaultSystemPrompts();
     saveAllSystemPrompts(currentSystemPrompts);
   }
-  currentSystemPrompts = type
-    ? currentSystemPrompts.filter(p => p.promptType === type)
-    : currentSystemPrompts.filter(p => p.promptType === undefined);
-  if (currentSystemPrompts.length === 0) {
-    // fix the crash issue
+  
+  // Pastikan currentSystemPrompts tidak undefined
+  if (!currentSystemPrompts) {
     currentSystemPrompts = getDefaultSystemPrompts();
-    currentSystemPrompts = type
-      ? currentSystemPrompts.filter(p => p.promptType === type)
-      : currentSystemPrompts.filter(p => p.promptType === undefined);
-    saveAllSystemPrompts(getDefaultSystemPrompts());
   }
-  return currentSystemPrompts;
+  
+  // Untuk non-voice prompts, pastikan hanya prompt tanpa promptType yang ditampilkan
+  // termasuk MENU, SEARCH WEB, MAPS yang penting
+  if (!type) {
+    return currentSystemPrompts.filter(p => p.promptType === undefined);
+  }
+  
+  // Untuk voice prompts, filter berdasarkan type
+  return currentSystemPrompts.filter(p => p.promptType === type);
 }
 
 export function getPromptId() {

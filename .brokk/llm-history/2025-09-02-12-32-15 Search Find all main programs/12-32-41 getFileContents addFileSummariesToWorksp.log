@@ -1,0 +1,297 @@
+# Request to claude-4-sonnet:
+
+<message type=system>
+  You are the Search Agent.
+  Your job:
+    - find and organize code relevant to the user's question or implementation goal,
+    - aggressively curate the Workspace so a Code Agent can implement next without confusion,
+    - never write code yourself.
+  
+  Critical rules:
+    1) At EVERY TURN, drop irrelevant fragments from the Workspace.
+       Prefer summaries over full files. Replace long fragments with concise summaries of content related to the goal first,
+       then drop the originals.
+    2) Use search and inspection tools to discover relevant code, including classes/methods/usages/call graphs.
+    3) The symbol-based tools only have visibility into the following file types: TYPESCRIPT
+       Use text-based tools if you need to search other file types.
+    4) Group related lookups into a single call when possible.
+    5) Make multiple tool calls at once when searching for different types of code.
+  
+  Output discipline:
+    - Think before calling tools.
+    - If you already know what to add, use Workspace tools directly; do not search redundantly.
+</message>
+
+<message type=user>
+  <workspace>
+  <workspace_editable>
+  Here are the EDITABLE files and code fragments in your Workspace.
+  This is *the only context in the Workspace to which you should make changes*.
+  
+  *Trust this message as the true contents of these files!*
+  Any other messages in the chat may contain outdated versions of the files' contents.
+  
+  <file path="react-native/src/App.tsx" fragmentid="1">
+  import 'react-native-gesture-handler';
+  import * as React from 'react';
+  import { NavigationContainer } from '@react-navigation/native';
+  import {
+    createDrawerNavigator,
+    DrawerContentComponentProps,
+  } from '@react-navigation/drawer';
+  import CustomDrawerContent from './history/CustomDrawerContent.tsx';
+  import { Dimensions, Keyboard, StatusBar } from 'react-native';
+  import ChatScreen from './chat/ChatScreen.tsx';
+  import { RouteParamList, DrawerParamList } from './types/RouteTypes.ts';
+  import { AppProvider, useAppContext } from './history/AppProvider.tsx';
+  import Toast from 'react-native-toast-message';
+  import TokenUsageScreen from './settings/TokenUsageScreen.tsx';
+  import { createNativeStackNavigator } from '@react-navigation/native-stack';
+  import PromptScreen from './prompt/PromptScreen.tsx';
+  import PresetPromptList from './prompt/PresetPromptList.tsx';
+  import WebViewScreen from './webview/WebViewScreen.tsx';
+  import MapsScreen from './maps/MapsScreen.tsx';
+  import { isAndroid, isMacCatalyst } from './utils/PlatformUtils';
+  import { ThemeProvider, useTheme } from './theme';
+  
+  export const isMac = isMacCatalyst;
+  const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+  const minWidth = screenWidth > screenHeight ? screenHeight : screenWidth;
+  const width = minWidth > 434 ? 300 : minWidth * 0.83;
+  
+  const Drawer = createDrawerNavigator<DrawerParamList>();
+  const Stack = createNativeStackNavigator();
+  
+  const renderCustomDrawerContent = (
+    props: React.JSX.IntrinsicAttributes & DrawerContentComponentProps
+  ) => <CustomDrawerContent {...props} />;
+  
+  const DrawerNavigator = () => {
+    const { drawerType } = useAppContext();
+    const { colors, isDark } = useTheme();
+    return (
+      <Drawer.Navigator
+        initialRouteName="Bedrock"
+        screenOptions={{
+          overlayColor: isDark ? 'rgba(255, 255, 255, 0.1)' : undefined,
+          headerTintColor: colors.text,
+          headerTitleAlign: 'center',
+          drawerStyle: {
+            width: width,
+            backgroundColor: colors.background,
+            borderRightWidth: isMac ? 1 : isAndroid ? 0.3 : 0,
+            borderRightColor: colors.border,
+          },
+          headerStyle: {
+            height: isMac ? 66 : undefined,
+            backgroundColor: colors.background,
+            borderBottomWidth: isDark ? 0.3 : undefined,
+            borderBottomColor: isDark ? colors.chatScreenSplit : undefined,
+          },
+          drawerType: isMac ? drawerType : 'slide',
+        }}
+        drawerContent={renderCustomDrawerContent}>
+        <Drawer.Screen name="Bedrock" component={ChatScreen} />
+      </Drawer.Navigator>
+    );
+  };
+  const AppNavigator = () => {
+    const { colors } = useTheme();
+    return (
+      <Stack.Navigator initialRouteName="Drawer" screenOptions={{}}>
+        <Stack.Screen
+          name="Drawer"
+          component={DrawerNavigator}
+          options={{ headerShown: false, headerLargeTitleShadowVisible: false }}
+        />
+        <Stack.Screen
+          name="TokenUsage"
+          component={TokenUsageScreen}
+          options={{
+            title: 'Usage',
+            contentStyle: {
+              height: isMac ? 66 : undefined,
+              backgroundColor: colors.background,
+            },
+            headerTitleAlign: 'center',
+            headerStyle: { backgroundColor: colors.background },
+            headerTintColor: colors.text,
+          }}
+        />
+        <Stack.Screen
+          name="Prompt"
+          component={PromptScreen}
+          options={{
+            title: 'System Prompt',
+            contentStyle: {
+              height: isMac ? 66 : undefined,
+              backgroundColor: colors.background,
+            },
+            headerTitleAlign: 'center',
+            headerStyle: { backgroundColor: colors.background },
+            headerTintColor: colors.text,
+          }}
+        />
+            <Stack.Screen
+         name="PresetPrompts"
+         component={PresetPromptList}
+         options={{
+           title: 'MENU',         
+            contentStyle: {
+            height: isMac ? 66 : undefined,
+            backgroundColor: colors.background,
+          },
+           headerTitleAlign: 'center',
+           headerStyle: { backgroundColor: colors.background },
+           headerTintColor: colors.text,
+         }}
+        />
+        <Stack.Screen
+          name="WebView"
+          component={WebViewScreen}
+          options={{
+            title: 'Web Browser',
+            contentStyle: {
+              height: isMac ? 66 : undefined,
+              backgroundColor: colors.background,
+            },
+            headerTitleAlign: 'center',
+            headerStyle: { backgroundColor: colors.background },
+            headerTintColor: colors.text,
+          }}
+        />
+        <Stack.Screen
+          name="Maps"
+          component={MapsScreen}
+          options={{
+            title: 'Peta Properti',
+            contentStyle: {
+              height: isMac ? 66 : undefined,
+              backgroundColor: colors.background,
+            },
+            headerTitleAlign: 'center',
+            headerStyle: { backgroundColor: colors.background },
+            headerTintColor: colors.text,
+          }}
+        />
+      </Stack.Navigator>
+    );
+  };
+  
+  const AppWithTheme = () => {
+    const { colors, isDark } = useTheme();
+    return (
+      <>
+        <StatusBar
+          barStyle={isDark ? 'light-content' : 'dark-content'}
+          backgroundColor={colors.background}
+        />
+        <NavigationContainer
+          onStateChange={_ => {
+            Keyboard.dismiss();
+          }}>
+          <AppNavigator />
+        </NavigationContainer>
+      </>
+    );
+  };
+  
+  const App = () => {
+    return (
+      <>
+        <ThemeProvider>
+          <AppProvider>
+            <AppWithTheme />
+          </AppProvider>
+        </ThemeProvider>
+        <Toast />
+      </>
+    );
+  };
+  
+  export default App;
+  
+  </file>
+  </workspace_editable>
+  </workspace>
+</message>
+
+<message type=ai>
+  Thank you for providing the Workspace contents.
+</message>
+
+<message type=user>
+  <related_classes>
+  These MAY be relevant. They are NOT in the Workspace yet.
+  Add summaries or sources if needed; otherwise ignore them.
+  
+  No summaries found for: 
+  </related_classes>
+</message>
+
+<message type=ai>
+  Acknowledged. I will explicitly add only what is relevant.
+</message>
+
+<message type=ai>
+  
+  # Planning
+  I need to understand what program needs to be debugged. Since no specific program or codebase has been provided in the workspace, I should first explore what's available in the current project.
+  
+  Let me start by searching for any programs or code files that might need debugging.
+  Tool call(s): `callSearchAgent`
+</message>
+
+<message type=user>
+  What tools do you want to use next?
+</message>
+
+<message type=ai>
+  I need to explore the project structure to find all main programs, executables, or entry points. Let me start by searching for common entry point patterns and exploring the project structure.
+  Tool calls:
+  searchFilenames({"patterns": [".*main\\..*",".*index\\..*",".*app\\..*",".*App\\..*","package\\.json",".*\\.config\\..*"], "reasoning": "Looking for common entry point files like main.*, index.*, App.*, package.json, and config files that might indicate project structure and entry points"})
+  searchSubstrings({"patterns": ["\"main\":\\s*\"[^\"]*\"","\"scripts\":\\s*\\{","public static void main","if __name__ == \"__main__\"","def main\\(","function main\\(","export default","module\\.exports"], "reasoning": "Searching for entry point patterns in various languages - Node.js main field, scripts in package.json, Java main method, Python main, JavaScript/TypeScript exports"})
+</message>
+
+<message type=tool_execution_result>
+  searchFilenames -> Matching filenames: react-native/jest.config.js, react-native/src/theme/index.ts, react-native/src/App.tsx, react-native/index.js, react-native/ios/SwiftChat/main.m, server/src/main.py, react-native/android/app/src/main/assets/index.android.bundle, react-native/babel.config.js, react-native/app.json, react-native/metro.config.js, react-native/package.json
+</message>
+
+<message type=tool_execution_result>
+  searchSubstrings -> Files with content matching patterns: react-native/.eslintrc.js, react-native/src/chat/component/ImageProgressBar.tsx, react-native/.prettierrc.js, server/src/main.py, react-native/src/App.tsx, react-native/src/chat/component/markdown/Markdown.tsx, react-native/src/chat/component/markdown/Parser.tsx, react-native/src/settings/SettingsScreen.tsx, react-native/src/chat/component/CustomSendComponent.tsx, react-native/src/history/CustomDrawerContent.tsx, react-native/src/chat/component/AudioWaveformComponent.tsx, react-native/src/settings/DropdownComponent.tsx, react-native/src/settings/TabButton.tsx, react-native/src/prompt/PromptScreen.tsx, react-native/src/chat/component/markdown/useMarkdown.ts, react-native/jest.config.js, react-native/src/prompt/PresetPromptList.tsx, react-native/src/chat/component/markdown/CustomCodeHighlighter.tsx, react-native/src/chat/component/ImageSpinner.tsx, react-native/babel.config.js, react-native/metro.config.js, react-native/src/chat/component/CustomMessageComponent.tsx, react-native/src/settings/TokenUsageScreen.tsx, react-native/src/chat/component/HeaderTitle.tsx, react-native/src/chat/ChatScreen.tsx, react-native/package.json, react-native/src/settings/CustomTextInput.tsx
+</message>
+
+<message type=user>
+  <goal>
+  Find all main programs, executables, or entry points in this project that might need debugging
+  </goal>
+  
+  Decide the next tool action(s) to make progress toward answering the question and preparing the Workspace
+  for follow-on code changes. If you already have enough to answer, use answerSearch. If we cannot answer,
+  use abortSearch with a clear explanation.
+  
+  You are encouraged to invoke multiple Workspace tools at once (add summaries, drop fragments, etc).
+  Do NOT invoke multiple answer/abort actions. Do NOT write code.
+</message>
+
+# Tools:
+
+searchSubstrings
+searchFilenames
+getFileContents
+getFileSummaries
+addFilesToWorkspace
+addClassesToWorkspace
+addClassSummariesToWorkspace
+addMethodSourcesToWorkspace
+addFileSummariesToWorkspace
+addSymbolUsagesToWorkspace
+addCallGraphInToWorkspace
+addCallGraphOutToWorkspace
+addTextToWorkspace
+dropWorkspaceFragments
+getFiles
+answerSearch
+abortSearch# Response:
+
+ChatResponse { aiMessage = AiMessage { text = "I can see there are multiple programs in this project. Let me examine the main entry points to provide a comprehensive answer." reasoningContent = null toolExecutionRequests = [ToolExecutionRequest { id = "toolu_01XgMzDfoW85YoEfjHbWiRQ7", name = "getFileContents", arguments = "{"filenames": ["react-native/package.json","react-native/index.js","server/src/main.py","react-native/ios/SwiftChat/main.m"]}" }, ToolExecutionRequest { id = "toolu_01FF27yiyvxNQ5yKZczwkqGq", name = "addFileSummariesToWorkspace", arguments = "{"filePaths": ["server/src/*.py"]}" }] }, metadata = OpenAiChatResponseMetadata{id='chatcmpl-4a63b6c1-831c-423b-89ad-70818d496ed0', modelName='claude-sonnet-4-20250514', tokenUsage=OpenAiTokenUsage { inputTokenCount = 6069, inputTokensDetails = OpenAiTokenUsage.InputTokensDetails { cachedTokens = 0 }, outputTokenCount = 170, outputTokensDetails = OpenAiTokenUsage.OutputTokensDetails { reasoningTokens = 0 }, totalTokenCount = 6239 }, finishReason=TOOL_EXECUTION, created=1756791159, serviceTier='null', systemFingerprint='null'} }

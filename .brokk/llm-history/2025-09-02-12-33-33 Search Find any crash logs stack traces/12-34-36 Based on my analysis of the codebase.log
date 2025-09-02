@@ -1,0 +1,2525 @@
+# Request to claude-4-sonnet:
+
+<message type=system>
+  You are a code expert extracting ALL information relevant to the given goal
+  from the provided tool call result.
+  
+  Your output will be given to the agent running the search, and replaces the raw result.
+  Thus, you must include every relevant class/method name and any
+  relevant code snippets that may be needed later. DO NOT speculate; only use the provided content.
+</message>
+
+<message type=user>
+  <goal>
+  Find any crash logs, stack traces, or error handling code that might indicate known issues
+  </goal>
+  <reasoning>
+  
+  </reasoning>
+  <tool name="getFileContents">
+  <file name="server/src/main.py">
+  import base64
+  from typing import List
+  import uvicorn
+  from fastapi import FastAPI, HTTPException, Depends, Request as FastAPIRequest
+  from fastapi.responses import StreamingResponse, PlainTextResponse
+  import boto3
+  import json
+  import random
+  import os
+  import re
+  from pydantic import BaseModel
+  from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+  from typing import Annotated
+  from urllib.request import urlopen, Request
+  import time
+  from image_nl_processor import get_native_request_with_ref_image, get_analyse_result
+  import httpx
+  
+  app = FastAPI()
+  security = HTTPBearer()
+  
+  auth_token = ''
+  
+  # System prompts untuk setiap bot (hidden dari user)
+  BOT_SYSTEM_PROMPTS = {
+      1: """Saya adalah Broperty Ai, bot utama yang HANYA merespon komunikasi terkait properti real estate. Jika pertanyaan tidak sesuai dengan topik properti real estate, saya akan secara halus menolaknya.
+  
+  PERAN UTAMA SAYA:
+  1. GERBANG UTAMA - Selalu berkomunikasi dengan user dan internal Broperty, serta menghubungkan kedua pihak tersebut
+  2. IDENTIFIKASI KEBUTUHAN USER - Berusaha untuk selalu mengetahui & memenuhi kebutuhan spesifik user terkait properti
+  3. MENYAMBUNGKAN KE BERBAGAI FITUR YANG ADA - Menghubungkan user ke sub-bot profesional, web view, atau Google Maps
+  
+  FITUR AKTIF YANG TERSEDIA:
+  - Sub Bot Profesional Ecosystem: Agensi Properti Ai, Notaris Ai, Pengacara Ai, Aparatur Pemerintah Ai, Sertifikasi Elektronik Ai, KPR Bank Ai
+  - Web View Integration - Akses konten properti terkini
+  - Google Maps Integration - Lokasi dan navigasi properti
+  
+  Silakan ajukan pertanyaan terkait properti real estate, saya akan menyambungkan Anda ke fitur yang tepat!""",
+  
+      926: """Aku adalah Agensi Properti Ai berpengalaman puluhan tahun dalam membantu pembelian dan penjualan properti klien kami. 
+  
+  KEAHLIAN KHUSUS:
+  - Konsultasi strategi jual beli properti
+  - Analisis harga pasar properti
+  - Negosiasi transaksi properti
+  - Marketing dan promosi properti
+  - Legalitas dasar transaksi properti
+  
+  Saya TIDAK DAPAT menjawab pertanyaan di luar bidang jual beli properti, dokumen legal mendalam, atau masalah hukum kompleks.""",
+  
+      900: """Halo! Aku adalah Notaris Ai. Aku akan memberikan kamu berbagai info terkait apapun itu yang menjadi tugas Notaris.
+  
+  KEAHLIAN KHUSUS:
+  - Pembuatan akta jual beli properti
+  - Pengurusan sertifikat tanah dan bangunan
+  - Legaliasi dokumen properti
+  - Prosedur peralihan hak milik
+  - Pengurusan surat ke BPN
+  
+  Saya TIDAK DAPAT menjawab pertanyaan di luar bidang kenotariatan dan dokumen legal properti.""",
+  
+      901: """Halo! Aku adalah Pengacara Ai. Aku akan memberikan kamu berbagai info berita terkait tugas Pengacara yang berkaitan dengan properti.
+  
+  KEAHLIAN KHUSUS:
+  - Penanganan sengketa properti
+  - Pemeriksaan dokumen transaksi jual beli
+  - Pendampingan hukum di pengadilan untuk kasus properti
+  - Kontrak dan perjanjian properti
+  - Advokasi hak kepemilikan properti
+  
+  Saya TIDAK DAPAT menjawab pertanyaan di luar bidang hukum properti.""",
+  
+      911: """Halo! Aku adalah Aparatur Pemerintah Ai seperti kepala desa, Lurah, Camat, Bupati, Walikota dll yang membantu terkait segala sesuatu yang berhubungan dengan properti.
+  
+  KEAHLIAN KHUSUS:
+  - Pengurusan prosedur kepemilikan properti di pemerintahan
+  - Informasi perizinan bangunan
+  - Proses administrasi tanah
+  - Koordinasi dengan instansi pemerintah terkait properti
+  - Kebijakan pemerintah tentang properti
+  
+  Saya TIDAK DAPAT menjawab pertanyaan di luar bidang administrasi pemerintahan terkait properti.""",
+  
+      920: """Halo! Aku adalah asisten Program Sertifikasi Elektronik Ai yang akan membantu anda dalam pengurusan sertifikat elektronik di BPN.
+  
+  KEAHLIAN KHUSUS:
+  - Pembuatan Sertifikasi Elektronik
+  - Prosedur digitalisasi sertifikat
+  - Teknologi sertifikat elektronik
+  - Integrasi sistem elektronik BPN
+  - Keamanan sertifikat digital
+  
+  Saya TIDAK DAPAT menjawab pertanyaan di luar Program Sertifikasi Elektronik.""",
+  
+      922: """Halo! Aku adalah asisten pengajuan KPR Bank Ai yang bertugas memberikan info dan membantu anda terkait segala sesuatu mengenai KPR berbagai Bank di Indonesia.
+  
+  KEAHLIAN KHUSUS:
+  - Informasi KPR berbagai bank
+  - Syarat dan prosedur pengajuan KPR
+  - Perbandingan suku bunga KPR
+  - Kalkulasi angsuran KPR
+  - Restrukturisasi KPR
+  
+  Saya TIDAK DAPAT menjawab pertanyaan di luar KPR Bank."""
+  }
+  CACHE_DURATION = 120000
+  cache = {
+      "latest_version": "",
+      "last_check": 0
+  }
+  
+  
+  class ImageRequest(BaseModel):
+      prompt: str
+      refImages: List[dict] | None = None
+      modelId: str
+      region: str
+      width: int
+      height: int
+  
+  
+  class ConverseRequest(BaseModel):
+      messages: List[dict] = []
+      modelId: str
+      enableThinking: bool | None = None
+      region: str
+      system: List[dict] | None = None
+      botId: int | None = None
+  
+  
+  class StreamOptions(BaseModel):
+      include_usage: bool = True
+  
+  
+  class GPTRequest(BaseModel):
+      model: str
+      messages: List[dict]
+      stream: bool = True
+      stream_options: StreamOptions
+      botId: int | None = None
+  
+  
+  class ModelsRequest(BaseModel):
+      region: str
+  
+  
+  class TokenRequest(BaseModel):
+      region: str
+  
+  
+  class UpgradeRequest(BaseModel):
+      os: str
+      version: str
+  
+  
+  def get_api_key_from_ssm(use_cache_token: bool):
+      global auth_token
+      if use_cache_token and auth_token != '':
+          return auth_token
+      ssm_client = boto3.client('ssm')
+      api_key_name = os.environ['API_KEY_NAME']
+      try:
+          response = ssm_client.get_parameter(
+              Name=api_key_name,
+              WithDecryption=True
+          )
+          auth_token = response['Parameter']['Value']
+          return auth_token
+      except Exception as error:
+          raise HTTPException(status_code=401,
+                              detail=f"Error: Please create your API Key in Parameter Store, {str(error)}")
+  
+  
+  def verify_api_key(credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
+                     use_cache_token: bool = True):
+      if credentials.credentials != get_api_key_from_ssm(use_cache_token):
+          raise HTTPException(status_code=401, detail="Invalid API Key")
+      return credentials.credentials
+  
+  
+  def verify_and_refresh_token(credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)]):
+      return verify_api_key(credentials, use_cache_token=False)
+  
+  
+  async def create_bedrock_command(request: ConverseRequest) -> tuple[boto3.client, dict]:
+      model_id = request.modelId
+      region = request.region
+  
+      client = boto3.client("bedrock-runtime", region_name=region)
+  
+      max_tokens = 4096
+      if model_id.startswith('meta.llama'):
+          max_tokens = 2048
+      if 'deepseek.r1' in model_id or 'claude-opus-4' in model_id:
+          max_tokens = 32000
+      if 'claude-3-7-sonnet' in model_id or 'claude-sonnet-4' in model_id:
+          max_tokens = 64000
+  
+      for message in request.messages:
+          if message["role"] == "user":
+              for content in message["content"]:
+                  if 'image' in content:
+                      image_bytes = base64.b64decode(content['image']['source']['bytes'])
+                      content['image']['source']['bytes'] = image_bytes
+                  if 'video' in content:
+                      video_bytes = base64.b64decode(content['video']['source']['bytes'])
+                      content['video']['source']['bytes'] = video_bytes
+                  if 'document' in content:
+                      document_bytes = base64.b64decode(content['document']['source']['bytes'])
+                      content['document']['source']['bytes'] = document_bytes
+  
+      command = {
+          "inferenceConfig": {"maxTokens": max_tokens},
+          "messages": request.messages,
+          "modelId": model_id
+      }
+  
+      if request.enableThinking:
+          command['additionalModelRequestFields'] = {
+              "reasoning_config": {
+                  "type": "enabled",
+                  "budget_tokens": 16000
+              }
+          }
+  
+      # Prioritaskan system prompt dari botId jika tersedia
+      if request.botId is not None and request.botId in BOT_SYSTEM_PROMPTS:
+          command["system"] = [{"text": BOT_SYSTEM_PROMPTS[request.botId]}]
+      elif request.system is not None:
+          command["system"] = request.system
+  
+      return client, command
+  
+  
+  @app.post("/api/converse/v3")
+  async def converse_v3(request: ConverseRequest,
+                        _: Annotated[str, Depends(verify_api_key)]):
+      try:
+          client, command = await create_bedrock_command(request)
+  
+          def event_generator():
+              try:
+                  response = client.converse_stream(**command)
+                  for item in response['stream']:
+                      yield json.dumps(item) + '\n\n'
+              except Exception as err:
+                  yield f"Error: {str(err)}"
+  
+          return StreamingResponse(event_generator(), media_type="text/event-stream")
+  
+      except Exception as error:
+          return PlainTextResponse(f"Error: {str(error)}", status_code=500)
+  
+  
+  @app.post("/api/converse/v2")
+  async def converse_v2(request: ConverseRequest,
+                        _: Annotated[str, Depends(verify_api_key)]):
+      try:
+          client, command = await create_bedrock_command(request)
+  
+          def event_generator():
+              try:
+                  response = client.converse_stream(**command)
+                  for item in response['stream']:
+                      yield json.dumps(item)
+              except Exception as err:
+                  yield f"Error: {str(err)}"
+  
+          return StreamingResponse(event_generator(), media_type="text/event-stream")
+  
+      except Exception as error:
+          return PlainTextResponse(f"Error: {str(error)}", status_code=500)
+  
+  
+  @app.post("/api/image")
+  async def gen_image(request: ImageRequest,
+                      _: Annotated[str, Depends(verify_api_key)]):
+      model_id = request.modelId
+      prompt = request.prompt
+      ref_images = request.refImages
+      width = request.width
+      height = request.height
+      region = request.region
+      client = boto3.client("bedrock-runtime",
+                            region_name=region)
+      if (ref_images is None or model_id.startswith("stability.")) and contains_chinese(prompt):
+          prompt = get_english_prompt(client, prompt)
+      return get_image(client, model_id, prompt, ref_images, width, height)
+  
+  
+  @app.post("/api/token")
+  async def get_token(request: TokenRequest,
+                      _: Annotated[str, Depends(verify_api_key)]):
+      region = request.region
+      try:
+          client_role_arn = os.environ.get('CLIENT_ROLE_ARN')
+          if not client_role_arn:
+              return {"error": "CLIENT_ROLE_ARN environment variable not set"}
+          sts_client = boto3.client('sts', region_name=region)
+          session_name = f"SwiftChatClient-{int(time.time())}"
+          response = sts_client.assume_role(
+              RoleArn=client_role_arn,
+              RoleSessionName=session_name,
+              DurationSeconds=3600
+          )
+          credentials = response['Credentials']
+          return {
+              "accessKeyId": credentials['AccessKeyId'],
+              "secretAccessKey": credentials['SecretAccessKey'],
+              "sessionToken": credentials['SessionToken'],
+              "expiration": credentials['Expiration'].isoformat()
+          }
+      except Exception as e:
+          print(f"Error assuming role: {e}")
+          return {"error": str(e)}
+  
+  
+  @app.post("/api/models")
+  async def get_models(request: ModelsRequest,
+                       _: Annotated[str, Depends(verify_api_key)]):
+      region = request.region
+      client = boto3.client("bedrock",
+                            region_name=region)
+  
+      try:
+          response = client.list_foundation_models()
+          if response.get("modelSummaries"):
+              model_names = set()
+              text_model = []
+              image_model = []
+              for model in response["modelSummaries"]:
+                  need_cross_region = "INFERENCE_PROFILE" in model["inferenceTypesSupported"]
+                  if (model["modelLifecycle"]["status"] == "ACTIVE"
+                          and ("ON_DEMAND" in model["inferenceTypesSupported"] or need_cross_region)
+                          and not model["modelId"].endswith("k")
+                          and model["modelName"] not in model_names):
+                      if ("TEXT" in model.get("outputModalities", []) and
+                              model.get("responseStreamingSupported")):
+                          if need_cross_region:
+                              region_prefix = region.split("-")[0]
+                              if region_prefix == 'ap':
+                                  region_prefix = 'apac'
+                              model_id = region_prefix + "." + model["modelId"]
+                          else:
+                              model_id = model["modelId"]
+                          text_model.append({
+                              "modelId": model_id,
+                              "modelName": model["modelName"]
+                          })
+                      elif "IMAGE" in model.get("outputModalities", []):
+                          image_model.append({
+                              "modelId": model["modelId"],
+                              "modelName": model["modelName"]
+                          })
+                      model_names.add(model["modelName"])
+              return {"textModel": text_model, "imageModel": image_model}
+          else:
+              return []
+      except Exception as e:
+          print(f"bedrock error: {e}")
+          return {"error": str(e)}
+  
+  
+  @app.post("/api/upgrade")
+  async def upgrade(request: UpgradeRequest,
+                    _: Annotated[str, Depends(verify_and_refresh_token)]):
+      new_version = get_latest_version()
+      total_number = calculate_version_total(request.version)
+      need_upgrade = False
+      url = ''
+      if total_number > 0:
+          need_upgrade = total_number < calculate_version_total(new_version)
+          if need_upgrade:
+              download_prefix = "https://github.com/aws-samples/swift-chat/releases/download/"
+              if request.os == 'android':
+                  url = download_prefix + new_version + "/SwiftChat.apk"
+              elif request.os == 'mac':
+                  url = download_prefix + new_version + "/SwiftChat.dmg"
+      return {"needUpgrade": need_upgrade, "version": new_version, "url": url}
+  
+  
+  @app.post("/api/openai")
+  async def converse_openai(request: GPTRequest, raw_request: FastAPIRequest):
+      auth_header = raw_request.headers.get("Authorization")
+      if not auth_header or not auth_header.startswith("Bearer "):
+          raise HTTPException(status_code=401, detail="Invalid auth header")
+      openai_api_key = auth_header.split(" ")[1]
+      request_url = raw_request.headers.get("request_url")
+      if not request_url or not request_url.startswith("http"):
+          raise HTTPException(status_code=401, detail="Invalid request url")
+      http_referer = raw_request.headers.get("HTTP-Referer")
+      x_title = raw_request.headers.get("X-Title")
+  
+      # Tambahkan system prompt berdasarkan botId jika tersedia
+      request_data = request.model_dump()
+      if request.botId is not None and request.botId in BOT_SYSTEM_PROMPTS:
+          # Cari dan tambahkan system message jika belum ada
+          has_system_message = any(msg.get("role") == "system" for msg in request_data["messages"])
+          if not has_system_message:
+              request_data["messages"].insert(0, {
+                  "role": "system",
+                  "content": BOT_SYSTEM_PROMPTS[request.botId]
+              })
+  
+      async def event_generator():
+          async with httpx.AsyncClient() as client:
+              try:
+                  async with client.stream(
+                          "POST",
+                          request_url,
+                          json=request_data,
+                          headers={
+                              "Authorization": f"Bearer {openai_api_key}",
+                              "Content-Type": "application/json",
+                              "Accept": "text/event-stream",
+                              **({"HTTP-Referer": http_referer} if http_referer else {}),
+                              **({"X-Title": x_title} if x_title else {})
+                          }
+                  ) as response:
+                      async for line in response.aiter_bytes():
+                          if line:
+                              yield line
+  
+              except Exception as err:
+                  print("error:", err)
+                  yield f"Error: {str(err)}".encode('utf-8')
+  
+      return StreamingResponse(event_generator(), media_type="text/event-stream")
+  
+  
+  def calculate_version_total(version: str) -> int:
+      versions = version.split(".")
+      total_number = 0
+      if len(versions) == 3:
+          total_number = int(versions[0]) * 10000 + int(versions[1]) * 100 + int(versions[2])
+      return total_number
+  
+  
+  def get_latest_version() -> str:
+      timestamp = int(time.time() * 1000)
+      if cache["last_check"] > 0 and timestamp - cache["last_check"] < CACHE_DURATION:
+          return cache["latest_version"]
+      req = Request(
+          f"https://api.github.com/repos/aws-samples/swift-chat/tags",
+          headers={
+              'User-Agent': 'Mozilla/5.0'
+          }
+      )
+      try:
+          with urlopen(req) as response:
+              content = response.read().decode('utf-8')
+              latest_version = json.loads(content)[0]['name']
+              cache["latest_version"] = latest_version
+              cache["last_check"] = timestamp
+              return json.loads(content)[0]['name']
+      except Exception as error:
+          print(f"Error occurred when get github tag: {error}")
+      return '0.0.0'
+  
+  
+  def get_image(client, model_id, prompt, ref_image, width, height):
+      try:
+          seed = random.randint(0, 2147483647)
+          native_request = {}
+          if model_id.startswith("amazon"):
+              if ref_image is None:
+                  native_request = {
+                      "taskType": "TEXT_IMAGE",
+                      "textToImageParams": {"text": prompt},
+                      "imageGenerationConfig": {
+                          "numberOfImages": 1,
+                          "quality": "standard",
+                          "cfgScale": 8.0,
+                          "height": height,
+                          "width": width,
+                          "seed": seed,
+                      },
+                  }
+              else:
+                  native_request = get_native_request_with_ref_image(client, prompt, ref_image, width, height)
+          elif model_id.startswith("stability."):
+              native_request = {
+                  "prompt": prompt,
+                  "output_format": "jpeg",
+                  "mode": "text-to-image",
+              }
+              if ref_image:
+                  native_request['mode'] = 'image-to-image'
+                  native_request['image'] = ref_image[0]['source']['bytes']
+                  native_request['strength'] = 0.5
+              else:
+                  native_request['aspect_ratio'] = "1:1"
+          request = json.dumps(native_request)
+          response = client.invoke_model(modelId=model_id, body=request)
+          model_response = json.loads(response["body"].read())
+          base64_image_data = model_response["images"][0]
+          return {"image": base64_image_data}
+      except Exception as error:
+          error_msg = str(error)
+          print(f"Error occurred: {error_msg}")
+          return {"error": error_msg}
+  
+  
+  def get_english_prompt(client, prompt):
+      global_prompt = f"Translate to English image prompt, output only English translation."
+      return get_analyse_result(client, prompt, global_prompt)
+  
+  
+  def contains_chinese(text):
+      pattern = re.compile(r'[\u4e00-\u9fff]')
+      match = pattern.search(text)
+      return match is not None
+  
+  
+  if __name__ == "__main__":
+      print("Starting webserver...")
+      uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+  
+  </file>
+  
+  <file name="react-native/src/api/bedrock-api.ts">
+  import {
+    AllModel,
+    BedrockChunk,
+    ChatMode,
+    ImageRes,
+    Model,
+    ModelTag,
+    SystemPrompt,
+    TokenResponse,
+    UpgradeInfo,
+    Usage,
+  } from '../types/Chat.ts';
+  import {
+    getApiKey,
+    getApiUrl,
+    getDeepSeekApiKey,
+    getImageModel,
+    getImageSize,
+    getOpenAIApiKey,
+    getOpenAICompatApiURL,
+    getRegion,
+    getTextModel,
+    getThinkingEnabled,
+    saveTokenInfo,
+  } from '../storage/StorageUtils.ts';
+  import { saveImageToLocal } from '../chat/util/FileUtils.ts';
+  import {
+    BedrockMessage,
+    ImageContent,
+    ImageInfo,
+    TextContent,
+  } from '../chat/util/BedrockMessageConvertor.ts';
+  import { invokeOpenAIWithCallBack } from './open-api.ts';
+  import { invokeOllamaWithCallBack } from './ollama-api.ts';
+  import { BedrockThinkingModels } from '../storage/Constants.ts';
+  import { getModelTag } from '../utils/ModelUtils.ts';
+  
+  type CallbackFunction = (
+    result: string,
+    complete: boolean,
+    needStop: boolean,
+    usage?: Usage,
+    reasoning?: string
+  ) => void;
+  export const isDev = false;
+  export const invokeBedrockWithCallBack = async (
+    messages: BedrockMessage[],
+    chatMode: ChatMode,
+    prompt: SystemPrompt | null,
+    shouldStop: () => boolean,
+    controller: AbortController,
+    callback: CallbackFunction
+  ) => {
+    const currentModelTag = getModelTag(getTextModel());
+    if (chatMode === ChatMode.Text && currentModelTag !== ModelTag.Bedrock) {
+      if (
+        currentModelTag === ModelTag.Broperty &&
+        getDeepSeekApiKey().length === 0
+      ) {
+        callback('Please configure your DeepSeek API Key', true, true);
+        return;
+      }
+      if (currentModelTag === ModelTag.OpenAI && getOpenAIApiKey().length === 0) {
+        callback('Please configure your OpenAI API Key', true, true);
+        return;
+      }
+      if (
+        currentModelTag === ModelTag.OpenAICompatible &&
+        getOpenAICompatApiURL().length === 0
+      ) {
+        callback('Please configure your OpenAI Compatible API URL', true, true);
+        return;
+      }
+      if (currentModelTag === ModelTag.Ollama) {
+        await invokeOllamaWithCallBack(
+          messages,
+          prompt,
+          shouldStop,
+          controller,
+          callback
+        );
+      } else {
+        await invokeOpenAIWithCallBack(
+          messages,
+          prompt,
+          shouldStop,
+          controller,
+          callback
+        );
+      }
+      return;
+    }
+    if (!isConfigured()) {
+      callback('Please configure your API URL and API Key', true, true);
+      return;
+    }
+      if (chatMode === ChatMode.Text) {
+      const bodyObject = {
+        messages: messages,
+        modelId: getTextModel().modelId,
+        region: getRegion(),
+        enableThinking: isEnableThinking(),
+        system: prompt ? [{ text: prompt?.prompt }] : undefined,
+        botId: prompt?.id,  // Kirim ID bot ke server
+      };
+      if (prompt?.includeHistory === false) {
+        bodyObject.messages = messages.slice(-1);
+      }
+  
+      const options = {
+        method: 'POST',
+        headers: {
+          accept: '*/*',
+          'content-type': 'application/json',
+          Authorization: 'Bearer ' + getApiKey(),
+        },
+        body: JSON.stringify(bodyObject),
+        signal: controller.signal,
+        reactNative: { textStreaming: true },
+      };
+      const url = getApiPrefix() + '/converse/v3';
+      let completeMessage = '';
+      let completeReasoning = '';
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
+      fetch(url!, options)
+        .then(response => {
+          return response.body;
+        })
+        .then(async body => {
+          clearTimeout(timeoutId);
+          if (!body) {
+            return;
+          }
+          const reader = body.getReader();
+          const decoder = new TextDecoder();
+          let appendTimes = 0;
+          while (true) {
+            if (shouldStop()) {
+              await reader.cancel();
+              if (completeMessage === '') {
+                completeMessage = '...';
+              }
+              callback(completeMessage, true, true, undefined, completeReasoning);
+              return;
+            }
+  
+            try {
+              const { done, value } = await reader.read();
+              const chunk = decoder.decode(value, { stream: true });
+              const bedrockChunk = parseChunk(chunk);
+              if (bedrockChunk) {
+                if (bedrockChunk.reasoning) {
+                  completeReasoning += bedrockChunk.reasoning ?? '';
+                  callback(
+                    completeMessage,
+                    false,
+                    false,
+                    undefined,
+                    completeReasoning
+                  );
+                }
+                if (bedrockChunk.text) {
+                  completeMessage += bedrockChunk.text ?? '';
+                  appendTimes++;
+                  if (appendTimes > 5000 && appendTimes % 2 === 0) {
+                    continue;
+                  }
+                  callback(
+                    completeMessage,
+                    false,
+                    false,
+                    undefined,
+                    completeReasoning
+                  );
+                }
+                if (bedrockChunk.usage) {
+                  bedrockChunk.usage.modelName = getTextModel().modelName;
+                  callback(
+                    completeMessage,
+                    false,
+                    false,
+                    bedrockChunk.usage,
+                    completeReasoning
+                  );
+                }
+              }
+              if (done) {
+                callback(
+                  completeMessage,
+                  true,
+                  false,
+                  undefined,
+                  completeReasoning
+                );
+                return;
+              }
+            } catch (readError) {
+              console.log('Error reading stream:', readError);
+              if (completeMessage === '') {
+                completeMessage = '...';
+              }
+              callback(completeMessage, true, true, undefined, completeReasoning);
+              return;
+            }
+          }
+        })
+        .catch(error => {
+          clearTimeout(timeoutId);
+          if (shouldStop()) {
+            if (completeMessage === '') {
+              completeMessage = '...';
+            }
+            callback(completeMessage, true, true, undefined, completeReasoning);
+          } else {
+            let errorMsg = String(error);
+            if (errorMsg.endsWith('AbortError: Aborted')) {
+              errorMsg = 'Timed out';
+            }
+            if (errorMsg.indexOf('http') >= 0) {
+              errorMsg = 'Unable to resolve host';
+            }
+            const errorInfo = 'Request error: ' + errorMsg;
+            callback(completeMessage + '\n\n' + errorInfo, true, true);
+            console.log(errorInfo);
+          }
+        });
+    } else {
+      const imagePrompt = (
+        messages[messages.length - 1].content[0] as TextContent
+      ).text;
+      let image: ImageInfo | undefined;
+      if (messages[messages.length - 1].content[1]) {
+        image = (messages[messages.length - 1].content[1] as ImageContent).image;
+      }
+  
+      const imageRes = await genImage(imagePrompt, controller, image);
+      if (imageRes.image.length > 0) {
+        const localFilePath = await saveImageToLocal(imageRes.image);
+        const imageSize = getImageSize().split('x')[0].trim();
+        const usage: Usage = {
+          modelName: getImageModel().modelName,
+          inputTokens: 0,
+          outputTokens: 0,
+          totalTokens: 0,
+          smallImageCount: 0,
+          imageCount: 0,
+          largeImageCount: 0,
+        };
+        if (imageSize === '512') {
+          usage.smallImageCount = 1;
+        } else if (imageSize === '1024') {
+          usage.imageCount = 1;
+        } else if (imageSize === '2048') {
+          usage.largeImageCount = 1;
+        }
+        if (localFilePath) {
+          callback(`![](${localFilePath})`, true, false, usage);
+        }
+      } else {
+        if (imageRes.error.endsWith('AbortError: Aborted')) {
+          if (shouldStop()) {
+            imageRes.error = 'Request canceled';
+          } else {
+            imageRes.error = 'Request timed out';
+          }
+        }
+        if (imageRes.error.indexOf('http') >= 0) {
+          imageRes.error = 'Request error: Unable to resolve host';
+        }
+        callback(imageRes.error, true, true);
+      }
+    }
+  };
+  
+  export const requestAllModels = async (): Promise<AllModel> => {
+    if (getApiUrl() === '') {
+      return { imageModel: [], textModel: [] };
+    }
+    const controller = new AbortController();
+    const url = getApiPrefix() + '/models';
+    const bodyObject = {
+      region: getRegion(),
+    };
+    const options = {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json',
+        Authorization: 'Bearer ' + getApiKey(),
+      },
+      body: JSON.stringify(bodyObject),
+      reactNative: { textStreaming: true },
+    };
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    try {
+      const response = await fetch(url, options);
+      clearTimeout(timeoutId);
+      if (!response.ok) {
+        console.log(`HTTP error! status: ${response.status}`);
+        return { imageModel: [], textModel: [] };
+      }
+      const allModel = await response.json();
+      allModel.imageModel = allModel.imageModel.map((item: Model) => ({
+        modelId: item.modelId,
+        modelName: item.modelName,
+        modelTag: ModelTag.Bedrock,
+      }));
+      allModel.textModel = allModel.textModel.map((item: Model) => ({
+        modelId: item.modelId,
+        modelName: item.modelName,
+        modelTag: ModelTag.Bedrock,
+      }));
+      return allModel;
+    } catch (error) {
+      console.log('Error fetching models:', error);
+      clearTimeout(timeoutId);
+      return { imageModel: [], textModel: [] };
+    }
+  };
+  
+  export const requestToken = async (): Promise<TokenResponse | null> => {
+    if (getApiUrl() === '') {
+      return null;
+    }
+  
+    const url = getApiPrefix() + '/token';
+    const bodyObject = {
+      region: getRegion(),
+    };
+  
+    const options = {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json',
+        Authorization: 'Bearer ' + getApiKey(),
+      },
+      body: JSON.stringify(bodyObject),
+      reactNative: { textStreaming: true },
+    };
+  
+    try {
+      const response = await fetch(url, options);
+      if (!response.ok) {
+        console.log(`HTTP error! status: ${response.status}`);
+        return null;
+      }
+  
+      const tokenResponse = (await response.json()) as TokenResponse;
+      saveTokenInfo(tokenResponse);
+      return tokenResponse;
+    } catch (error) {
+      console.log('Error fetching token:', error);
+      return null;
+    }
+  };
+  
+  export const requestUpgradeInfo = async (
+    os: string,
+    version: string
+  ): Promise<UpgradeInfo> => {
+    const url = getApiPrefix() + '/upgrade';
+    const options = {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json',
+        Authorization: 'Bearer ' + getApiKey(),
+      },
+      body: JSON.stringify({
+        os: os,
+        version: version,
+      }),
+      reactNative: { textStreaming: true },
+    };
+  
+    try {
+      const response = await fetch(url, options);
+      return await response.json();
+    } catch (error) {
+      console.log('Error fetching upgrade info:', error);
+      return { needUpgrade: false, version: '', url: '' };
+    }
+  };
+  
+  export const genImage = async (
+    imagePrompt: string,
+    controller: AbortController,
+    image?: ImageInfo
+  ): Promise<ImageRes> => {
+    if (!isConfigured()) {
+      return {
+        image: '',
+        error: 'Please configure your API URL and API Key',
+      };
+    }
+    const url = getApiPrefix() + '/image';
+    const imageSize = getImageSize().split('x');
+    const width = imageSize[0].trim();
+    const height = imageSize[1].trim();
+    const bodyObject = {
+      prompt: imagePrompt,
+      refImages: image ? [image] : undefined,
+      modelId: getImageModel().modelId,
+      region: getRegion(),
+      width: width,
+      height: height,
+    };
+    const options = {
+      method: 'POST',
+      headers: {
+        accept: '*/*',
+        'content-type': 'application/json',
+        Authorization: 'Bearer ' + getApiKey(),
+      },
+      body: JSON.stringify(bodyObject),
+      signal: controller.signal,
+      reactNative: { textStreaming: true },
+    };
+  
+    try {
+      const timeoutMs = parseInt(width, 10) >= 1024 ? 120000 : 90000;
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      const response = await fetch(url, options);
+      if (!response.ok) {
+        const responseJson = await response.json();
+        const errMsg = responseJson.detail.includes(
+          "You don't have access to the model"
+        )
+          ? responseJson.detail +
+            ' Please enable your `Nova Lite` model in the US region to support generating images with Chinese prompts.'
+          : responseJson.detail;
+        console.log(errMsg);
+        return {
+          image: '',
+          error: errMsg,
+        };
+      }
+      const data = await response.json();
+      clearTimeout(timeoutId);
+      if (data.error) {
+        console.log(data.error);
+        return {
+          image: '',
+          error: data.error,
+        };
+      }
+      if (data.image && data.image.length > 0) {
+        return {
+          image: data.image,
+          error: '',
+        };
+      }
+      return {
+        image: '',
+        error: 'image is empty',
+      };
+    } catch (error) {
+      const errMsg = `Error fetching image: ${error}`;
+      console.log(errMsg);
+      return {
+        image: '',
+        error: errMsg,
+      };
+    }
+  };
+  
+  function parseChunk(rawChunk: string) {
+    if (rawChunk.length > 0) {
+      const dataChunks = rawChunk.split('\n\n');
+      if (dataChunks.length > 0) {
+        let combinedReasoning = '';
+        let combinedText = '';
+        let lastUsage;
+        for (let i = 0; i < dataChunks.length; i++) {
+          const part = dataChunks[i];
+          if (part.length === 0) {
+            continue;
+          }
+          try {
+            const chunk: BedrockChunk = JSON.parse(part);
+            const content = extractChunkContent(chunk, rawChunk);
+            if (content.reasoning) {
+              combinedReasoning += content.reasoning;
+            }
+            if (content.text) {
+              combinedText += content.text;
+            }
+            if (content.usage) {
+              lastUsage = content.usage;
+            }
+          } catch (innerError) {
+            console.log('DataChunk parse error:' + innerError, part);
+            return {
+              reasoning: combinedReasoning,
+              text: rawChunk,
+              usage: lastUsage,
+            };
+          }
+        }
+        return {
+          reasoning: combinedReasoning,
+          text: combinedText,
+          usage: lastUsage,
+        };
+      }
+    }
+    return null;
+  }
+  
+  /**
+   * Helper function to extract content from a BedrockChunk
+   */
+  function extractChunkContent(bedrockChunk: BedrockChunk, rawChunk: string) {
+    const reasoning =
+      bedrockChunk?.contentBlockDelta?.delta?.reasoningContent?.text;
+    let text = bedrockChunk?.contentBlockDelta?.delta?.text;
+    const usage = bedrockChunk?.metadata?.usage;
+    if (bedrockChunk?.detail) {
+      text = rawChunk;
+    }
+    return { reasoning, text, usage };
+  }
+  
+  function getApiPrefix(): string {
+    if (isDev) {
+      return 'http://localhost:8080/api';
+    } else {
+      return getApiUrl() + '/api';
+    }
+  }
+  
+  const isEnableThinking = (): boolean => {
+    return isThinkingModel() && getThinkingEnabled();
+  };
+  
+  const isThinkingModel = (): boolean => {
+    const textModelName = getTextModel().modelName;
+    return BedrockThinkingModels.includes(textModelName);
+  };
+  
+  function isConfigured(): boolean {
+    return getApiPrefix().startsWith('http') && getApiKey().length > 0;
+  }
+  
+  </file>
+  
+  <file name="react-native/src/api/open-api.ts">
+  import { ModelTag, SystemPrompt, Usage } from '../types/Chat.ts';
+  import {
+    getApiUrl,
+    getDeepSeekApiKey,
+    getOpenAIApiKey,
+    getOpenAICompatApiKey,
+    getOpenAICompatApiURL,
+    getOpenAIProxyEnabled,
+    getTextModel,
+  } from '../storage/StorageUtils.ts';
+  import {
+    BedrockMessage,
+    ImageContent,
+    OpenAIMessage,
+    TextContent,
+  } from '../chat/util/BedrockMessageConvertor.ts';
+  import { isDev } from './bedrock-api.ts';
+  import { GITHUB_LINK } from '../settings/SettingsScreen.tsx';
+  
+  type CallbackFunction = (
+    result: string,
+    complete: boolean,
+    needStop: boolean,
+    usage?: Usage,
+    reasoning?: string
+  ) => void;
+  const OpenRouterTag = ': OPENROUTER PROCESSING';
+  
+  export const invokeOpenAIWithCallBack = async (
+    messages: BedrockMessage[],
+    prompt: SystemPrompt | null,
+    shouldStop: () => boolean,
+    controller: AbortController,
+    callback: CallbackFunction
+  ) => {
+    const isOpenRouter = isOpenRouterRequest();
+    const bodyObject = {
+      model: getTextModel().modelId,
+      messages: getOpenAIMessages(messages, prompt),
+      stream: true,
+      stream_options: {
+        include_usage: true,
+      },
+      // Kirim botId ke server untuk proxy requests
+      ...(prompt?.id ? { botId: prompt.id } : {}),
+    };
+  
+    const options = {
+      method: 'POST',
+      headers: {
+        accept: '*/*',
+        'content-type': 'application/json',
+        Authorization: 'Bearer ' + getApiKey(),
+      },
+      body: JSON.stringify(bodyObject),
+      signal: controller.signal,
+      reactNative: { textStreaming: true },
+    };
+    const proxyRequestUrl = getProxyRequestURL();
+    if (proxyRequestUrl.length > 0) {
+      options.headers['request_url' as keyof typeof options.headers] =
+        proxyRequestUrl;
+    }
+    if (isOpenRouter) {
+      options.headers['HTTP-Referer' as keyof typeof options.headers] =
+        GITHUB_LINK;
+      options.headers['X-Title' as keyof typeof options.headers] = 'SwiftChat';
+    }
+    const url = getApiURL();
+    let completeMessage = '';
+    let completeReasoning = '';
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
+    fetch(url!, options)
+      .then(response => {
+        return response.body;
+      })
+      .then(async body => {
+        clearTimeout(timeoutId);
+        if (!body) {
+          return;
+        }
+        const reader = body.getReader();
+        const decoder = new TextDecoder();
+        let lastChunk = '';
+        while (true) {
+          if (shouldStop()) {
+            await reader.cancel();
+            if (completeMessage === '') {
+              completeMessage = '...';
+            }
+            callback(completeMessage, true, true, undefined, completeReasoning);
+            return;
+          }
+  
+          try {
+            const { done, value } = await reader.read();
+            const chunk = decoder.decode(value, { stream: true });
+            if (isOpenRouter && chunk === OpenRouterTag + '\n\n') {
+              continue;
+            }
+            const parsed = parseStreamData(chunk, lastChunk);
+            if (parsed.error) {
+              callback(
+                completeMessage + '\n\n' + parsed.error,
+                true,
+                true,
+                undefined,
+                completeReasoning
+              );
+              return;
+            }
+            if (parsed.reason) {
+              completeReasoning += parsed.reason;
+            }
+            if (parsed.content) {
+              completeMessage += parsed.content;
+            }
+            if (parsed.dataChunk) {
+              lastChunk = parsed.dataChunk;
+            } else {
+              lastChunk = '';
+            }
+            if (parsed.usage && parsed.usage.inputTokens) {
+              callback(
+                completeMessage,
+                false,
+                false,
+                parsed.usage,
+                completeReasoning
+              );
+            } else {
+              callback(
+                completeMessage,
+                done,
+                false,
+                undefined,
+                completeReasoning
+              );
+            }
+            if (done) {
+              return;
+            }
+          } catch (readError) {
+            console.log('Error reading stream:', readError);
+            if (completeMessage === '') {
+              completeMessage = '...';
+            }
+            callback(completeMessage, true, true, undefined, completeReasoning);
+            return;
+          }
+        }
+      })
+      .catch(error => {
+        console.log(error);
+        clearTimeout(timeoutId);
+        if (shouldStop()) {
+          if (completeMessage === '') {
+            completeMessage = '...';
+          }
+          callback(completeMessage, true, true, undefined, completeReasoning);
+        } else {
+          const errorMsg = String(error);
+          const errorInfo = 'Request error: ' + errorMsg;
+          callback(
+            completeMessage + '\n\n' + errorInfo,
+            true,
+            true,
+            undefined,
+            completeReasoning
+          );
+        }
+      });
+  };
+  
+  const parseStreamData = (chunk: string, lastChunk: string = '') => {
+    const dataChunks = (lastChunk + chunk).split('\n\n');
+    let content = '';
+    let reason = '';
+    let usage: Usage | undefined;
+    for (let dataChunk of dataChunks) {
+      if (!dataChunk.trim()) {
+        continue;
+      }
+      if (dataChunk[0] === '\n') {
+        dataChunk = dataChunk.slice(1);
+      }
+      const cleanedData = dataChunk.replace(/^data: /, '');
+      if (cleanedData.trim() === '[DONE]') {
+        continue;
+      }
+      if (cleanedData.trim() === OpenRouterTag) {
+        continue;
+      }
+  
+      try {
+        const parsedData: ChatResponse = JSON.parse(cleanedData);
+        if (parsedData.error) {
+          let errorMessage = '**Error:** ' + (parsedData.error?.message ?? '');
+          if (parsedData.error?.metadata?.raw) {
+            errorMessage += ':\n' + parsedData.error.metadata.raw;
+          }
+          return { error: errorMessage };
+        }
+        if (parsedData.detail) {
+          return {
+            error:
+              `Error: Please upgrade your [server API](${GITHUB_LINK}?tab=readme-ov-file#upgrade-api), API ` +
+              parsedData.detail,
+          };
+        }
+        if (parsedData.choices[0]?.delta?.content) {
+          content += parsedData.choices[0].delta.content;
+        }
+  
+        if (parsedData.choices[0]?.delta?.reasoning_content) {
+          reason += parsedData.choices[0].delta.reasoning_content;
+        }
+        if (parsedData.choices[0]?.delta?.reasoning) {
+          reason += parsedData.choices[0].delta.reasoning;
+        }
+  
+        if (parsedData.usage) {
+          usage = {
+            modelName: getTextModel().modelName,
+            inputTokens:
+              parsedData.usage.prompt_tokens -
+              (parsedData.usage.prompt_cache_hit_tokens ?? 0),
+            outputTokens: parsedData.usage.completion_tokens,
+            totalTokens: parsedData.usage.total_tokens,
+          };
+        }
+      } catch (error) {
+        if (lastChunk.length > 0) {
+          return { reason, content, dataChunk, usage };
+        } else if (reason === '' && content === '') {
+          if (dataChunk === 'data: ') {
+            return { reason, content, dataChunk, usage };
+          }
+          return { error: chunk };
+        }
+        if (reason || content) {
+          return { reason, content, dataChunk, usage };
+        }
+      }
+    }
+    return { reason, content, usage };
+  };
+  
+  type ChatResponse = {
+    choices: Array<{
+      delta: {
+        content: string;
+        reasoning_content: string;
+        reasoning: string;
+      };
+    }>;
+    usage?: {
+      prompt_tokens: number;
+      completion_tokens: number;
+      total_tokens: number;
+      prompt_cache_hit_tokens: number;
+    };
+    error?: {
+      message?: string;
+      metadata?: {
+        raw?: string;
+      };
+    };
+    detail?: string;
+  };
+  
+  function getOpenAIMessages(
+    messages: BedrockMessage[],
+    prompt: SystemPrompt | null
+  ): OpenAIMessage[] {
+    // Untuk OpenAI, kita tetap menggunakan prompt yang ada karena system prompts
+    // akan ditangani oleh server melalui proxy (/api/openai)
+    return [
+      ...(prompt ? [{ role: 'system', content: prompt.prompt }] : []),
+      ...messages.map(message => {
+        const hasImage = message.content.some(content => 'image' in content);
+        if (hasImage) {
+          return {
+            role: message.role,
+            content: message.content.map(content => {
+              if ('text' in content) {
+                return {
+                  type: 'text' as const,
+                  text: (content as TextContent).text,
+                };
+              } else {
+                const base64Data = (content as ImageContent).image.source.bytes;
+                return {
+                  type: 'image_url' as const,
+                  image_url: {
+                    url: `data:image/png;base64,${base64Data}`,
+                  },
+                };
+              }
+            }),
+          };
+        }
+        return {
+          role: message.role,
+          content: message.content
+            .map(content => (content as TextContent).text)
+            .join('\n'),
+        };
+      }),
+    ];
+  }
+  
+  function getApiKey(): string {
+    if (getTextModel().modelTag === ModelTag.OpenAICompatible) {
+      return getOpenAICompatApiKey();
+    } else if (getTextModel().modelId.includes('deepseek')) {
+      return getDeepSeekApiKey();
+    } else {
+      return getOpenAIApiKey();
+    }
+  }
+  
+  function isOpenRouterRequest(): boolean {
+    return (
+      getTextModel().modelTag === ModelTag.OpenAICompatible &&
+      getOpenAICompatApiURL().startsWith('https://openrouter.ai/api')
+    );
+  }
+  
+  function getProxyRequestURL(): string {
+    if (getTextModel().modelTag === ModelTag.OpenAICompatible) {
+      return getOpenAICompatApiURL() + '/chat/completions';
+    } else if (getTextModel().modelId.includes('deepseek')) {
+      return '';
+    } else {
+      return 'https://api.openai.com/v1/chat/completions';
+    }
+  }
+  
+  function getApiURL(): string {
+    if (getTextModel().modelTag === ModelTag.OpenAICompatible) {
+      if (getOpenAIProxyEnabled()) {
+        return (isDev ? 'http://localhost:8080' : getApiUrl()) + '/api/openai';
+      } else {
+        return getOpenAICompatApiURL() + '/chat/completions';
+      }
+    } else if (getTextModel().modelId.includes('deepseek')) {
+      return 'https://api.deepseek.com/chat/completions';
+    } else {
+      if (getOpenAIProxyEnabled()) {
+        return (isDev ? 'http://localhost:8080' : getApiUrl()) + '/api/openai';
+      } else {
+        return 'https://api.openai.com/v1/chat/completions';
+      }
+    }
+  }
+  
+  </file>
+  
+  <file name="react-native/src/chat/service/VoiceChatService.ts">
+  import {
+    NativeModules,
+    NativeEventEmitter,
+    EmitterSubscription,
+  } from 'react-native';
+  import { DefaultVoicePrompt } from '../../storage/Constants';
+  import {
+    getCurrentVoiceSystemPrompt,
+    getVoiceId,
+    isTokenValid,
+    getTokenInfo,
+    getRegion,
+  } from '../../storage/StorageUtils.ts';
+  import { requestToken } from '../../api/bedrock-api.ts';
+  import { TokenResponse } from '../../types/Chat.ts';
+  
+  const { VoiceChatModule } = NativeModules;
+  const voiceChatEmitter = VoiceChatModule
+    ? new NativeEventEmitter(VoiceChatModule)
+    : null;
+  
+  export class VoiceChatService {
+    private isInitialized = false;
+    private subscriptions: EmitterSubscription[] = [];
+    private onTranscriptReceivedCallback?: (role: string, text: string) => void;
+    private onErrorCallback?: (message: string) => void;
+    private onAudioLevelChangedCallback?: (source: string, level: number) => void;
+  
+    constructor() {
+      this.setupEventListeners();
+    }
+  
+    /**
+     * Set callbacks for voice chat events
+     * @param onTranscriptReceived Callback when transcript is received
+     * @param onError Callback when error occurs
+     */
+    public setCallbacks(
+      onTranscriptReceived?: (role: string, text: string) => void,
+      onError?: (message: string) => void
+    ) {
+      this.onTranscriptReceivedCallback = onTranscriptReceived;
+      this.onErrorCallback = onError;
+    }
+  
+    /**
+     * Set OnAudioLevelCallback for voice chat events
+     * @param onAudioLevelChanged Callback when audio level changes
+     */
+    public setOnAudioLevelCallbacks(
+      onAudioLevelChanged?: (source: string, level: number) => void
+    ) {
+      this.onAudioLevelChangedCallback = onAudioLevelChanged;
+    }
+  
+    /**
+     * Setup event listeners for voice chat events
+     */
+    private setupEventListeners() {
+      if (voiceChatEmitter) {
+        const transcriptSubscription = voiceChatEmitter.addListener(
+          'onTranscriptReceived',
+          event => {
+            if (this.onTranscriptReceivedCallback) {
+              this.onTranscriptReceivedCallback(event.role, event.text);
+            }
+          }
+        );
+  
+        const errorSubscription = voiceChatEmitter.addListener(
+          'onError',
+          event => {
+            if (this.onErrorCallback) {
+              let errorMsg = event.message ?? '';
+              if (errorMsg.includes('The network connection was lost')) {
+                errorMsg = '\n**The network connection was lost**';
+              } else if (errorMsg.includes('The request timed out')) {
+                errorMsg = '\n**The request timed out**';
+              } else if (errorMsg.includes('messages cannot be null or empty')) {
+                errorMsg = '\n**Messages cannot be null or empty**';
+              } else if (
+                errorMsg.includes('Timed out waiting for input events')
+              ) {
+                errorMsg = '\n**Timed out waiting for input events**';
+              } else if (
+                errorMsg.includes('The operation couldn’t be completed')
+              ) {
+                errorMsg = '\n**The operation couldn’t be completed**';
+              } else if (
+                errorMsg.includes(
+                  'The system encountered an unexpected error during processing. Try your request again.'
+                )
+              ) {
+                errorMsg =
+                  '\n**The system encountered an unexpected error during processing. Try your request again.**';
+              } else if (
+                errorMsg.includes('closed stream. HTTP/2 error code: NO_ERROR')
+              ) {
+                errorMsg = '\n**Stream Closed With NO_ERROR**';
+              }
+              this.onErrorCallback(errorMsg);
+            }
+          }
+        );
+  
+        const audioLevelSubscription = voiceChatEmitter.addListener(
+          'onAudioLevelChanged',
+          event => {
+            if (this.onAudioLevelChangedCallback) {
+              this.onAudioLevelChangedCallback(event.source, event.level);
+            }
+          }
+        );
+  
+        this.subscriptions = [
+          transcriptSubscription,
+          errorSubscription,
+          audioLevelSubscription,
+        ];
+      }
+    }
+  
+    /**
+     * Get new AWS credentials configuration, requesting a new token if needed
+     * @returns Promise<object | null> Configuration object with AWS credentials or null if not available
+     */
+    private async getValidConfig(): Promise<object | null> {
+      // Request new token
+      let tokenInfo: TokenResponse | null;
+      if (!isTokenValid()) {
+        tokenInfo = await requestToken();
+        if (!tokenInfo) {
+          if (this.onErrorCallback) {
+            this.onErrorCallback('Failed to get credentials');
+          }
+        }
+        if (tokenInfo?.error) {
+          if (this.onErrorCallback) {
+            this.onErrorCallback(tokenInfo.error);
+          }
+        }
+      } else {
+        tokenInfo = getTokenInfo();
+        if (!tokenInfo) {
+          if (this.onErrorCallback) {
+            this.onErrorCallback('AWS credentials not available');
+          }
+        }
+      }
+      if (!tokenInfo) {
+        return null;
+      }
+      // Create and return config
+      return {
+        region: getRegion(),
+        accessKey: tokenInfo.accessKeyId,
+        secretKey: tokenInfo.secretAccessKey,
+        sessionToken: tokenInfo.sessionToken,
+      };
+    }
+  
+    /**
+     * Initialize voice chat module with AWS credentials
+     * @returns Promise<boolean> True if initialization is successful
+     */
+    public async initialize(): Promise<boolean> {
+      if (!VoiceChatModule) {
+        if (this.onErrorCallback) {
+          this.onErrorCallback('Voice chat module not available');
+        }
+        return false;
+      }
+      if (this.isInitialized) {
+        return true;
+      }
+  
+      try {
+        // Get credentials config (will request new token if needed)
+        const config = await this.getValidConfig();
+        if (!config) {
+          return false;
+        }
+        await VoiceChatModule.initialize(config);
+        this.isInitialized = true;
+        return true;
+      } catch (err: unknown) {
+        if (this.onErrorCallback) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          this.onErrorCallback(`Initialization failed: ${errorMessage}`);
+        }
+        return false;
+      }
+    }
+  
+    /**
+     * Start a new conversation
+     * @returns Promise<boolean> True if starting conversation is successful
+     */
+    public async startConversation(): Promise<boolean> {
+      if (!VoiceChatModule) {
+        if (this.onErrorCallback) {
+          this.onErrorCallback('Voice chat module not available');
+        }
+        return false;
+      }
+  
+      try {
+        // Ensure module is initialized
+        const voiceSystemPrompt = getCurrentVoiceSystemPrompt();
+        if (!this.isInitialized) {
+          const initSuccess = await this.initialize();
+          if (!initSuccess) {
+            return false;
+          }
+        } else {
+          const config = await this.getValidConfig();
+          if (!config) {
+            return false;
+          }
+          await VoiceChatModule.updateCredentials(config);
+        }
+  
+        // Start conversation with system prompt and voice ID
+        const systemPrompt = voiceSystemPrompt?.prompt ?? DefaultVoicePrompt;
+        const voiceId = getVoiceId();
+        await VoiceChatModule.startConversation(
+          systemPrompt,
+          voiceId,
+          voiceSystemPrompt?.allowInterruption ?? true
+        );
+        return true;
+      } catch (err: unknown) {
+        if (this.onErrorCallback) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          this.onErrorCallback(`Operation failed: ${errorMessage}`);
+        }
+        return false;
+      }
+    }
+  
+    /**
+     * End the current conversation
+     * @returns Promise<boolean> True if ending conversation is successful
+     */
+    public async endConversation(): Promise<boolean> {
+      if (!VoiceChatModule || !this.isInitialized) {
+        return false;
+      }
+  
+      try {
+        await VoiceChatModule.endConversation();
+        return true;
+      } catch (err: unknown) {
+        if (this.onErrorCallback) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          this.onErrorCallback(`Failed to end conversation: ${errorMessage}`);
+        }
+        return false;
+      }
+    }
+  
+    /**
+     * Clean up event listeners
+     */
+    public cleanup() {
+      this.subscriptions.forEach(subscription => subscription.remove());
+      this.subscriptions = [];
+    }
+  }
+  
+  // Create singleton instance
+  export const voiceChatService = new VoiceChatService();
+  
+  </file>
+  
+  <file name="react-native/src/storage/StorageUtils.ts">
+  import 'react-native-get-random-values';
+  import { MMKV } from 'react-native-mmkv';
+  import {
+    AllModel,
+    Chat,
+    ChatMode,
+    SwiftChatMessage,
+    Model,
+    ModelTag,
+    SystemPrompt,
+    Usage,
+    TokenResponse,
+  } from '../types/Chat.ts';
+  import { v4 as uuidv4 } from 'uuid';
+  import {
+    DefaultRegion,
+    DefaultVoiceSystemPrompts,
+    getDefaultImageModels,
+    getDefaultSystemPrompts,
+    getDefaultTextModels,
+    VoiceIDList,
+    HARDCODED_DEEPSEEK_API_KEY,
+  } from './Constants.ts';
+  
+  export const storage = new MMKV();
+  
+  const initializeStorage = () => {
+    const key = 'encryption_key';
+    let encryptionKey = storage.getString(key);
+    if (!encryptionKey) {
+      encryptionKey = uuidv4();
+      storage.set(key, encryptionKey);
+    }
+  
+    return new MMKV({
+      id: 'swiftchat',
+      encryptionKey: encryptionKey,
+    });
+  };
+  export const encryptStorage = initializeStorage();
+  
+  const keyPrefix = 'bedrock/';
+  const messageListKey = keyPrefix + 'messageList';
+  const sessionIdPrefix = keyPrefix + 'sessionId/';
+  const currentSessionIdKey = keyPrefix + 'currentSessionId';
+  const hapticEnabledKey = keyPrefix + 'hapticEnabled';
+  const apiUrlKey = keyPrefix + 'apiUrlKey';
+  const apiKeyTag = keyPrefix + 'apiKeyTag';
+  const ollamaApiUrlKey = keyPrefix + 'ollamaApiUrlKey';
+  const deepSeekApiKeyTag = keyPrefix + 'deepSeekApiKeyTag';
+  const openAIApiKeyTag = keyPrefix + 'openAIApiKeyTag';
+  const openAICompatApiKeyTag = keyPrefix + 'openAICompatApiKeyTag';
+  const openAICompatApiURLKey = keyPrefix + 'openAICompatApiURLKey';
+  const openAICompatModelsKey = keyPrefix + 'openAICompatModelsKey';
+  const regionKey = keyPrefix + 'regionKey';
+  const textModelKey = keyPrefix + 'textModelKey';
+  const imageModelKey = keyPrefix + 'imageModelKey';
+  const allModelKey = keyPrefix + 'allModelKey';
+  const imageSizeKey = keyPrefix + 'imageSizeKey';
+  const modelUsageKey = keyPrefix + 'modelUsageKey';
+  const systemPromptsKey = keyPrefix + 'systemPromptsKey';
+  const currentSystemPromptKey = keyPrefix + 'currentSystemPromptKey';
+  const currentVoiceSystemPromptKey = keyPrefix + 'currentVoiceSystemPromptKey';
+  const currentPromptIdKey = keyPrefix + 'currentPromptIdKey';
+  const openAIProxyEnabledKey = keyPrefix + 'openAIProxyEnabledKey';
+  const thinkingEnabledKey = keyPrefix + 'thinkingEnabledKey';
+  const modelOrderKey = keyPrefix + 'modelOrderKey';
+  const voiceIdKey = keyPrefix + 'voiceIdKey';
+  const tokenInfoKey = keyPrefix + 'tokenInfo';
+  
+  let currentApiUrl: string | undefined;
+  let currentApiKey: string | undefined;
+  let currentOllamaApiUrl: string | undefined;
+  let currentDeepSeekApiKey: string | undefined;
+  let currentOpenAIApiKey: string | undefined;
+  let currentOpenAICompatApiKey: string | undefined;
+  let currentOpenAICompatApiURL: string | undefined;
+  let currentRegion: string | undefined;
+  let currentImageModel: Model | undefined;
+  let currentTextModel: Model | undefined;
+  let currentSystemPrompts: SystemPrompt[] | undefined;
+  let currentOpenAIProxyEnabled: boolean | undefined;
+  let currentThinkingEnabled: boolean | undefined;
+  let currentModelOrder: Model[] | undefined;
+  
+  export function saveMessages(
+    sessionId: number,
+    messages: SwiftChatMessage[],
+    usage: Usage
+  ) {
+    messages[0].usage = usage;
+    messages.forEach((message, index) => {
+      if (index !== 0 && 'usage' in message) {
+        delete message.usage;
+      }
+    });
+    storage.set(sessionIdPrefix + sessionId, JSON.stringify(messages));
+  }
+  
+  export function saveMessageList(
+    sessionId: number,
+    messages: SwiftChatMessage[],
+    chatMode: ChatMode
+  ) {
+    let allMessageStr = getMessageListStr();
+     
+    // Find the first user message (not bot message) for the title
+    // Bot messages typically have user._id === 2, user messages have user._id === 1
+       const firstUserMessage = messages.find(msg => msg.user._id === 1);
+       const titleMessage = firstUserMessage || messages[messages.length - 1];
+       
+    const currentMessageStr = JSON.stringify({
+      id: sessionId,
+      title: titleMessage.text.substring(0, 50).replaceAll('\n', ' '),
+      mode: chatMode.toString(),
+      timestamp: (titleMessage.createdAt as Date).getTime(),
+    });
+    if (allMessageStr.length === 1) {
+      allMessageStr = currentMessageStr + allMessageStr;
+    } else {
+      allMessageStr = currentMessageStr + ',' + allMessageStr;
+    }
+    storage.set(messageListKey, allMessageStr);
+    storage.set(currentSessionIdKey, sessionId);
+  }
+  
+  export function getMessageList(): Chat[] {
+    return JSON.parse('[' + getMessageListStr()) as Chat[];
+  }
+  
+  export function updateMessageList(chatList: Chat[]) {
+    if (chatList.length > 0) {
+      storage.set(messageListKey, JSON.stringify(chatList).substring(1));
+    } else {
+      storage.delete(messageListKey);
+    }
+   }
+  
+  export function updateChatTitlesFromUserMessages() {
+    const chatList = getMessageList();
+    let hasUpdates = false;
+   
+    const updatedChatList = chatList.map(chat => {
+      const messages = getMessagesBySessionId(chat.id);
+      if (messages.length > 0) {
+         // Find the first user message (not bot message) for the title
+         const firstUserMessage = messages.find(msg => msg.user._id === 1);
+         if (firstUserMessage && firstUserMessage.text !== chat.title.substring(0, 50).replaceAll('\n', ' ')) {
+           hasUpdates = true;
+           return {
+             ...chat,
+             title: firstUserMessage.text.substring(0, 50).replaceAll('\n', ' ')
+           };
+        }
+     }
+     return chat;
+   });
+   
+   if (hasUpdates) {
+     updateMessageList(updatedChatList);
+   }
+   
+     return updatedChatList;
+  }
+  
+  function getMessageListStr() {
+    return storage.getString(messageListKey) ?? ']';
+  }
+  
+  export function getMessagesBySessionId(sessionId: number): SwiftChatMessage[] {
+    const messageStr = storage.getString(sessionIdPrefix + sessionId);
+    if (messageStr) {
+      return JSON.parse(messageStr) as SwiftChatMessage[];
+    }
+    return [];
+  }
+  
+  export function deleteMessagesBySessionId(sessionId: number) {
+    storage.delete(sessionIdPrefix + sessionId);
+  }
+  
+  export function getSessionId() {
+    return storage.getNumber(currentSessionIdKey) ?? 0;
+  }
+  
+  export function saveKeys(apiUrl: string, apiKey: string) {
+    if (apiUrl.endsWith('/')) {
+      apiUrl = apiUrl.slice(0, -1);
+    }
+    saveApiUrl(apiUrl);
+    saveApiKey(apiKey);
+    currentApiKey = apiKey;
+    currentApiUrl = apiUrl;
+  }
+  
+  export function getApiUrl(): string {
+    if (currentApiUrl) {
+      return currentApiUrl;
+    } else {
+      currentApiUrl = storage.getString(apiUrlKey) ?? '';
+      return currentApiUrl;
+    }
+  }
+  
+  export function getOllamaApiUrl(): string {
+    if (currentOllamaApiUrl) {
+      return currentOllamaApiUrl;
+    } else {
+      currentOllamaApiUrl = storage.getString(ollamaApiUrlKey) ?? '';
+      return currentOllamaApiUrl;
+    }
+  }
+  
+  export function getApiKey(): string {
+    if (currentApiKey) {
+      return currentApiKey;
+    } else {
+      currentApiKey = encryptStorage.getString(apiKeyTag) ?? '';
+      return currentApiKey;
+    }
+  }
+  
+  export function getDeepSeekApiKey(): string {
+    return HARDCODED_DEEPSEEK_API_KEY;
+  }
+  
+  export function getOpenAIApiKey(): string {
+    if (currentOpenAIApiKey) {
+      return currentOpenAIApiKey;
+    } else {
+      currentOpenAIApiKey = encryptStorage.getString(openAIApiKeyTag) ?? '';
+      return currentOpenAIApiKey;
+    }
+  }
+  
+  export function getOpenAICompatApiKey(): string {
+    if (currentOpenAICompatApiKey) {
+      return currentOpenAICompatApiKey;
+    } else {
+      currentOpenAICompatApiKey =
+        encryptStorage.getString(openAICompatApiKeyTag) ?? '';
+      return currentOpenAICompatApiKey;
+    }
+  }
+  
+  export function getOpenAICompatApiURL(): string {
+    if (currentOpenAICompatApiURL) {
+      return currentOpenAICompatApiURL;
+    } else {
+      currentOpenAICompatApiURL = storage.getString(openAICompatApiURLKey) ?? '';
+      return currentOpenAICompatApiURL;
+    }
+  }
+  
+  export function getOpenAICompatModels(): string {
+    return storage.getString(openAICompatModelsKey) ?? '';
+  }
+  
+  export function saveOpenAICompatApiKey(apiKey: string) {
+    currentOpenAICompatApiKey = apiKey;
+    encryptStorage.set(openAICompatApiKeyTag, apiKey);
+  }
+  
+  export function saveOpenAICompatApiURL(apiUrl: string) {
+    currentOpenAICompatApiURL = apiUrl;
+    storage.set(openAICompatApiURLKey, apiUrl);
+  }
+  
+  export function saveOpenAICompatModels(models: string) {
+    storage.set(openAICompatModelsKey, models);
+  }
+  
+  export function saveHapticEnabled(enabled: boolean) {
+    storage.set(hapticEnabledKey, enabled);
+  }
+  
+  export function getHapticEnabled() {
+    return storage.getBoolean(hapticEnabledKey) ?? true;
+  }
+  
+  export function saveApiUrl(apiUrl: string) {
+    storage.set(apiUrlKey, apiUrl);
+  }
+  
+  export function saveApiKey(apiKey: string) {
+    encryptStorage.set(apiKeyTag, apiKey);
+  }
+  
+  export function saveOllamaApiURL(apiUrl: string) {
+    currentOllamaApiUrl = apiUrl;
+    storage.set(ollamaApiUrlKey, apiUrl);
+  }
+  
+  export function saveDeepSeekApiKey(apiKey: string) {
+    // No-op: API key is hardcoded, no need to save
+    // currentDeepSeekApiKey = apiKey;
+    // encryptStorage.set(deepSeekApiKeyTag, apiKey);
+  }
+  
+  export function saveOpenAIApiKey(apiKey: string) {
+    currentOpenAIApiKey = apiKey;
+    encryptStorage.set(openAIApiKeyTag, apiKey);
+  }
+  
+  export function saveRegion(region: string) {
+    currentRegion = region;
+    storage.set(regionKey, region);
+  }
+  
+  export function getRegion() {
+    if (currentRegion) {
+      return currentRegion;
+    } else {
+      currentRegion = storage.getString(regionKey) ?? DefaultRegion;
+      return currentRegion;
+    }
+  }
+  
+  export function saveTextModel(model: Model) {
+    currentTextModel = model;
+    storage.set(textModelKey, JSON.stringify(model));
+  }
+  
+  export function getTextModel(): Model {
+    if (currentTextModel) {
+      return currentTextModel;
+    } 
+      const modelString = storage.getString(textModelKey) ?? '';
+      if (modelString.length > 0) {
+        currentTextModel = JSON.parse(modelString) as Model;
+      } else {
+        // Default to DeepSeek-V3 as the primary model
+        currentTextModel = {
+          modelName: 'DeepSeek-V3',
+          modelId: 'deepseek-chat',
+          modelTag: ModelTag.Broperty,
+        };
+      }
+      return currentTextModel;
+    }
+  
+  export function saveImageModel(model: Model) {
+    currentImageModel = model;
+    storage.set(imageModelKey, JSON.stringify(model));
+  }
+  
+  export function getImageModel(): Model {
+    if (currentImageModel) {
+      return currentImageModel;
+    } else {
+      const modelString = storage.getString(imageModelKey) ?? '';
+      if (modelString.length > 0) {
+        currentImageModel = JSON.parse(modelString) as Model;
+      } else {
+        currentImageModel = getDefaultImageModels()[0];
+      }
+      return currentImageModel;
+    }
+  }
+  
+  export function saveAllModels(allModels: AllModel) {
+    storage.set(allModelKey, JSON.stringify(allModels));
+  }
+  
+  export function getAllModels() {
+    const modelString = storage.getString(allModelKey) ?? '';
+    if (modelString.length > 0) {
+      return JSON.parse(modelString) as AllModel;
+    }
+    return {
+      imageModel: getDefaultImageModels(),
+      textModel: getDefaultTextModels(),
+    };
+  }
+  
+  export function getAllImageSize(imageModelId: string = '') {
+    if (isNewStabilityImageModel(imageModelId)) {
+      return ['1024 x 1024'];
+    }
+    if (isNovaCanvas(imageModelId)) {
+      return ['1024 x 1024', '2048 x 2048'];
+    }
+    return ['512 x 512', '1024 x 1024'];
+  }
+  
+  export function isNewStabilityImageModel(modelId: string) {
+    return (
+      modelId === 'stability.sd3-large-v1:0' ||
+      modelId === 'stability.stable-image-ultra-v1:0' ||
+      modelId === 'stability.stable-image-core-v1:0'
+    );
+  }
+  
+  export function isNovaCanvas(modelId: string) {
+    return modelId.includes('nova-canvas');
+  }
+  
+  export function saveImageSize(size: string) {
+    storage.set(imageSizeKey, size);
+  }
+  
+  export function getImageSize() {
+    return storage.getString(imageSizeKey) ?? getAllImageSize()[1];
+  }
+  
+  export function saveVoiceId(voiceId: string) {
+    storage.set(voiceIdKey, voiceId);
+  }
+  
+  export function getVoiceId() {
+    return storage.getString(voiceIdKey) ?? VoiceIDList[0].voiceId;
+  }
+  
+  export function getModelUsage(): Usage[] {
+    const usage = storage.getString(modelUsageKey);
+    return usage ? JSON.parse(usage) : [];
+  }
+  
+  export function updateTotalUsage(usage: Usage) {
+    const currentUsage = getModelUsage();
+    const modelIndex = currentUsage.findIndex(
+      m => m.modelName === usage.modelName
+    );
+    if (modelIndex >= 0) {
+      if (usage.imageCount) {
+        currentUsage[modelIndex].imageCount! += usage.imageCount;
+      } else if (usage.smallImageCount) {
+        currentUsage[modelIndex].smallImageCount! += usage.smallImageCount;
+      } else if (usage.largeImageCount) {
+        currentUsage[modelIndex].largeImageCount! += usage.largeImageCount;
+      } else {
+        currentUsage[modelIndex].inputTokens += usage.inputTokens;
+        currentUsage[modelIndex].outputTokens += usage.outputTokens;
+      }
+    } else {
+      currentUsage.push(usage);
+    }
+    storage.set(modelUsageKey, JSON.stringify(currentUsage));
+  }
+  
+  export function saveCurrentSystemPrompt(prompts: SystemPrompt | null) {
+    storage.set(currentSystemPromptKey, prompts ? JSON.stringify(prompts) : '');
+  }
+  
+  export function getCurrentSystemPrompt(): SystemPrompt | null {
+    const promptString = storage.getString(currentSystemPromptKey) ?? '';
+    if (promptString.length > 0) {
+      return JSON.parse(promptString) as SystemPrompt;
+    }
+    return null;
+  }
+  
+  export function saveCurrentVoiceSystemPrompt(prompts: SystemPrompt | null) {
+    storage.set(
+      currentVoiceSystemPromptKey,
+      prompts ? JSON.stringify(prompts) : ''
+    );
+  }
+  
+  export function getCurrentVoiceSystemPrompt(): SystemPrompt | null {
+    const promptString = storage.getString(currentVoiceSystemPromptKey) ?? '';
+    if (promptString.length > 0) {
+      return JSON.parse(promptString) as SystemPrompt;
+    }
+    return null;
+  }
+  
+  export function saveSystemPrompts(prompts: SystemPrompt[], type?: string) {
+    // get all prompt
+    currentSystemPrompts = prompts;
+    const promptsString = storage.getString(systemPromptsKey) ?? '';
+    let allPrompts: SystemPrompt[] = [];
+  
+    if (promptsString.length > 0) {
+      allPrompts = JSON.parse(promptsString) as SystemPrompt[];
+    }
+    const updatedPrompts = [
+      ...allPrompts.filter(p => p.promptType !== type),
+      ...prompts,
+    ];
+    storage.set(systemPromptsKey, JSON.stringify(updatedPrompts));
+  }
+  
+  export function saveAllSystemPrompts(prompts: SystemPrompt[]) {
+    storage.set(systemPromptsKey, JSON.stringify(prompts));
+  }
+  
+  export function getSystemPrompts(type?: string): SystemPrompt[] {
+    if (
+      currentSystemPrompts &&
+      currentSystemPrompts.length > 0 &&
+      currentSystemPrompts[0].promptType === type
+    ) {
+      return currentSystemPrompts;
+    }
+    const promptsString = storage.getString(systemPromptsKey) ?? '';
+    if (promptsString.length > 0) {
+      currentSystemPrompts = JSON.parse(promptsString) as SystemPrompt[];
+      if (
+        currentSystemPrompts.filter(p => p.promptType === 'voice').length === 0
+      ) {
+        currentSystemPrompts = currentSystemPrompts.concat(
+          DefaultVoiceSystemPrompts
+        );
+        saveAllSystemPrompts(currentSystemPrompts);
+      }
+    } else {
+      currentSystemPrompts = getDefaultSystemPrompts();
+      saveAllSystemPrompts(currentSystemPrompts);
+    }
+    currentSystemPrompts = type
+      ? currentSystemPrompts.filter(p => p.promptType === type)
+      : currentSystemPrompts.filter(p => p.promptType === undefined);
+    if (currentSystemPrompts.length === 0) {
+      // fix the crash issue
+      currentSystemPrompts = getDefaultSystemPrompts();
+      currentSystemPrompts = type
+        ? currentSystemPrompts.filter(p => p.promptType === type)
+        : currentSystemPrompts.filter(p => p.promptType === undefined);
+      saveAllSystemPrompts(getDefaultSystemPrompts());
+    }
+    return currentSystemPrompts;
+  }
+  
+  export function getPromptId() {
+    return storage.getNumber(currentPromptIdKey) ?? 0;
+  }
+  
+  export function savePromptId(promptId: number) {
+    storage.set(currentPromptIdKey, promptId);
+  }
+  
+  export function saveOpenAIProxyEnabled(enabled: boolean) {
+    currentOpenAIProxyEnabled = enabled;
+    storage.set(openAIProxyEnabledKey, enabled);
+  }
+  
+  export function getOpenAIProxyEnabled() {
+    if (currentOpenAIProxyEnabled !== undefined) {
+      return currentOpenAIProxyEnabled;
+    } else {
+      currentOpenAIProxyEnabled =
+        storage.getBoolean(openAIProxyEnabledKey) ?? false;
+      return currentOpenAIProxyEnabled;
+    }
+  }
+  
+  export function saveThinkingEnabled(enabled: boolean) {
+    currentThinkingEnabled = enabled;
+    storage.set(thinkingEnabledKey, enabled);
+  }
+  
+  export function getThinkingEnabled() {
+    if (currentThinkingEnabled !== undefined) {
+      return currentThinkingEnabled;
+    } else {
+      currentThinkingEnabled = storage.getBoolean(thinkingEnabledKey) ?? true;
+      return currentThinkingEnabled;
+    }
+  }
+  
+  // Model order functions
+  export function saveModelOrder(models: Model[]) {
+    currentModelOrder = models;
+    storage.set(modelOrderKey, JSON.stringify(models));
+  }
+  
+  export function getModelOrder(): Model[] {
+    if (currentModelOrder) {
+      return currentModelOrder;
+    } else {
+      const modelOrderString = storage.getString(modelOrderKey) ?? '';
+      if (modelOrderString.length > 0) {
+        currentModelOrder = JSON.parse(modelOrderString) as Model[];
+      } else {
+        currentModelOrder = [];
+      }
+      return currentModelOrder;
+    }
+  }
+  
+  // Update model order when a model is used
+  export function updateTextModelUsageOrder(model: Model) {
+    const currentOrder = getModelOrder();
+    const updatedOrder = [
+      model,
+      ...currentOrder.filter(m => m.modelId !== model.modelId),
+    ];
+    saveModelOrder(updatedOrder);
+    return updatedOrder;
+  }
+  
+  // Get merged model order - combines history with current available models
+  export function getMergedModelOrder(): Model[] {
+    const historyModels = getModelOrder();
+    const currentTextModels = getAllModels().textModel;
+    const currentModelMap = new Map<string, Model>();
+    currentTextModels.forEach(model => {
+      currentModelMap.set(model.modelId, model);
+    });
+    const mergedModels: Model[] = [];
+    historyModels.forEach(model => {
+      if (currentModelMap.has(model.modelId)) {
+        mergedModels.push(currentModelMap.get(model.modelId)!);
+        currentModelMap.delete(model.modelId);
+      }
+    });
+    currentModelMap.forEach(model => {
+      mergedModels.push(model);
+    });
+  
+    return mergedModels;
+  }
+  
+  // token related methods
+  export function saveTokenInfo(tokenInfo: TokenResponse) {
+    encryptStorage.set(tokenInfoKey, JSON.stringify(tokenInfo));
+  }
+  
+  export function getTokenInfo(): TokenResponse | null {
+    const tokenInfoStr = encryptStorage.getString(tokenInfoKey);
+    if (tokenInfoStr) {
+      return JSON.parse(tokenInfoStr) as TokenResponse;
+    }
+    return null;
+  }
+  
+  export function isTokenValid(): boolean {
+    const tokenInfo = getTokenInfo();
+    if (!tokenInfo) {
+      return false;
+    }
+    const expirationDate = new Date(tokenInfo.expiration).getTime();
+    const now = new Date().getTime();
+    return expirationDate > now + 10 * 60 * 1000;
+  }
+  
+  </file>
+  </tool>
+</message>
+
+# Tools:
+
+# Response:
+
+ChatResponse { aiMessage = AiMessage { text = "Based on my analysis of the codebase, I found several crash logs, error handling code, and indicators of known issues:
+
+## Error Handling and Known Issues
+
+### 1. Server-side Error Handling (main.py)
+
+**API Key Validation Errors:**
+```python
+def get_api_key_from_ssm(use_cache_token: bool):
+    # ...
+    except Exception as error:
+        raise HTTPException(status_code=401,
+                            detail=f"Error: Please create your API Key in Parameter Store, {str(error)}")
+
+def verify_api_key(credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
+                   use_cache_token: bool = True):
+    if credentials.credentials != get_api_key_from_ssm(use_cache_token):
+        raise HTTPException(status_code=401, detail="Invalid API Key")
+```
+
+**Image Generation Error Handling:**
+```python
+def get_image(client, model_id, prompt, ref_image, width, height):
+    try:
+        # ... image generation logic
+        return {"image": base64_image_data}
+    except Exception as error:
+        error_msg = str(error)
+        print(f"Error occurred: {error_msg}")
+        return {"error": error_msg}
+```
+
+**General Exception Handling in Endpoints:**
+```python
+@app.post("/api/converse/v3")
+async def converse_v3(request: ConverseRequest, _: Annotated[str, Depends(verify_api_key)]):
+    try:
+        # ... processing logic
+        return StreamingResponse(event_generator(), media_type="text/event-stream")
+    except Exception as error:
+        return PlainTextResponse(f"Error: {str(error)}", status_code=500)
+```
+
+### 2. Client-side Error Handling (bedrock-api.ts)
+
+**Network and Timeout Errors:**
+```typescript
+.catch(error => {
+    clearTimeout(timeoutId);
+    if (shouldStop()) {
+        // Handle cancellation
+    } else {
+        let errorMsg = String(error);
+        if (errorMsg.endsWith('AbortError: Aborted')) {
+            errorMsg = 'Timed out';
+        }
+        if (errorMsg.indexOf('http') >= 0) {
+            errorMsg = 'Unable to resolve host';
+        }
+        const errorInfo = 'Request error: ' + errorMsg;
+        callback(completeMessage + '\n\n' + errorInfo, true, true);
+    }
+});
+```
+
+**Configuration Validation:**
+```typescript
+if (!isConfigured()) {
+    callback('Please configure your API URL and API Key', true, true);
+    return;
+}
+
+if (chatMode === ChatMode.Text && currentModelTag !== ModelTag.Bedrock) {
+    if (currentModelTag === ModelTag.Broperty && getDeepSeekApiKey().length === 0) {
+        callback('Please configure your DeepSeek API Key', true, true);
+        return;
+    }
+    // ... other API key checks
+}
+```
+
+### 3. Voice Chat Error Handling (VoiceChatService.ts)
+
+**Specific Voice Chat Errors with Known Messages:**
+```typescript
+let errorMsg = event.message ?? '';
+if (errorMsg.includes('The network connection was lost')) {
+    errorMsg = '\n**The network connection was lost**';
+} else if (errorMsg.includes('The request timed out')) {
+    errorMsg = '\n**The request timed out**';
+} else if (errorMsg.includes('messages cannot be null or empty')) {
+    errorMsg = '\n**Messages cannot be null or empty**';
+} else if (errorMsg.includes('Timed out waiting for input events')) {
+    errorMsg = '\n**Timed out waiting for input events**';
+} else if (errorMsg.includes('The operation couldn't be completed')) {
+    errorMsg = '\n**The operation couldn't be completed**';
+} else if (errorMsg.includes('The system encountered an unexpected error during processing')) {
+    errorMsg = '\n**The system encountered an unexpected error during processing. Try your request again.**';
+} else if (errorMsg.includes('closed stream. HTTP/2 error code: NO_ERROR')) {
+    errorMsg = '\n**Stream Closed With NO_ERROR**';
+}
+```
+
+### 4. OpenAI API Error Handling (open-api.ts)
+
+**Stream Parsing Errors:**
+```typescript
+try {
+    const parsedData: ChatResponse = JSON.parse(cleanedData);
+    if (parsedData.error) {
+        let errorMessage = '**Error:** ' + (parsedData.error?.message ?? '');
+        if (parsedData.error?.metadata?.raw) {
+            errorMessage += ':\n' + parsedData.error.metadata.raw;
+        }
+        return { error: errorMessage };
+    }
+    if (parsedData.detail) {
+        return {
+            error: `Error: Please upgrade your [server API](${GITHUB_LINK}?tab=readme-ov-file#upgrade-api), API ` + parsedData.detail,
+        };
+    }
+} catch (error) {
+    // ... error handling for parsing failures
+}
+```
+
+### 5. Storage Error Prevention (StorageUtils.ts)
+
+**Crash Prevention Code:**
+```typescript
+export function getSystemPrompts(type?: string): SystemPrompt[] {
+    // ... existing logic
+    if (currentSystemPrompts.length === 0) {
+        // fix the crash issue
+        currentSystemPrompts = getDefaultSystemPrompts();
+        currentSystemPrompts = type
+            ? currentSystemPrompts.filter(p => p.promptType === type)
+            : currentSystemPrompts.filter(p => p.promptType === undefined);
+        saveAllSystemPrompts(getDefaultSystemPrompts());
+    }
+    return currentSystemPrompts;
+}
+```
+
+## Key Known Issues Identified:
+
+1. **Network connectivity issues** - Various timeout and connection errors
+2. **Authentication failures** - API key validation and token expiration
+3. **Voice chat stream errors** - HTTP/2 stream closure and timeout issues  
+4. **Configuration validation** - Missing API keys and URLs
+5. **Image generation failures** - Model access and processing errors
+6. **Stream parsing errors** - JSON parsing failures in API responses
+7. **Storage corruption prevention** - Empty system prompts causing crashes
+
+The codebase shows comprehensive error handling throughout, suggesting these are well-known issues that the developers have encountered and addressed with specific error messages and recovery mechanisms." reasoningContent = null toolExecutionRequests = [] }, metadata = OpenAiChatResponseMetadata{id='chatcmpl-9df78f1d-6eed-446b-b223-31252dbe6670', modelName='claude-sonnet-4-20250514', tokenUsage=OpenAiTokenUsage { inputTokenCount = 21731, inputTokensDetails = OpenAiTokenUsage.InputTokensDetails { cachedTokens = 0 }, outputTokenCount = 1585, outputTokensDetails = OpenAiTokenUsage.OutputTokensDetails { reasoningTokens = 0 }, totalTokenCount = 23316 }, finishReason=STOP, created=1756791248, serviceTier='null', systemFingerprint='null'} }

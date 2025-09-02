@@ -1,0 +1,30 @@
+# Request to gemini-2.0-flash:
+
+<message type=system>
+  You are an expert software engineer that generates concise summaries of code-related text.
+  
+  Reply only with the summary, without any additional text, explanations, or line breaks.
+</message>
+
+<message type=user>
+  Give a detailed but concise summary of this task.
+  A third party should be able to understand what happened without reference to the original.
+  Focus on information that would be useful for someone doing further work on the project described in the task.
+  
+  Here is the task to summarize. Do not include XML tags or other markup.
+  <task sequence=3>
+    <message type=ai>
+      
+      # Planning
+      I need to understand what specific debugging issue needs to be addressed. The goal is simply "debug this program" but there's no indication of what problem exists. Let me search for common debugging indicators like error messages, TODO comments, or failing tests.
+      Tool call(s): `callSearchAgent`, `callSearchAgent`, `callSearchAgent`
+    </message>
+  </task>
+</message>
+
+# Tools:
+
+# Response:
+
+ChatResponse { aiMessage = AiMessage { text = "The engineer is initiating a debugging process without a specific problem description and will use search queries to identify error messages, TODO comments, or failing tests within the codebase to understand the debugging issue.
+" reasoningContent = null toolExecutionRequests = [] }, metadata = OpenAiChatResponseMetadata{id='aIK2aOvGLtWsmNAP09qBiQw', modelName='gemini-2.0-flash', tokenUsage=OpenAiTokenUsage { inputTokenCount = 206, inputTokensDetails = OpenAiTokenUsage.InputTokensDetails { cachedTokens = null }, outputTokenCount = 39, outputTokensDetails = OpenAiTokenUsage.OutputTokensDetails { reasoningTokens = 0 }, totalTokenCount = 245 }, finishReason=STOP, created=1756791401, serviceTier='null', systemFingerprint='null'} }

@@ -1,0 +1,31 @@
+{
+  "messages" : [ {
+    "text" : "You are an expert software engineer that generates concise summaries of code-related text.\n\nReply only with the summary, without any additional text, explanations, or line breaks.\n"
+  }, {
+    "name" : null,
+    "contents" : [ {
+      "text" : "Give a detailed but concise summary of this task.\nA third party should be able to understand what happened without reference to the original.\nFocus on information that would be useful for someone doing further work on the project described in the task.\n\nHere is the task to summarize. Do not include XML tags or other markup.\n<task sequence=6>\n  <message type=user>\n    debug this program\n    execute npx react-native run-android\n  </message>\n  \n  <message type=ai>\n    I can see this is a React Native application with both frontend and backend components. To debug the program when running `npx react-native run-android`, I need to understand what specific issues you're encountering.\n    \n    Based on my analysis of the codebase, I found extensive debug logging and error handling throughout the application, but I need more information to provide targeted debugging help.\n    \n    ## Questions to clarify the debugging scope:\n    \n    1. **What specific error or issue are you seeing** when running `npx react-native run-android`?\n       - Build failures?\n       - Runtime crashes?\n       - Network connectivity issues?\n       - Specific feature not working?\n    \n    2. **What is the exact error message or behavior** you're experiencing?\n    \n    3. **Are you having issues with:**\n       - The React Native app startup?\n       - The Python FastAPI server connection?\n       - Specific features like voice chat, file upload, or AI model integration?\n    \n    From the debug analysis I performed, the most common issues in this codebase are related to:\n    \n    - **Network connectivity** (API timeouts, stream reading failures)\n    - **Authentication** (API key validation, token issues)\n    - **Audio processing** (microphone permissions, recording failures)\n    - **File operations** (video compression, file sharing)\n    - **Stream processing** (JSON parsing, data chunk errors)\n    \n    Once you provide the specific error or issue you're encountering, I can give you targeted debugging steps and potentially propose code fixes using *SEARCH/REPLACE* blocks.\n    \n    Could you please share:\n    1. The exact command output/error when running `npx react-native run-android`\n    2. Any relevant logs from the Metro bundler or Android logcat\n    3. What specific functionality isn't working as expected\n  </message>\n  \n  <message type=custom>\n    \n    # Code Agent Finished\n    No edits found or applied in response, and no changes since last build; ending task.\n  </message>\n</task>\n\n"
+    } ]
+  } ],
+  "parameters" : {
+    "modelName" : null,
+    "temperature" : null,
+    "topP" : null,
+    "frequencyPenalty" : null,
+    "presencePenalty" : null,
+    "maxOutputTokens" : null,
+    "stopSequences" : [ ],
+    "toolSpecifications" : [ ],
+    "toolChoice" : null,
+    "responseFormat" : null,
+    "maxCompletionTokens" : null,
+    "logitBias" : { },
+    "parallelToolCalls" : null,
+    "seed" : null,
+    "user" : null,
+    "store" : null,
+    "metadata" : { },
+    "serviceTier" : null,
+    "reasoningEffort" : null
+  }
+}

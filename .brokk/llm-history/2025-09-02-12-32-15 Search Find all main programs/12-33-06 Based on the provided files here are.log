@@ -1,0 +1,724 @@
+# Request to claude-4-sonnet:
+
+<message type=system>
+  You are a code expert extracting ALL information relevant to the given goal
+  from the provided tool call result.
+  
+  Your output will be given to the agent running the search, and replaces the raw result.
+  Thus, you must include every relevant class/method name and any
+  relevant code snippets that may be needed later. DO NOT speculate; only use the provided content.
+</message>
+
+<message type=user>
+  <goal>
+  Find all main programs, executables, or entry points in this project that might need debugging
+  </goal>
+  <reasoning>
+  
+  </reasoning>
+  <tool name="getFileContents">
+  <file name="react-native/package.json">
+  {
+    "name": "BropertyAi",
+    "description": "Sample Bedrock Cross-platform App - BropertyAi",
+    "version": "2.4.0",
+    "private": true,
+    "scripts": {
+      "android": "react-native run-android",
+      "ios": "react-native run-ios",
+      "build:ios": "cd ios && xcodebuild -workspace BropertyAi.xcworkspace -scheme BropertyAi -sdk iphonesimulator -configuration Release -destination generic/platform=iOS CODE_SIGN_IDENTITY=\"\" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO clean archive | xcpretty",
+      "format": "npx prettier --check '*.{js,ts}'",
+      "lint": "npx eslint .",
+      "start": "react-native start",
+      "test": "jest"
+    },
+    "dependencies": {
+      "@bwjohns4/react-native-draggable-flatlist": "^4.0.1-patch",
+      "@react-native-clipboard/clipboard": "^1.14.1",
+      "@react-navigation/drawer": "^7.1.1",
+      "@react-navigation/native": "^7.0.14",
+      "@react-navigation/native-stack": "^7.2.0",
+      "mathjax-full": "^3.2.2",
+      "react": "18.2.0",
+      "react-native": "0.74.1",
+      "react-native-code-highlighter": "^1.2.2",
+      "react-native-compressor": "^1.10.1",
+      "react-native-dialog": "^9.3.0",
+      "react-native-document-picker": "^9.3.1",
+      "react-native-element-dropdown": "^2.12.1",
+      "react-native-fetch-api": "^3.0.0",
+      "react-native-file-viewer": "^2.1.5",
+      "react-native-fs": "^2.20.0",
+      "react-native-gesture-handler": "^2.16.2",
+      "react-native-get-random-values": "^1.11.0",
+      "react-native-gifted-chat": "^2.4.0",
+      "react-native-haptic-feedback": "^2.2.0",
+      "react-native-image-picker": "^7.2.3",
+      "react-native-image-viewing": "^0.2.2",
+      "react-native-keyboard-controller": "^1.18.2",
+      "react-native-maps": "^1.7.1",
+      "react-native-marked": "^6.0.7",
+      "react-native-math-view": "^3.9.5",
+      "react-native-mmkv": "^2.12.2",
+      "react-native-polyfill-globals": "^3.1.0",
+      "react-native-progress": "^5.0.1",
+      "react-native-reanimated": "^3.10.1",
+      "react-native-safe-area-context": "^4.10.8",
+      "react-native-screens": "^4.4.0",
+      "react-native-share": "^10.2.1",
+      "react-native-svg": "^15.4.0",
+      "react-native-toast-message": "^2.2.1",
+      "react-native-uuid": "^2.0.3",
+      "react-native-webview": "^13.16.0",
+      "react-syntax-highlighter": "^15.5.0",
+      "readable-stream": "^4.7.0",
+      "text-decoder": "^1.2.3",
+      "text-encoding": "^0.7.0",
+      "uuid": "^11.1.0",
+      "web-streams-polyfill": "^3.2.1"
+    },
+    "devDependencies": {
+      "@babel/core": "^7.26.10",
+      "@babel/preset-env": "^7.26.9",
+      "@babel/runtime": "^7.26.10",
+      "@react-native/babel-preset": "0.74.85",
+      "@react-native/eslint-config": "0.74.85",
+      "@react-native/metro-config": "0.74.85",
+      "@react-native/typescript-config": "0.74.85",
+      "@types/marked": "5.0.0",
+      "@types/react": "^18.2.6",
+      "@types/react-native-table-component": "^1.2.8",
+      "@types/react-syntax-highlighter": "^15.5.13",
+      "@types/react-test-renderer": "^18.0.0",
+      "@types/uuid": "^3.4.13",
+      "babel-jest": "^29.6.3",
+      "core-js": "^3.37.1",
+      "eslint": "^8.57.0",
+      "eslint-config-prettier": "8.8.0",
+      "jest": "^29.6.3",
+      "patch-package": "^8.0.0",
+      "prettier": "2.8.8",
+      "react-test-renderer": "18.2.0",
+      "typescript": "5.0.4"
+    },
+    "overrides": {
+      "@react-native-clipboard/clipboard": {
+        "react-native": "~0.74.1",
+        "react-native-windows": "~0.74.1"
+      }
+    },
+    "engines": {
+      "node": ">=18"
+    },
+    "license": "Apache-2.0",
+    "types": "module"
+  }
+  
+  </file>
+  
+  <file name="react-native/index.js">
+  /**
+   * @format
+   */
+  import 'react-native-polyfill-globals/auto';
+  import { AppRegistry } from 'react-native';
+  import App from './src/App';
+  
+  AppRegistry.registerComponent('BropertyAi', () => App);
+  
+  </file>
+  
+  <file name="server/src/main.py">
+  import base64
+  from typing import List
+  import uvicorn
+  from fastapi import FastAPI, HTTPException, Depends, Request as FastAPIRequest
+  from fastapi.responses import StreamingResponse, PlainTextResponse
+  import boto3
+  import json
+  import random
+  import os
+  import re
+  from pydantic import BaseModel
+  from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+  from typing import Annotated
+  from urllib.request import urlopen, Request
+  import time
+  from image_nl_processor import get_native_request_with_ref_image, get_analyse_result
+  import httpx
+  
+  app = FastAPI()
+  security = HTTPBearer()
+  
+  auth_token = ''
+  
+  # System prompts untuk setiap bot (hidden dari user)
+  BOT_SYSTEM_PROMPTS = {
+      1: """Saya adalah Broperty Ai, bot utama yang HANYA merespon komunikasi terkait properti real estate. Jika pertanyaan tidak sesuai dengan topik properti real estate, saya akan secara halus menolaknya.
+  
+  PERAN UTAMA SAYA:
+  1. GERBANG UTAMA - Selalu berkomunikasi dengan user dan internal Broperty, serta menghubungkan kedua pihak tersebut
+  2. IDENTIFIKASI KEBUTUHAN USER - Berusaha untuk selalu mengetahui & memenuhi kebutuhan spesifik user terkait properti
+  3. MENYAMBUNGKAN KE BERBAGAI FITUR YANG ADA - Menghubungkan user ke sub-bot profesional, web view, atau Google Maps
+  
+  FITUR AKTIF YANG TERSEDIA:
+  - Sub Bot Profesional Ecosystem: Agensi Properti Ai, Notaris Ai, Pengacara Ai, Aparatur Pemerintah Ai, Sertifikasi Elektronik Ai, KPR Bank Ai
+  - Web View Integration - Akses konten properti terkini
+  - Google Maps Integration - Lokasi dan navigasi properti
+  
+  Silakan ajukan pertanyaan terkait properti real estate, saya akan menyambungkan Anda ke fitur yang tepat!""",
+  
+      926: """Aku adalah Agensi Properti Ai berpengalaman puluhan tahun dalam membantu pembelian dan penjualan properti klien kami. 
+  
+  KEAHLIAN KHUSUS:
+  - Konsultasi strategi jual beli properti
+  - Analisis harga pasar properti
+  - Negosiasi transaksi properti
+  - Marketing dan promosi properti
+  - Legalitas dasar transaksi properti
+  
+  Saya TIDAK DAPAT menjawab pertanyaan di luar bidang jual beli properti, dokumen legal mendalam, atau masalah hukum kompleks.""",
+  
+      900: """Halo! Aku adalah Notaris Ai. Aku akan memberikan kamu berbagai info terkait apapun itu yang menjadi tugas Notaris.
+  
+  KEAHLIAN KHUSUS:
+  - Pembuatan akta jual beli properti
+  - Pengurusan sertifikat tanah dan bangunan
+  - Legaliasi dokumen properti
+  - Prosedur peralihan hak milik
+  - Pengurusan surat ke BPN
+  
+  Saya TIDAK DAPAT menjawab pertanyaan di luar bidang kenotariatan dan dokumen legal properti.""",
+  
+      901: """Halo! Aku adalah Pengacara Ai. Aku akan memberikan kamu berbagai info berita terkait tugas Pengacara yang berkaitan dengan properti.
+  
+  KEAHLIAN KHUSUS:
+  - Penanganan sengketa properti
+  - Pemeriksaan dokumen transaksi jual beli
+  - Pendampingan hukum di pengadilan untuk kasus properti
+  - Kontrak dan perjanjian properti
+  - Advokasi hak kepemilikan properti
+  
+  Saya TIDAK DAPAT menjawab pertanyaan di luar bidang hukum properti.""",
+  
+      911: """Halo! Aku adalah Aparatur Pemerintah Ai seperti kepala desa, Lurah, Camat, Bupati, Walikota dll yang membantu terkait segala sesuatu yang berhubungan dengan properti.
+  
+  KEAHLIAN KHUSUS:
+  - Pengurusan prosedur kepemilikan properti di pemerintahan
+  - Informasi perizinan bangunan
+  - Proses administrasi tanah
+  - Koordinasi dengan instansi pemerintah terkait properti
+  - Kebijakan pemerintah tentang properti
+  
+  Saya TIDAK DAPAT menjawab pertanyaan di luar bidang administrasi pemerintahan terkait properti.""",
+  
+      920: """Halo! Aku adalah asisten Program Sertifikasi Elektronik Ai yang akan membantu anda dalam pengurusan sertifikat elektronik di BPN.
+  
+  KEAHLIAN KHUSUS:
+  - Pembuatan Sertifikasi Elektronik
+  - Prosedur digitalisasi sertifikat
+  - Teknologi sertifikat elektronik
+  - Integrasi sistem elektronik BPN
+  - Keamanan sertifikat digital
+  
+  Saya TIDAK DAPAT menjawab pertanyaan di luar Program Sertifikasi Elektronik.""",
+  
+      922: """Halo! Aku adalah asisten pengajuan KPR Bank Ai yang bertugas memberikan info dan membantu anda terkait segala sesuatu mengenai KPR berbagai Bank di Indonesia.
+  
+  KEAHLIAN KHUSUS:
+  - Informasi KPR berbagai bank
+  - Syarat dan prosedur pengajuan KPR
+  - Perbandingan suku bunga KPR
+  - Kalkulasi angsuran KPR
+  - Restrukturisasi KPR
+  
+  Saya TIDAK DAPAT menjawab pertanyaan di luar KPR Bank."""
+  }
+  CACHE_DURATION = 120000
+  cache = {
+      "latest_version": "",
+      "last_check": 0
+  }
+  
+  
+  class ImageRequest(BaseModel):
+      prompt: str
+      refImages: List[dict] | None = None
+      modelId: str
+      region: str
+      width: int
+      height: int
+  
+  
+  class ConverseRequest(BaseModel):
+      messages: List[dict] = []
+      modelId: str
+      enableThinking: bool | None = None
+      region: str
+      system: List[dict] | None = None
+      botId: int | None = None
+  
+  
+  class StreamOptions(BaseModel):
+      include_usage: bool = True
+  
+  
+  class GPTRequest(BaseModel):
+      model: str
+      messages: List[dict]
+      stream: bool = True
+      stream_options: StreamOptions
+      botId: int | None = None
+  
+  
+  class ModelsRequest(BaseModel):
+      region: str
+  
+  
+  class TokenRequest(BaseModel):
+      region: str
+  
+  
+  class UpgradeRequest(BaseModel):
+      os: str
+      version: str
+  
+  
+  def get_api_key_from_ssm(use_cache_token: bool):
+      global auth_token
+      if use_cache_token and auth_token != '':
+          return auth_token
+      ssm_client = boto3.client('ssm')
+      api_key_name = os.environ['API_KEY_NAME']
+      try:
+          response = ssm_client.get_parameter(
+              Name=api_key_name,
+              WithDecryption=True
+          )
+          auth_token = response['Parameter']['Value']
+          return auth_token
+      except Exception as error:
+          raise HTTPException(status_code=401,
+                              detail=f"Error: Please create your API Key in Parameter Store, {str(error)}")
+  
+  
+  def verify_api_key(credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
+                     use_cache_token: bool = True):
+      if credentials.credentials != get_api_key_from_ssm(use_cache_token):
+          raise HTTPException(status_code=401, detail="Invalid API Key")
+      return credentials.credentials
+  
+  
+  def verify_and_refresh_token(credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)]):
+      return verify_api_key(credentials, use_cache_token=False)
+  
+  
+  async def create_bedrock_command(request: ConverseRequest) -> tuple[boto3.client, dict]:
+      model_id = request.modelId
+      region = request.region
+  
+      client = boto3.client("bedrock-runtime", region_name=region)
+  
+      max_tokens = 4096
+      if model_id.startswith('meta.llama'):
+          max_tokens = 2048
+      if 'deepseek.r1' in model_id or 'claude-opus-4' in model_id:
+          max_tokens = 32000
+      if 'claude-3-7-sonnet' in model_id or 'claude-sonnet-4' in model_id:
+          max_tokens = 64000
+  
+      for message in request.messages:
+          if message["role"] == "user":
+              for content in message["content"]:
+                  if 'image' in content:
+                      image_bytes = base64.b64decode(content['image']['source']['bytes'])
+                      content['image']['source']['bytes'] = image_bytes
+                  if 'video' in content:
+                      video_bytes = base64.b64decode(content['video']['source']['bytes'])
+                      content['video']['source']['bytes'] = video_bytes
+                  if 'document' in content:
+                      document_bytes = base64.b64decode(content['document']['source']['bytes'])
+                      content['document']['source']['bytes'] = document_bytes
+  
+      command = {
+          "inferenceConfig": {"maxTokens": max_tokens},
+          "messages": request.messages,
+          "modelId": model_id
+      }
+  
+      if request.enableThinking:
+          command['additionalModelRequestFields'] = {
+              "reasoning_config": {
+                  "type": "enabled",
+                  "budget_tokens": 16000
+              }
+          }
+  
+      # Prioritaskan system prompt dari botId jika tersedia
+      if request.botId is not None and request.botId in BOT_SYSTEM_PROMPTS:
+          command["system"] = [{"text": BOT_SYSTEM_PROMPTS[request.botId]}]
+      elif request.system is not None:
+          command["system"] = request.system
+  
+      return client, command
+  
+  
+  @app.post("/api/converse/v3")
+  async def converse_v3(request: ConverseRequest,
+                        _: Annotated[str, Depends(verify_api_key)]):
+      try:
+          client, command = await create_bedrock_command(request)
+  
+          def event_generator():
+              try:
+                  response = client.converse_stream(**command)
+                  for item in response['stream']:
+                      yield json.dumps(item) + '\n\n'
+              except Exception as err:
+                  yield f"Error: {str(err)}"
+  
+          return StreamingResponse(event_generator(), media_type="text/event-stream")
+  
+      except Exception as error:
+          return PlainTextResponse(f"Error: {str(error)}", status_code=500)
+  
+  
+  @app.post("/api/converse/v2")
+  async def converse_v2(request: ConverseRequest,
+                        _: Annotated[str, Depends(verify_api_key)]):
+      try:
+          client, command = await create_bedrock_command(request)
+  
+          def event_generator():
+              try:
+                  response = client.converse_stream(**command)
+                  for item in response['stream']:
+                      yield json.dumps(item)
+              except Exception as err:
+                  yield f"Error: {str(err)}"
+  
+          return StreamingResponse(event_generator(), media_type="text/event-stream")
+  
+      except Exception as error:
+          return PlainTextResponse(f"Error: {str(error)}", status_code=500)
+  
+  
+  @app.post("/api/image")
+  async def gen_image(request: ImageRequest,
+                      _: Annotated[str, Depends(verify_api_key)]):
+      model_id = request.modelId
+      prompt = request.prompt
+      ref_images = request.refImages
+      width = request.width
+      height = request.height
+      region = request.region
+      client = boto3.client("bedrock-runtime",
+                            region_name=region)
+      if (ref_images is None or model_id.startswith("stability.")) and contains_chinese(prompt):
+          prompt = get_english_prompt(client, prompt)
+      return get_image(client, model_id, prompt, ref_images, width, height)
+  
+  
+  @app.post("/api/token")
+  async def get_token(request: TokenRequest,
+                      _: Annotated[str, Depends(verify_api_key)]):
+      region = request.region
+      try:
+          client_role_arn = os.environ.get('CLIENT_ROLE_ARN')
+          if not client_role_arn:
+              return {"error": "CLIENT_ROLE_ARN environment variable not set"}
+          sts_client = boto3.client('sts', region_name=region)
+          session_name = f"SwiftChatClient-{int(time.time())}"
+          response = sts_client.assume_role(
+              RoleArn=client_role_arn,
+              RoleSessionName=session_name,
+              DurationSeconds=3600
+          )
+          credentials = response['Credentials']
+          return {
+              "accessKeyId": credentials['AccessKeyId'],
+              "secretAccessKey": credentials['SecretAccessKey'],
+              "sessionToken": credentials['SessionToken'],
+              "expiration": credentials['Expiration'].isoformat()
+          }
+      except Exception as e:
+          print(f"Error assuming role: {e}")
+          return {"error": str(e)}
+  
+  
+  @app.post("/api/models")
+  async def get_models(request: ModelsRequest,
+                       _: Annotated[str, Depends(verify_api_key)]):
+      region = request.region
+      client = boto3.client("bedrock",
+                            region_name=region)
+  
+      try:
+          response = client.list_foundation_models()
+          if response.get("modelSummaries"):
+              model_names = set()
+              text_model = []
+              image_model = []
+              for model in response["modelSummaries"]:
+                  need_cross_region = "INFERENCE_PROFILE" in model["inferenceTypesSupported"]
+                  if (model["modelLifecycle"]["status"] == "ACTIVE"
+                          and ("ON_DEMAND" in model["inferenceTypesSupported"] or need_cross_region)
+                          and not model["modelId"].endswith("k")
+                          and model["modelName"] not in model_names):
+                      if ("TEXT" in model.get("outputModalities", []) and
+                              model.get("responseStreamingSupported")):
+                          if need_cross_region:
+                              region_prefix = region.split("-")[0]
+                              if region_prefix == 'ap':
+                                  region_prefix = 'apac'
+                              model_id = region_prefix + "." + model["modelId"]
+                          else:
+                              model_id = model["modelId"]
+                          text_model.append({
+                              "modelId": model_id,
+                              "modelName": model["modelName"]
+                          })
+                      elif "IMAGE" in model.get("outputModalities", []):
+                          image_model.append({
+                              "modelId": model["modelId"],
+                              "modelName": model["modelName"]
+                          })
+                      model_names.add(model["modelName"])
+              return {"textModel": text_model, "imageModel": image_model}
+          else:
+              return []
+      except Exception as e:
+          print(f"bedrock error: {e}")
+          return {"error": str(e)}
+  
+  
+  @app.post("/api/upgrade")
+  async def upgrade(request: UpgradeRequest,
+                    _: Annotated[str, Depends(verify_and_refresh_token)]):
+      new_version = get_latest_version()
+      total_number = calculate_version_total(request.version)
+      need_upgrade = False
+      url = ''
+      if total_number > 0:
+          need_upgrade = total_number < calculate_version_total(new_version)
+          if need_upgrade:
+              download_prefix = "https://github.com/aws-samples/swift-chat/releases/download/"
+              if request.os == 'android':
+                  url = download_prefix + new_version + "/SwiftChat.apk"
+              elif request.os == 'mac':
+                  url = download_prefix + new_version + "/SwiftChat.dmg"
+      return {"needUpgrade": need_upgrade, "version": new_version, "url": url}
+  
+  
+  @app.post("/api/openai")
+  async def converse_openai(request: GPTRequest, raw_request: FastAPIRequest):
+      auth_header = raw_request.headers.get("Authorization")
+      if not auth_header or not auth_header.startswith("Bearer "):
+          raise HTTPException(status_code=401, detail="Invalid auth header")
+      openai_api_key = auth_header.split(" ")[1]
+      request_url = raw_request.headers.get("request_url")
+      if not request_url or not request_url.startswith("http"):
+          raise HTTPException(status_code=401, detail="Invalid request url")
+      http_referer = raw_request.headers.get("HTTP-Referer")
+      x_title = raw_request.headers.get("X-Title")
+  
+      # Tambahkan system prompt berdasarkan botId jika tersedia
+      request_data = request.model_dump()
+      if request.botId is not None and request.botId in BOT_SYSTEM_PROMPTS:
+          # Cari dan tambahkan system message jika belum ada
+          has_system_message = any(msg.get("role") == "system" for msg in request_data["messages"])
+          if not has_system_message:
+              request_data["messages"].insert(0, {
+                  "role": "system",
+                  "content": BOT_SYSTEM_PROMPTS[request.botId]
+              })
+  
+      async def event_generator():
+          async with httpx.AsyncClient() as client:
+              try:
+                  async with client.stream(
+                          "POST",
+                          request_url,
+                          json=request_data,
+                          headers={
+                              "Authorization": f"Bearer {openai_api_key}",
+                              "Content-Type": "application/json",
+                              "Accept": "text/event-stream",
+                              **({"HTTP-Referer": http_referer} if http_referer else {}),
+                              **({"X-Title": x_title} if x_title else {})
+                          }
+                  ) as response:
+                      async for line in response.aiter_bytes():
+                          if line:
+                              yield line
+  
+              except Exception as err:
+                  print("error:", err)
+                  yield f"Error: {str(err)}".encode('utf-8')
+  
+      return StreamingResponse(event_generator(), media_type="text/event-stream")
+  
+  
+  def calculate_version_total(version: str) -> int:
+      versions = version.split(".")
+      total_number = 0
+      if len(versions) == 3:
+          total_number = int(versions[0]) * 10000 + int(versions[1]) * 100 + int(versions[2])
+      return total_number
+  
+  
+  def get_latest_version() -> str:
+      timestamp = int(time.time() * 1000)
+      if cache["last_check"] > 0 and timestamp - cache["last_check"] < CACHE_DURATION:
+          return cache["latest_version"]
+      req = Request(
+          f"https://api.github.com/repos/aws-samples/swift-chat/tags",
+          headers={
+              'User-Agent': 'Mozilla/5.0'
+          }
+      )
+      try:
+          with urlopen(req) as response:
+              content = response.read().decode('utf-8')
+              latest_version = json.loads(content)[0]['name']
+              cache["latest_version"] = latest_version
+              cache["last_check"] = timestamp
+              return json.loads(content)[0]['name']
+      except Exception as error:
+          print(f"Error occurred when get github tag: {error}")
+      return '0.0.0'
+  
+  
+  def get_image(client, model_id, prompt, ref_image, width, height):
+      try:
+          seed = random.randint(0, 2147483647)
+          native_request = {}
+          if model_id.startswith("amazon"):
+              if ref_image is None:
+                  native_request = {
+                      "taskType": "TEXT_IMAGE",
+                      "textToImageParams": {"text": prompt},
+                      "imageGenerationConfig": {
+                          "numberOfImages": 1,
+                          "quality": "standard",
+                          "cfgScale": 8.0,
+                          "height": height,
+                          "width": width,
+                          "seed": seed,
+                      },
+                  }
+              else:
+                  native_request = get_native_request_with_ref_image(client, prompt, ref_image, width, height)
+          elif model_id.startswith("stability."):
+              native_request = {
+                  "prompt": prompt,
+                  "output_format": "jpeg",
+                  "mode": "text-to-image",
+              }
+              if ref_image:
+                  native_request['mode'] = 'image-to-image'
+                  native_request['image'] = ref_image[0]['source']['bytes']
+                  native_request['strength'] = 0.5
+              else:
+                  native_request['aspect_ratio'] = "1:1"
+          request = json.dumps(native_request)
+          response = client.invoke_model(modelId=model_id, body=request)
+          model_response = json.loads(response["body"].read())
+          base64_image_data = model_response["images"][0]
+          return {"image": base64_image_data}
+      except Exception as error:
+          error_msg = str(error)
+          print(f"Error occurred: {error_msg}")
+          return {"error": error_msg}
+  
+  
+  def get_english_prompt(client, prompt):
+      global_prompt = f"Translate to English image prompt, output only English translation."
+      return get_analyse_result(client, prompt, global_prompt)
+  
+  
+  def contains_chinese(text):
+      pattern = re.compile(r'[\u4e00-\u9fff]')
+      match = pattern.search(text)
+      return match is not None
+  
+  
+  if __name__ == "__main__":
+      print("Starting webserver...")
+      uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+  
+  </file>
+  
+  <file name="react-native/ios/SwiftChat/main.m">
+  #import <UIKit/UIKit.h>
+  
+  #import "AppDelegate.h"
+  
+  int main(int argc, char *argv[])
+  {
+    @autoreleasepool {
+      return UIApplicationMain(argc, argv, nil, NSStringFromClass([AppDelegate class]));
+    }
+  }
+  
+  </file>
+  </tool>
+</message>
+
+# Tools:
+
+# Response:
+
+ChatResponse { aiMessage = AiMessage { text = "Based on the provided files, here are all the main programs, executables, or entry points in this project that might need debugging:
+
+## Main Entry Points
+
+### 1. React Native Application Entry Point
+**File:** `react-native/index.js`
+- **Main component:** `App` (imported from `./src/App`)
+- **Registration:** `AppRegistry.registerComponent('BropertyAi', () => App)`
+- This is the primary entry point for the React Native application
+
+### 2. Python FastAPI Server Entry Point
+**File:** `server/src/main.py`
+- **Main function:** `if __name__ == "__main__":` block at the end
+- **Server startup:** `uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))`
+- This is the main server application that handles API requests
+
+### 3. iOS Native Entry Point
+**File:** `react-native/ios/SwiftChat/main.m`
+- **Function:** `int main(int argc, char *argv[])`
+- **Delegates to:** `AppDelegate` class via `UIApplicationMain`
+- This is the iOS-specific native entry point
+
+## Package.json Scripts (Executable Commands)
+
+**File:** `react-native/package.json`
+
+### Development Scripts:
+- `"start": "react-native start"` - Metro bundler entry point
+- `"android": "react-native run-android"` - Android app launcher
+- `"ios": "react-native run-ios"` - iOS app launcher
+
+### Build Scripts:
+- `"build:ios": "cd ios && xcodebuild -workspace BropertyAi.xcworkspace -scheme BropertyAi..."` - iOS build process
+
+### Testing/Quality Scripts:
+- `"test": "jest"` - Test runner entry point
+- `"lint": "npx eslint ."` - Linting process
+- `"format": "npx prettier --check '*.{js,ts}'"` - Code formatting check
+
+## Key Application Details
+
+### React Native App:
+- **App Name:** "BropertyAi" 
+- **Version:** "2.4.0"
+- **Main App Component:** Located at `./src/App` (referenced in index.js)
+
+### FastAPI Server:
+- **Port:** Configurable via PORT environment variable (default: 8080)
+- **Host:** "0.0.0.0" (all interfaces)
+- **Framework:** FastAPI with uvicorn server
+- **Main app instance:** `app = FastAPI()`
+
+These entry points represent the primary locations where debugging efforts should be focused, as they control the application startup and execution flow." reasoningContent = null toolExecutionRequests = [] }, metadata = OpenAiChatResponseMetadata{id='chatcmpl-d4de34b6-736e-46c1-a636-a00d98fcf13b', modelName='claude-sonnet-4-20250514', tokenUsage=OpenAiTokenUsage { inputTokenCount = 7559, inputTokensDetails = OpenAiTokenUsage.InputTokensDetails { cachedTokens = 0 }, outputTokenCount = 638, outputTokensDetails = OpenAiTokenUsage.OutputTokensDetails { reasoningTokens = 0 }, totalTokenCount = 8197 }, finishReason=STOP, created=1756791164, serviceTier='null', systemFingerprint='null'} }
